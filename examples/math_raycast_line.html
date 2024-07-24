@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>t3d - 3dtiles</title>
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link type="text/css" rel="stylesheet" href="main.css">
+</head>
+<body>
+	<div id="info">
+		<a href="" target="_blank">t3d</a> - Raycasting for line segment<br/>
+		The resource 'ayutthaya' is sourced from <a href="https://ebeaufay.github.io/ThreedTilesViewer.github.io/" target="_blank">jdultra.com</a>
+		<div id="stats_container"></div>
+	</div>
+
+	<script src="./libs/nanobar.min.js"></script>
+
+	<!-- Import maps polyfill -->
+    <!-- Remove this when import maps will be widely supported -->
+    <script async src="./libs/es-module-shims.js"></script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "t3d": "./libs/t3d/build/t3d.module.js",
+                "t3d/addons/": "./libs/t3d/examples/jsm/",
+				"t3d-3dtiles": "../build/t3d.3dtiles.module.js"
+            }
+        }
+    </script>
+
+	<script type="module">
+		import * as t3d from 't3d';
+		import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
+		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
+		import { TransformControls } from 't3d/addons/controls/TransformControls.js';
+		import { Raycaster } from 't3d/addons/Raycaster.js';
+
+		import { Tiles3D } from 't3d-3dtiles';
+		import {
+			Tiles3DDebugger,
+			NONE,
+			SCREEN_ERROR,
+			GEOMETRIC_ERROR,
+			DISTANCE,
+			DEPTH,
+			RELATIVE_DEPTH,
+			IS_LEAF,
+			RANDOM_COLOR,
+			RANDOM_NODE_COLOR
+		} from './jsm/Tiles3DDebugger.js';
+
+		import { GUI } from './libs/lil-gui.esm.min.js';
+		import Stats from './libs/stats.module.js';
+
+		let width = window.innerWidth || 2;
+		let height = window.innerHeight || 2;
+
+		const canvas = document.createElement('canvas');
+		canvas.width = width * window.devicePixelRatio;
+		canvas.height = height * window.devicePixelRatio;
+		canvas.style.width = width + 'px';
+		canvas.style.height = height + 'px';
+		document.body.appendChild(canvas);
+
+		const forwardRenderer = new ForwardRenderer(canvas);
+		forwardRenderer.setClearColor(0.6, 0.7, 0.8, 1);
+
+		const scene = new t3d.Scene();
+
+		const ambientLight = new t3d.AmbientLight(0xffffff, 0.2);
+		scene.add(ambientLight);
+
+		const directionalLight = new t3d.DirectionalLight(0xffffff, 0.8);
+		directionalLight.position.set(20, 30, 40);
+		directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+		scene.add(directionalLight);
+
+		const camera = new t3d.Camera();
+		camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+		camera.position.set(120, 80, 120);
+		camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 10000);
+		scene.add(camera);
+
+		const controller = new OrbitControls(camera, canvas);
+		controller.enablePan = true;
+		controller.minDistance = 1;
+		controller.maxDistance = 10000;
+
+		// Create 3D tiles
+
+		const offsetGroup = new t3d.Object3D();
+		scene.add(offsetGroup);
+
+		const tiles3D = new Tiles3D('https://storage.googleapis.com/ogc-3d-tiles/ayutthaya/tiledWithSkirts/tileset.json');
+
+		const dracoLoader = new DRACOLoader();
+		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
+		tiles3D.setDRACOLoader(dracoLoader);
+		
+		tiles3D.addCamera(camera);
+		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+		tiles3D.addEventListener('TileSetLoaded', ({ json, url }) => {
+			if (url !== tiles3D.rootURL) return;
+			offsetGroup.add(tiles3D);
+			offsetGroup.euler.x = -Math.PI / 2;
+		});
+
+		const tilesDebugger = new Tiles3DDebugger(tiles3D);
+		tilesDebugger.helper.sphereGroup.visible = false;
+		tilesDebugger.helper.boxGroup.visible = false;
+
+		// Ray casting
+
+		class LineSegment extends t3d.Object3D {
+
+			constructor() {
+				super();
+
+				const boxGeometry = new t3d.SphereGeometry(1);
+
+				this.start = new t3d.Mesh(boxGeometry, new t3d.BasicMaterial());
+				this.start.scale.setScalar(1);
+				this.add(this.start);
+
+				this.end = new t3d.Mesh(boxGeometry, new t3d.BasicMaterial());
+				this.end.scale.setScalar(1);
+				this.add(this.end);
+
+				const lineArray = new Float32Array([0, 0, 0, 0, 0, 0]);
+				const lineGeometry = new t3d.Geometry();
+				lineGeometry.addAttribute('a_Position', new t3d.Attribute(new t3d.Buffer(lineArray, 3)));
+				const lineMaterial = new t3d.BasicMaterial();
+				lineMaterial.drawMode = t3d.DRAW_MODE.LINES;
+				this.line = new t3d.Mesh(lineGeometry, lineMaterial);
+				this.add(this.line);
+
+				this._ray = new t3d.Ray();
+				this._points = [this.start, this.end];
+
+				this.start.material.diffuse.setHex(0x00ffff);
+				this.end.material.diffuse.setHex(0x00ffff);
+			}
+
+			getPoints() {
+				return this._points;
+			}
+
+			getLength() {
+				return this.start.position.distanceTo(this.end.position);
+			}
+
+			getRay() {
+				this._ray.origin.copy(this.start.position);
+				this._ray.direction.subVectors(this.end.position, this.start.position).normalize();
+				return this._ray;
+			}
+
+			getRayInverse() {
+				this._ray.origin.copy(this.end.position);
+				this._ray.direction.subVectors(this.start.position, this.end.position).normalize();
+				return this._ray;
+			}
+
+			syncLine() {
+				const lineBuffer = this.line.geometry.attributes.a_Position.buffer;
+				const lineArray = lineBuffer.array;
+				this.start.position.toArray(lineArray, 0);
+				this.end.position.toArray(lineArray, 3);
+				lineBuffer.version++;
+			}
+
+			highlightLine(value) {
+				this.line.material.diffuse.setHex(value ? 0xff0000 : 0x00ff00);
+			}
+		
+		}
+		
+		let timing = 0;
+		function doRaycast(force) {
+			if (!force && (new Date().getTime() - timing < 100)) return;
+			timing = new Date().getTime();
+
+			let intersects = [];
+
+			const ray = lineSegment.getRay();
+			tiles3D.raycast(ray, intersects);
+			const rayInverse = lineSegment.getRayInverse();
+			tiles3D.raycast(rayInverse, intersects); // TODO intersect with segment
+
+			const segmentLength = lineSegment.getLength();
+			intersects = intersects.filter(intersect => {
+				return segmentLength - intersect.distance > 0;
+			});
+
+			if (intersects.length > 0) {
+				lineSegment.highlightLine(true);
+			} else {
+				lineSegment.highlightLine(false);
+			}
+
+			clearIntersectPoints();
+			showIntersectPoints(intersects);
+		}
+
+		const intersectPointContainer = new t3d.Object3D();
+		scene.add(intersectPointContainer);
+		const intersectPointPool = [];
+		function clearIntersectPoints() {
+			intersectPointContainer.children.slice(0).forEach(point => {
+				intersectPointPool.push(point);
+				intersectPointContainer.remove(point);
+			});
+		}
+		function showIntersectPoints(intersects) {
+			intersects.forEach(intersect => {
+				const point = intersectPointPool.pop() || createIntersectPoint();
+				point.position.copy(intersect.point);
+				intersectPointContainer.add(point);
+			});
+		}
+
+		function createIntersectPoint() {
+			const material = new t3d.BasicMaterial();
+			material.diffuse.setHex(0xffff00);
+			const geometry = new t3d.SphereGeometry(0.4);
+			return new t3d.Mesh(geometry, material);
+		}
+
+		const lineSegment = new LineSegment();
+		lineSegment.start.position.set(-30, 20, 20);
+		lineSegment.end.position.set(0, 10, -20);
+		lineSegment.syncLine();
+		scene.add(lineSegment);
+
+		lineSegment.start.updateMatrix();
+		camera.updateMatrix();
+		const transformControls = new TransformControls(camera, canvas);
+		transformControls.size = 0.8;
+		scene.add(transformControls);
+		transformControls.group.addObject(lineSegment.start);
+
+		transformControls.onDragStart = function() {
+			controller.enabled = false;
+		};
+
+		transformControls.onDragEnd = function() {
+			controller.enabled = true;
+			doRaycast(false);
+		};
+
+		transformControls.onDrag = function() {
+			lineSegment.syncLine();
+			doRaycast();
+		};
+
+		const raycaster = new Raycaster();
+		const mouse = new t3d.Vector2();
+
+		document.addEventListener('mousedown', event => {
+			mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+			mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+			raycaster.setFromCamera(mouse, camera);
+
+			const array = raycaster.intersectObjects(lineSegment.getPoints(), false);
+			if (array.length) {
+				const object = array[0].object;
+				transformControls.group.reset();
+				transformControls.group.addObject(object);
+			}
+		});
+
+		tiles3D.addEventListener('TileLoaded', ({ scene, tile, visible }) => {
+			doRaycast();
+		});
+
+		// GUI
+
+		const gui = new GUI();
+
+		const tileOptions = gui.addFolder('Tiles Options');
+		tileOptions.add(tiles3D, 'errorTarget', 0, 100, 1);
+		tileOptions.open();
+
+		const debugFolder = gui.addFolder('Tiles Debug');
+		debugFolder.add(tilesDebugger.helper.boxGroup, 'visible').name('displayBoxBounds');
+		debugFolder.add(tilesDebugger.helper.sphereGroup, 'visible').name('displaySphereBounds');
+		debugFolder.add(tilesDebugger, 'colorMode', {
+			NONE,
+			SCREEN_ERROR,
+			GEOMETRIC_ERROR,
+			DISTANCE,
+			DEPTH,
+			RELATIVE_DEPTH,
+			IS_LEAF,
+			RANDOM_COLOR,
+			RANDOM_NODE_COLOR
+		});
+		debugFolder.open();
+
+		const statsContainer = document.getElementById('stats_container');
+
+		const stats = new Stats();
+		stats.showPanel(0);
+		document.body.appendChild(stats.dom);
+
+		//
+
+		function loop(count) {
+			requestAnimationFrame(loop);
+
+			stats.begin();
+
+			controller.update();
+
+			transformControls.update();
+
+			tiles3D.update();
+			tilesDebugger.update();
+
+			const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
+			if (statsContainer.innerHTML !== str) {
+				statsContainer.innerHTML = str;
+			}
+
+			forwardRenderer.render(scene, camera);
+
+			stats.end();
+		}
+		requestAnimationFrame(loop);
+
+		function onWindowResize() {
+			width = window.innerWidth || 2;
+			height = window.innerHeight || 2;
+
+			camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 10000);
+
+			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+			canvas.style.width = width + 'px';
+			canvas.style.height = height + 'px';
+		}
+		window.addEventListener('resize', onWindowResize, false);
+	</script>
+</body>
+</html>

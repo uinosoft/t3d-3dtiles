@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>t3d - 3dtiles</title>
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link type="text/css" rel="stylesheet" href="main.css">
+</head>
+<body>
+	<div id="info">
+		<a href="" target="_blank">t3d</a> - Multiple Cameras Test<br/>
+		The resource 'Curiosity Dingo Gap' is sourced from <a href="https://github.com/NASA-AMMOS/3DTilesSampleData/tree/master/msl-dingo-gap" target="_blank">NASA-AMMOS/3DTilesSampleData</a>
+		<div id="stats_container"></div>
+	</div>
+
+	<script src="./libs/nanobar.min.js"></script>
+
+	<!-- Import maps polyfill -->
+    <!-- Remove this when import maps will be widely supported -->
+    <script async src="./libs/es-module-shims.js"></script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "t3d": "./libs/t3d/build/t3d.module.js",
+                "t3d/addons/": "./libs/t3d/examples/jsm/",
+				"t3d-3dtiles": "../build/t3d.3dtiles.module.js"
+            }
+        }
+    </script>
+
+	<script type="module">
+		import * as t3d from 't3d';
+		import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
+		import { CameraHelper } from 't3d/addons/objects/CameraHelper.js';
+		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
+
+		import { Tiles3D } from 't3d-3dtiles';
+		import {
+			Tiles3DDebugger,
+			NONE,
+			SCREEN_ERROR,
+			GEOMETRIC_ERROR,
+			DISTANCE,
+			DEPTH,
+			RELATIVE_DEPTH,
+			IS_LEAF,
+			RANDOM_COLOR,
+			RANDOM_NODE_COLOR
+		} from './jsm/Tiles3DDebugger.js';
+
+		import { GUI } from './libs/lil-gui.esm.min.js';
+
+		let width = window.innerWidth || 2;
+		let height = window.innerHeight || 2;
+
+		const canvas = document.createElement('canvas');
+		canvas.width = width * window.devicePixelRatio;
+		canvas.height = height * window.devicePixelRatio;
+		canvas.style.width = width + 'px';
+		canvas.style.height = height + 'px';
+		document.body.appendChild(canvas);
+
+		const forwardRenderer = new ForwardRenderer(canvas);
+		forwardRenderer.setClearColor(0.6, 0.7, 0.8, 1);
+		forwardRenderer.autoClear = false;
+
+		const scene = new t3d.Scene();
+
+		const ambientLight = new t3d.AmbientLight(0xffffff, 0.2);
+		scene.add(ambientLight);
+
+		const directionalLight = new t3d.DirectionalLight(0xffffff, 0.8);
+		directionalLight.position.set(20, 30, 40);
+		directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+		scene.add(directionalLight);
+
+		const cameras = [
+			new t3d.Vector3(80, 30, 80),
+			new t3d.Vector3(50, 200, 300),
+			new t3d.Vector3(80, 30, -80)
+		].map(position => {
+			const camera = new t3d.Camera();
+			camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+			camera.position.copy(position);
+			camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 1000);
+			scene.add(camera);
+
+			const helper = new CameraHelper(camera);
+			helper.visible = false;
+			camera.add(helper);
+
+			const controller = new OrbitControls(camera, canvas);
+			controller.enablePan = true;
+			controller.minDistance = 1;
+			controller.maxDistance = 1000;
+			controller.enabled = false;
+
+			return { camera, controller, helper };
+		});
+
+		// Create 3D tiles
+
+		const offsetGroup = new t3d.Object3D();
+		scene.add(offsetGroup);
+
+		const tiles3D = new Tiles3D('https://raw.githubusercontent.com/NASA-AMMOS/3DTilesSampleData/master/msl-dingo-gap/0528_0260184_to_s64o256_colorize/scene-tileset.json');
+
+		const dracoLoader = new DRACOLoader();
+		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
+		tiles3D.setDRACOLoader(dracoLoader);
+		
+		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+		tiles3D.addEventListener('TileSetLoaded', ({ json, url }) => {
+			if (url !== tiles3D.rootURL) return;
+			offsetGroup.add(tiles3D);
+			offsetGroup.euler.x = Math.PI / 2;
+		});
+
+		const tilesDebugger = new Tiles3DDebugger(tiles3D);
+		tilesDebugger.helper.sphereGroup.visible = false;
+
+		// GUI
+
+		const params = { camera1: true, camera2: false, camera3: false, mainCamera: 0, miniCamera: 1 };
+		const cameraOptions = { Camera1: 0, Camera2: 1, Camera3: 2 };
+
+		function setMainCamera(value) {
+			cameras.forEach((camera, index) => {
+				camera.controller.enabled = index === params.mainCamera;
+			});
+		}
+
+		setMainCamera(params.mainCamera);
+		tiles3D.addCamera(cameras[0].camera);
+
+		const gui = new GUI();
+
+		const viewsFolder = gui.addFolder('Views');
+		viewsFolder.add(params, 'mainCamera', cameraOptions).name('Main Camera').onChange(setMainCamera);
+		viewsFolder.add(params, 'miniCamera', cameraOptions).name('Mini Camera');
+
+		const activityFolder = gui.addFolder('Activation');
+		for (let i = 0; i < 3; i++) {
+			activityFolder.add(params, `camera${i + 1}`).name(`Camera ${i + 1}`).onChange(value => {
+				if (value) {
+					tiles3D.addCamera(cameras[i].camera);
+				} else {
+					tiles3D.removeCamera(cameras[i].camera);
+				}
+			});
+		}
+
+		const debugFolder = gui.addFolder('Debug');
+		debugFolder.add(tilesDebugger.helper.boxGroup, 'visible').name('displayBoxBounds');
+		debugFolder.add(tilesDebugger.helper.sphereGroup, 'visible').name('displaySphereBounds');
+		debugFolder.add(tilesDebugger, 'colorMode', {
+			NONE,
+			SCREEN_ERROR,
+			GEOMETRIC_ERROR,
+			DISTANCE,
+			DEPTH,
+			RELATIVE_DEPTH,
+			IS_LEAF,
+			RANDOM_COLOR,
+			RANDOM_NODE_COLOR
+		});
+		debugFolder.close();
+
+		const statsContainer = document.getElementById('stats_container');
+
+		//
+
+		function loop(count) {
+			requestAnimationFrame(loop);
+
+			cameras.forEach(camera => camera.controller.update());
+
+			tiles3D.update();
+			tilesDebugger.update();
+
+			const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
+			if (statsContainer.innerHTML !== str) {
+				statsContainer.innerHTML = str;
+			}
+
+			cameras.forEach((camera, i) => camera.helper.visible = i !== params.mainCamera && params[`camera${i + 1}`]);
+			cameras[params.mainCamera].camera.rect.set(0, 0, 1, 1);
+			forwardRenderer.clear(true, true, true);
+			forwardRenderer.render(scene, cameras[params.mainCamera].camera);
+
+			cameras.forEach((camera, i) => camera.helper.visible = i !== params.miniCamera && params[`camera${i + 1}`]);
+			cameras[params.miniCamera].camera.rect.set(0, 0, 0.25, 0.25);
+			forwardRenderer.clear(false, true, true);
+			forwardRenderer.render(scene, cameras[params.miniCamera].camera);
+		}
+		requestAnimationFrame(loop);
+
+		function onWindowResize() {
+			width = window.innerWidth || 2;
+			height = window.innerHeight || 2;
+
+			cameras.forEach(camera => {
+				camera.camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 1000);
+				camera.helper.update();
+			});
+
+			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+			canvas.style.width = width + 'px';
+			canvas.style.height = height + 'px';
+		}
+		window.addEventListener('resize', onWindowResize, false);
+	</script>
+</body>
+</html>

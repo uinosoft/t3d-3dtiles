@@ -1,0 +1,21 @@
+{
+	"basic": [
+		"basic_house",
+		"basic_discrete_lod",
+		"basic_ion"
+	],
+	"math": [
+		"math_raycast_pick",
+		"math_raycast_line",
+		"math_intersect_path"
+	],
+	"advance": [
+		"advance_multiple_cameras"
+	],
+	"loader": [
+		"loader_b3dm",
+		"loader_i3dm",
+		"loader_pnts",
+		"loader_gltf"
+	]
+}

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>t3d - 3dtiles</title>
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link type="text/css" rel="stylesheet" href="main.css">
+</head>
+<body>
+	<div id="info">
+		<a href="" target="_blank">t3d</a> - Simple House<br/>
+		The resource 'house' is sourced from <a href="https://storage.googleapis.com/jdultra-website/occlusion/index.html" target="_blank">jdultra.com</a>
+		<div id="stats_container"></div>
+	</div>
+
+	<script src="./libs/nanobar.min.js"></script>
+
+	<!-- Import maps polyfill -->
+    <!-- Remove this when import maps will be widely supported -->
+    <script async src="./libs/es-module-shims.js"></script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "t3d": "./libs/t3d/build/t3d.module.js",
+                "t3d/addons/": "./libs/t3d/examples/jsm/",
+				"t3d-3dtiles": "../build/t3d.3dtiles.module.js"
+            }
+        }
+    </script>
+
+	<script type="module">
+		import * as t3d from 't3d';
+		import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
+		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
+
+		import { Tiles3D } from 't3d-3dtiles';
+		import {
+			Tiles3DDebugger,
+			NONE,
+			SCREEN_ERROR,
+			GEOMETRIC_ERROR,
+			DISTANCE,
+			DEPTH,
+			RELATIVE_DEPTH,
+			IS_LEAF,
+			RANDOM_COLOR,
+			RANDOM_NODE_COLOR
+		} from './jsm/Tiles3DDebugger.js';
+
+		import { GUI } from './libs/lil-gui.esm.min.js';
+
+		let width = window.innerWidth || 2;
+		let height = window.innerHeight || 2;
+
+		const canvas = document.createElement('canvas');
+		canvas.width = width * window.devicePixelRatio;
+		canvas.height = height * window.devicePixelRatio;
+		canvas.style.width = width + 'px';
+		canvas.style.height = height + 'px';
+		document.body.appendChild(canvas);
+
+		const forwardRenderer = new ForwardRenderer(canvas);
+		forwardRenderer.setClearColor(0.6, 0.7, 0.8, 1);
+
+		const scene = new t3d.Scene();
+
+		const ambientLight = new t3d.AmbientLight(0xffffff, 0.3);
+		scene.add(ambientLight);
+
+		const directionalLight = new t3d.DirectionalLight(0xffffff, 0.4);
+		directionalLight.position.set(20, 30, 40);
+		directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+		scene.add(directionalLight);
+
+		const camera = new t3d.Camera();
+		camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.GAMMA;
+		camera.gammaFactor = 2;
+		camera.position.set(-32.82152883962877, 17.252733670611747, 28.792587210500955);
+		camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 1000);
+		scene.add(camera);
+
+		const controller = new OrbitControls(camera, canvas);
+		controller.enablePan = true;
+		controller.minDistance = 1;
+		controller.maxDistance = 1000;
+
+		// Create 3D tiles
+
+		const offsetGroup = new t3d.Object3D();
+		scene.add(offsetGroup);
+
+		const tilesetUri = 'https://storage.googleapis.com/ogc-3d-tiles/house3/tileset.json';
+		const tiles3D = new Tiles3D(tilesetUri);
+
+		const dracoLoader = new DRACOLoader();
+		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
+		tiles3D.setDRACOLoader(dracoLoader);
+
+		tiles3D.errorThreshold = 60;
+		tiles3D.maxDepth = 15;
+
+		tiles3D.addCamera(camera);
+		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+		tiles3D.addEventListener('TileSetLoaded', ({ json, url }) => {
+			if (url !== tiles3D.rootURL) return;
+			offsetGroup.add(tiles3D);
+			offsetGroup.euler.x = Math.PI;
+		});
+
+		const tilesDebugger = new Tiles3DDebugger(tiles3D);
+		tilesDebugger.helper.sphereGroup.visible = false;
+		
+		// GUI
+
+		const gui = new GUI();
+
+		const tileOptions = gui.addFolder('Tiles Options');
+		tileOptions.add(tiles3D, 'loadSiblings');
+		tileOptions.add(tiles3D, 'stopAtEmptyTiles');
+		tileOptions.add(tiles3D, 'displayActiveTiles');
+		tileOptions.add(tiles3D, 'errorTarget', 0, 20, 1);
+		tileOptions.add(tiles3D, 'errorThreshold', 0, 1000, 1);
+		tileOptions.add(tiles3D, 'maxDepth', 1, 100, 1);
+		tileOptions.open();
+
+		const debugFolder = gui.addFolder('Tiles Debug');
+		debugFolder.add(tilesDebugger.helper.boxGroup, 'visible').name('displayBoxBounds');
+		debugFolder.add(tilesDebugger.helper.sphereGroup, 'visible').name('displaySphereBounds');
+		debugFolder.add(tilesDebugger, 'colorMode', {
+			NONE,
+			SCREEN_ERROR,
+			GEOMETRIC_ERROR,
+			DISTANCE,
+			DEPTH,
+			RELATIVE_DEPTH,
+			IS_LEAF,
+			RANDOM_COLOR,
+			RANDOM_NODE_COLOR
+		});
+		debugFolder.open();
+
+		const statsContainer = document.getElementById('stats_container');
+
+		//
+
+		function loop(count) {
+			requestAnimationFrame(loop);
+
+			controller.update();
+
+			tiles3D.update();
+			tilesDebugger.update();
+
+			const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
+			if (statsContainer.innerHTML !== str) {
+				statsContainer.innerHTML = str;
+			}
+
+			forwardRenderer.render(scene, camera);
+		}
+		requestAnimationFrame(loop);
+
+		function onWindowResize() {
+			width = window.innerWidth || 2;
+			height = window.innerHeight || 2;
+
+			camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 1000);
+
+			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+			canvas.style.width = width + 'px';
+			canvas.style.height = height + 'px';
+		}
+		window.addEventListener('resize', onWindowResize, false);
+	</script>
+</body>
+
+</html>

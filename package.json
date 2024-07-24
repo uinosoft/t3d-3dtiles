@@ -1,0 +1,57 @@
+{
+  "name": "t3d-3dtiles",
+  "version": "0.0.3",
+  "description": "An extension for 3D Tiles based on t3d.js",
+  "type": "module",
+  "main": "./build/t3d.3dtiles.js",
+  "module": "./build/t3d.3dtiles.module.js",
+  "exports": {
+    ".": "./build/t3d.3dtiles.module.js",
+    "./src/*": "./src/*",
+    "./addons/*": "./examples/jsm/*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uinosoft/t3d-3dtiles"
+  },
+  "files": [
+    "build",
+    "examples/jsm",
+    "LICENSE",
+    "package.json",
+    "README.md",
+    "src"
+  ],
+  "keywords": [
+    "3dtiles",
+    "t3d",
+    "javascript",
+    "3d",
+    "webgl",
+    "webgl2",
+    "canvas",
+    "html5"
+  ],
+  "author": "uino",
+  "license": "BSD-3-Clause",
+  "devDependencies": {
+    "@babel/core": "^7.18.10",
+    "@babel/preset-env": "^7.18.10",
+    "@rollup/plugin-babel": "^6.0.3",
+    "@rollup/plugin-terser": "^0.4.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-html": "^8.1.1",
+    "eslint-plugin-import": "^2.29.0",
+    "rollup": "^4.18.0"
+  },
+  "peerDependencies": {
+    "t3d": "^0.2.7"
+  },
+  "scripts": {
+    "dev": "rollup -w -c",
+    "build": "rollup -c",
+    "lint": "eslint src",
+    "lint-fix": "eslint src --fix",
+    "lint-examples": "eslint examples --ext .html"
+  }
+}

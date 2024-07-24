@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<title>t3d - 3dtiles</title>
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link type="text/css" rel="stylesheet" href="main.css">
+</head>
+
+<body>
+	<div id="info">
+		<a href="" target="_blank">t3d</a> - Path Intersection<br/>
+		The resource 'ayutthaya' is sourced from <a href="https://ebeaufay.github.io/ThreedTilesViewer.github.io/" target="_blank">jdultra.com</a>
+		<div id="stats_container"></div>
+	</div>
+
+	<script src="./libs/nanobar.min.js"></script>
+
+	<!-- Import maps polyfill -->
+	<!-- Remove this when import maps will be widely supported -->
+	<script async src="./libs/es-module-shims.js"></script>
+
+	<script type="importmap">
+        {
+            "imports": {
+                "t3d": "./libs/t3d/build/t3d.module.js",
+                "t3d/addons/": "./libs/t3d/examples/jsm/",
+				"t3d-3dtiles": "../build/t3d.3dtiles.module.js"
+            }
+        }
+    </script>
+
+	<script type="module">
+		import * as t3d from 't3d';
+		import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
+		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
+		import { TransformControls } from 't3d/addons/controls/TransformControls.js';
+		import { Raycaster } from 't3d/addons/Raycaster.js';
+		import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
+
+		import { Tiles3D, OBB } from 't3d-3dtiles';
+		
+		import {
+			Tiles3DDebugger,
+			NONE,
+			SCREEN_ERROR,
+			GEOMETRIC_ERROR,
+			DISTANCE,
+			DEPTH,
+			RELATIVE_DEPTH,
+			IS_LEAF,
+			RANDOM_COLOR,
+			RANDOM_NODE_COLOR
+		} from './jsm/Tiles3DDebugger.js';
+		import { LineSegment } from './jsm/math/LineSegment.js';
+		import { getIntersectWithPath } from './jsm/math/Intersects.js';
+		import { OBBHelper } from './jsm/helpers/OBBHelper.js';
+		import { LineSegmentHelper } from './jsm/helpers/LineSegmentHelper.js';
+
+		import { GUI } from './libs/lil-gui.esm.min.js';
+		import Stats from './libs/stats.module.js';
+
+		let width = window.innerWidth || 2;
+		let height = window.innerHeight || 2;
+
+		const canvas = document.createElement('canvas');
+		canvas.width = width * window.devicePixelRatio;
+		canvas.height = height * window.devicePixelRatio;
+		canvas.style.width = width + 'px';
+		canvas.style.height = height + 'px';
+		document.body.appendChild(canvas);
+
+		const forwardRenderer = new ForwardRenderer(canvas);
+		forwardRenderer.setClearColor(0.6, 0.7, 0.8, 1);
+
+		const scene = new t3d.Scene();
+
+		const ambientLight = new t3d.AmbientLight(0xffffff, 0.2);
+		scene.add(ambientLight);
+
+		const directionalLight = new t3d.DirectionalLight(0xffffff, 0.8);
+		directionalLight.position.set(20, 30, 40);
+		directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+		scene.add(directionalLight);
+
+		const camera = new t3d.Camera();
+		camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+		camera.position.set(120, 80, 120);
+		camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 10000);
+		scene.add(camera);
+
+		const controller = new OrbitControls(camera, canvas);
+		controller.enablePan = true;
+		controller.minDistance = 1;
+		controller.maxDistance = 10000;
+
+		// Create 3D tiles
+
+		const offsetGroup = new t3d.Object3D();
+		scene.add(offsetGroup);
+
+		const tiles3D = new Tiles3D('https://storage.googleapis.com/ogc-3d-tiles/ayutthaya/tiledWithSkirts/tileset.json');
+
+		const dracoLoader = new DRACOLoader();
+		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
+		tiles3D.setDRACOLoader(dracoLoader);
+
+		tiles3D.addCamera(camera);
+		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+		tiles3D.addEventListener('TileSetLoaded', ({ json, url }) => {
+			if (url !== tiles3D.rootURL) return;
+			offsetGroup.add(tiles3D);
+			offsetGroup.euler.x = -Math.PI / 2;
+		});
+
+		const tilesDebugger = new Tiles3DDebugger(tiles3D);
+		tilesDebugger.helper.sphereGroup.visible = false;
+		tilesDebugger.helper.boxGroup.visible = false;
+
+		// Path, Path Helpers and Controls
+
+		const params = { thresholdDistance: 10, minDistance: '' };
+
+		const lineSegment = new LineSegment(new t3d.Vector3(-10, 20, 20), new t3d.Vector3(0, 10, -20));
+		const lineSegmentHelper = new LineSegmentHelper(lineSegment, 1, undefined, 0x00ff00);
+		scene.add(lineSegmentHelper);
+
+		const obbHelper = new OBBHelper(new OBB());
+		lineSegment.getOBB(params.thresholdDistance, obbHelper.obb);
+		obbHelper.visible = false;
+		scene.add(obbHelper);
+		
+		lineSegmentHelper.updateMatrix();
+		camera.updateMatrix();
+		const transformControls = new TransformControls(camera, canvas);
+		transformControls.size = 0.8;
+		transformControls.group.addObject(lineSegmentHelper.start);
+		scene.add(transformControls);
+
+		transformControls.onDragStart = function() {
+			controller.enabled = false;
+		};
+
+		transformControls.onDragEnd = function() {
+			controller.enabled = true;
+		};
+
+		transformControls.onDrag = function() {
+			// apply the transformation to the line segment
+			lineSegment.startPoint.copy(lineSegmentHelper.start.position);
+			lineSegment.endPoint.copy(lineSegmentHelper.end.position);
+
+			// update obb helper
+			lineSegment.getOBB(params.thresholdDistance, obbHelper.obb);
+		
+			doIntersect();
+		};
+
+		const raycaster = new Raycaster();
+		const mouse = new t3d.Vector2();
+
+		document.addEventListener('mousedown', event => {
+			mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+			mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+			raycaster.setFromCamera(mouse, camera);
+
+			const array = raycaster.intersectObjects(lineSegmentHelper.children, false);
+			if (array.length) {
+				const object = array[0].object;
+				transformControls.group.reset();
+				transformControls.group.addObject(object);
+			}
+		});
+
+		tiles3D.addEventListener('TileLoaded', ({ scene, tile, visible }) => {
+			doIntersect();
+		});
+
+		// Intersect
+
+		const distanceHelper = new LineSegmentHelper(new LineSegment(), 0.4);
+		scene.add(distanceHelper);
+
+		const sphereHelper = new SphereHelper(new t3d.Sphere());
+		sphereHelper.visible = false;
+		scene.add(sphereHelper);
+
+		let timing = 0;
+		function doIntersect(force) {
+			if (!force && (new Date().getTime() - timing < 100)) return;
+			timing = new Date().getTime();
+		
+			const intersect = getIntersectWithPath(tiles3D, lineSegment, params.thresholdDistance);
+
+			if (intersect) {
+				lineSegmentHelper.setLineColor(0xff0000);
+				obbHelper.setColor(0xff0000);
+
+				distanceHelper.visible = true;
+				distanceHelper.lineSegment.startPoint.fromArray(intersect.startPoint);
+				distanceHelper.lineSegment.endPoint.fromArray(intersect.endPoint);
+
+				params.minDistance = intersect.distance.toFixed(2);
+
+				intersect.tile.cached.boundingVolume.getBoundingSphere(sphereHelper.sphere)
+					.applyMatrix4(tiles3D.worldMatrix);
+				scene.add(sphereHelper);
+			} else {
+				lineSegmentHelper.setLineColor(0x00ff00);
+				obbHelper.setColor(0x00ff00);
+		
+				distanceHelper.visible = false;
+		
+				params.minDistance = `>${params.thresholdDistance}`;
+
+				scene.remove(sphereHelper);
+			}
+		}
+
+		// GUI
+
+		const gui = new GUI();
+
+		gui.add(params, 'minDistance').listen().disable();
+		gui.add(params, 'thresholdDistance', 0, 50, 0.1).onChange(() => {
+			lineSegment.getOBB(params.thresholdDistance, obbHelper.obb);
+			doIntersect();
+		});
+		gui.add(sphereHelper, 'visible').name('tileSphere');
+		gui.add(obbHelper, 'visible').name('pathBox');
+		
+		const tileOptions = gui.addFolder('Tiles Options');
+		tileOptions.add(tiles3D, 'errorTarget', 0, 100, 1);
+		tileOptions.close();
+
+		const debugFolder = gui.addFolder('Tiles Debug');
+		debugFolder.add(tilesDebugger.helper.boxGroup, 'visible').name('displayBoxBounds');
+		debugFolder.add(tilesDebugger.helper.sphereGroup, 'visible').name('displaySphereBounds');
+		debugFolder.add(tilesDebugger, 'colorMode', {
+			NONE,
+			SCREEN_ERROR,
+			GEOMETRIC_ERROR,
+			DISTANCE,
+			DEPTH,
+			RELATIVE_DEPTH,
+			IS_LEAF,
+			RANDOM_COLOR,
+			RANDOM_NODE_COLOR
+		});
+		debugFolder.close();
+
+		const statsContainer = document.getElementById('stats_container');
+
+		const stats = new Stats();
+		stats.showPanel(0);
+		document.body.appendChild(stats.dom);
+
+		//
+
+		function loop(count) {
+			requestAnimationFrame(loop);
+
+			stats.begin();
+
+			tiles3D.update();
+			controller.update();
+
+			transformControls.update();
+
+			tilesDebugger.update();
+
+			const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
+			if (statsContainer.innerHTML !== str) {
+				statsContainer.innerHTML = str;
+			}
+
+			forwardRenderer.render(scene, camera);
+
+			stats.end();
+		}
+		requestAnimationFrame(loop);
+
+		function onWindowResize() {
+			width = window.innerWidth || 2;
+			height = window.innerHeight || 2;
+
+			camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 10000);
+
+			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+			canvas.style.width = width + 'px';
+			canvas.style.height = height + 'px';
+		}
+		window.addEventListener('resize', onWindowResize, false);
+	</script>
+</body>
+
+</html>

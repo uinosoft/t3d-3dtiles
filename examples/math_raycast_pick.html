@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>t3d - 3dtiles</title>
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link type="text/css" rel="stylesheet" href="main.css">
+</head>
+<body>
+	<div id="info">
+		<a href="" target="_blank">t3d</a> - Raycasting for picking<br/>
+		The resource 'ayutthaya' is sourced from <a href="https://ebeaufay.github.io/ThreedTilesViewer.github.io/" target="_blank">jdultra.com</a>
+		<div id="stats_container"></div>
+	</div>
+
+	<script src="./libs/nanobar.min.js"></script>
+
+	<!-- Import maps polyfill -->
+    <!-- Remove this when import maps will be widely supported -->
+    <script async src="./libs/es-module-shims.js"></script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "t3d": "./libs/t3d/build/t3d.module.js",
+                "t3d/addons/": "./libs/t3d/examples/jsm/",
+				"t3d-3dtiles": "../build/t3d.3dtiles.module.js"
+            }
+        }
+    </script>
+
+	<script type="module">
+		import * as t3d from 't3d';
+		import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
+		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
+		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
+		import { Raycaster } from 't3d/addons/Raycaster.js';
+
+		import { Tiles3D } from 't3d-3dtiles';
+		import {
+			Tiles3DDebugger,
+			NONE,
+			SCREEN_ERROR,
+			GEOMETRIC_ERROR,
+			DISTANCE,
+			DEPTH,
+			RELATIVE_DEPTH,
+			IS_LEAF,
+			RANDOM_COLOR,
+			RANDOM_NODE_COLOR
+		} from './jsm/Tiles3DDebugger.js';
+
+		import { GUI } from './libs/lil-gui.esm.min.js';
+		import Stats from './libs/stats.module.js';
+
+		let width = window.innerWidth || 2;
+		let height = window.innerHeight || 2;
+
+		const canvas = document.createElement('canvas');
+		canvas.width = width * window.devicePixelRatio;
+		canvas.height = height * window.devicePixelRatio;
+		canvas.style.width = width + 'px';
+		canvas.style.height = height + 'px';
+		document.body.appendChild(canvas);
+
+		const forwardRenderer = new ForwardRenderer(canvas);
+		forwardRenderer.setClearColor(0.6, 0.7, 0.8, 1);
+
+		const scene = new t3d.Scene();
+
+		const ambientLight = new t3d.AmbientLight(0xffffff, 0.2);
+		scene.add(ambientLight);
+
+		const directionalLight = new t3d.DirectionalLight(0xffffff, 0.8);
+		directionalLight.position.set(20, 30, 40);
+		directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
+		scene.add(directionalLight);
+
+		const camera = new t3d.Camera();
+		camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+		camera.position.set(120, 80, 120);
+		camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 10000);
+		scene.add(camera);
+
+		const controller = new OrbitControls(camera, canvas);
+		controller.enablePan = true;
+		controller.minDistance = 1;
+		controller.maxDistance = 10000;
+
+		// Create 3D tiles
+
+		const offsetGroup = new t3d.Object3D();
+		scene.add(offsetGroup);
+
+		const tiles3D = new Tiles3D('https://storage.googleapis.com/ogc-3d-tiles/ayutthaya/tiledWithSkirts/tileset.json');
+
+		const dracoLoader = new DRACOLoader();
+		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
+		tiles3D.setDRACOLoader(dracoLoader);
+		
+		tiles3D.addCamera(camera);
+		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+		tiles3D.addEventListener('TileSetLoaded', ({ json, url }) => {
+			if (url !== tiles3D.rootURL) return;
+			offsetGroup.add(tiles3D);
+			offsetGroup.euler.x = -Math.PI / 2;
+		});
+
+		const tilesDebugger = new Tiles3DDebugger(tiles3D);
+		tilesDebugger.helper.sphereGroup.visible = false;
+		tilesDebugger.helper.boxGroup.visible = false;
+
+		// Ray casting
+
+		const raycaster = new Raycaster();
+		const mouse = new t3d.Vector2();
+		const rayIntersection = createRayIntersection();
+
+		function onMouseDown() {
+			if (currentIntersect) {
+				const tile = currentIntersect.tile;
+				console.log({
+					distanceToCamera: tile.__distanceFromCamera,
+					geometricError: tile.geometricError,
+					screenSpaceError: tile.__error,
+					depth: tile.__depth,
+					isLeaf: tile.__isLeaf
+				});
+			}
+		}
+
+		canvas.addEventListener('mousedown', onMouseDown, false);
+
+		function onMouseMove(e) {
+			const bounds = this.getBoundingClientRect();
+			mouse.x = e.clientX - bounds.x;
+			mouse.y = e.clientY - bounds.y;
+			mouse.x = (mouse.x / bounds.width) * 2 - 1;
+			mouse.y = -(mouse.y / bounds.height) * 2 + 1;
+		}
+
+		canvas.addEventListener('mousemove', onMouseMove, false);
+
+		let currentIntersect;
+		const intersects = [];
+		const normal = new t3d.Vector3();
+		const up = new t3d.Vector3(0, 1, 0);
+		const raycastParams = { onlyFirstHit: true };
+
+		let timing = 0;
+		function raycast() {
+			if (new Date().getTime() - timing < 33) return;
+			timing = new Date().getTime();
+
+			if (!tiles3D.root) return;
+			raycaster.setFromCamera(mouse, camera);
+		
+			if (raycastParams.onlyFirstHit) {
+				currentIntersect = tiles3D.raycastFirst(raycaster.ray, intersects);
+			} else {
+				intersects.length = 0;
+				tiles3D.raycast(raycaster.ray, intersects);
+				currentIntersect = intersects[0];
+			}
+		
+			if (currentIntersect) {
+				rayIntersection.visible = true;
+				rayIntersection.position.copy(currentIntersect.point);
+
+				if (currentIntersect.face) {
+					normal.copy(currentIntersect.face.normal)
+						.transformDirection(currentIntersect.object.worldMatrix);
+					rayIntersection.lookAt(normal.add(rayIntersection.position), up);
+				}
+
+				const dist = camera.position.distanceTo(rayIntersection.position);
+				rayIntersection.scale.set(dist / 150, dist / 150, dist / 150);
+			} else {
+				rayIntersection.visible = false;
+			}
+		}
+
+		function createRayIntersection() {
+			const rayIntersect = new t3d.Object3D();
+			scene.add(rayIntersect);
+			rayIntersect.visible = false;
+
+			const rayIntersectMat = new t3d.BasicMaterial();
+			rayIntersectMat.diffuse.setHex(0xe91e63);
+		
+			const rayMesh = new t3d.Mesh(new t3d.CylinderGeometry(0.25, 0.25, 4), rayIntersectMat);
+			rayMesh.euler.x = Math.PI / 2;
+			rayMesh.position.z += 3;
+			rayIntersect.add(rayMesh);
+
+			const rayRing = new t3d.Mesh(new t3d.SphereGeometry(1), rayIntersectMat);
+			rayIntersect.add(rayRing);
+
+			return rayIntersect;
+		}
+
+		// GUI
+
+		const gui = new GUI();
+
+		const tileOptions = gui.addFolder('Tiles Options');
+		tileOptions.add(tiles3D, 'errorTarget', 0, 20, 1);
+		tileOptions.close();
+
+		const debugFolder = gui.addFolder('Tiles Debug');
+		debugFolder.add(tilesDebugger.helper.boxGroup, 'visible').name('displayBoxBounds');
+		debugFolder.add(tilesDebugger.helper.sphereGroup, 'visible').name('displaySphereBounds');
+		debugFolder.add(tilesDebugger, 'colorMode', {
+			NONE,
+			SCREEN_ERROR,
+			GEOMETRIC_ERROR,
+			DISTANCE,
+			DEPTH,
+			RELATIVE_DEPTH,
+			IS_LEAF,
+			RANDOM_COLOR,
+			RANDOM_NODE_COLOR
+		});
+		debugFolder.close();
+
+		const pickFolder = gui.addFolder('Pick');
+		pickFolder.add(raycastParams, 'onlyFirstHit').name('Only First Hit');
+
+		const statsContainer = document.getElementById('stats_container');
+
+		const stats = new Stats();
+		stats.showPanel(0);
+		document.body.appendChild(stats.dom);
+
+		//
+
+		function loop(count) {
+			requestAnimationFrame(loop);
+
+			stats.begin();
+
+			controller.update();
+
+			tiles3D.update();
+			tilesDebugger.update();
+
+			raycast();
+
+			const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
+			if (statsContainer.innerHTML !== str) {
+				statsContainer.innerHTML = str;
+			}
+
+			forwardRenderer.render(scene, camera);
+
+			stats.end();
+		}
+		requestAnimationFrame(loop);
+
+		function onWindowResize() {
+			width = window.innerWidth || 2;
+			height = window.innerHeight || 2;
+
+			camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 10000);
+
+			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+			canvas.style.width = width + 'px';
+			canvas.style.height = height + 'px';
+		}
+		window.addEventListener('resize', onWindowResize, false);
+	</script>
+</body>
+</html>
