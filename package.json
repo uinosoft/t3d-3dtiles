@@ -1,6 +1,6 @@
 {
   "name": "t3d-3dtiles",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "An extension for 3D Tiles based on t3d.js",
   "type": "module",
   "main": "./build/t3d.3dtiles.js",
