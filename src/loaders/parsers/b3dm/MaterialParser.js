@@ -3,18 +3,20 @@ import {
 	DRAW_SIDE,
 	TEXEL_ENCODING_TYPE
 } from 't3d';
-import { KHR_materials_unlit as _KHR_materials_unlit } from '../../../libs/glTF/extensions/KHR_materials_unlit.js';
-import { KHR_materials_pbrSpecularGlossiness as _KHR_materials_pbrSpecularGlossiness } from '../../../libs/glTF/extensions/KHR_materials_pbrSpecularGlossiness.js';
-import { KHR_materials_clearcoat as _KHR_materials_clearcoat } from '../../../libs/glTF/extensions/KHR_materials_clearcoat.js';
-import { KHR_texture_transform } from '../../../libs/glTF/extensions/KHR_texture_transform.js';
 import { ALPHA_MODES } from '../../../libs/glTF/Constants.js';
 
 export class MaterialParser {
 
-	static parse(context) {
+	static parse(context, loader) {
 		const { gltf, textures } = context;
 
 		if (!gltf.materials) return;
+
+		const transformExt = loader.extensions.get('KHR_texture_transform');
+		const unlitExt = loader.extensions.get('KHR_materials_unlit');
+		const pbrSpecularGlossinessExt = loader.extensions.get('KHR_materials_pbrSpecularGlossiness');
+		const clearcoatExt = loader.extensions.get('KHR_materials_clearcoat');
+		const techniquesExt = loader.extensions.get('KHR_techniques_webgl');
 
 		const materials = [];
 		for (let i = 0; i < gltf.materials.length; i++) {
@@ -34,24 +36,17 @@ export class MaterialParser {
 			const { KHR_materials_unlit, KHR_materials_pbrSpecularGlossiness, KHR_materials_clearcoat, KHR_techniques_webgl } = extensions;
 
 			let material = null;
-			if (KHR_materials_unlit) {
-				material = _KHR_materials_unlit.getMaterial();
-			} else if (KHR_materials_pbrSpecularGlossiness) {
-				material = _KHR_materials_pbrSpecularGlossiness.getMaterial();
-				_KHR_materials_pbrSpecularGlossiness.parseParams(material, KHR_materials_pbrSpecularGlossiness, textures);
-			} else if (KHR_materials_clearcoat) {
-				material = _KHR_materials_clearcoat.getMaterial();
-				_KHR_materials_clearcoat.parseParams(material, KHR_materials_clearcoat, textures);
-			} else if (KHR_techniques_webgl) { // @parser-modification - add KHR_techniques_webgl
-				material = new PBRMaterial();
-
-				const { values } = KHR_techniques_webgl;
-				const { u_diffuse } = values;
-
-				if (u_diffuse) {
-					material.diffuseMap = textures[u_diffuse.index];
-					material.diffuseMapCoord = u_diffuse.texCoord || 0;
-				}
+			if (KHR_materials_unlit && unlitExt) {
+				material = unlitExt.getMaterial();
+			} else if (KHR_materials_pbrSpecularGlossiness && pbrSpecularGlossinessExt) {
+				material = pbrSpecularGlossinessExt.getMaterial();
+				pbrSpecularGlossinessExt.parseParams(material, KHR_materials_pbrSpecularGlossiness, textures, transformExt);
+			} else if (KHR_materials_clearcoat && clearcoatExt) {
+				material = clearcoatExt.getMaterial();
+				clearcoatExt.parseParams(material, KHR_materials_clearcoat, textures);
+			} else if (KHR_techniques_webgl && techniquesExt) { // @parser-modification - add KHR_techniques_webgl
+				material = techniquesExt.getMaterial();
+				techniquesExt.parseParams(material, KHR_techniques_webgl, textures);
 			} else {
 				material = new PBRMaterial();
 			}
@@ -71,7 +66,7 @@ export class MaterialParser {
 					material.diffuseMapCoord = baseColorTexture.texCoord || 0;
 					if (material.diffuseMap) {
 						material.diffuseMap.encoding = TEXEL_ENCODING_TYPE.SRGB;
-						parseTextureTransform(material, 'diffuseMap', baseColorTexture.extensions);
+						transformExt && transformExt.handleMaterialMap(material, 'diffuseMap', baseColorTexture);
 					}
 				}
 
@@ -81,8 +76,7 @@ export class MaterialParser {
 					if (metallicRoughnessTexture) {
 						material.metalnessMap = textures[metallicRoughnessTexture.index];
 						material.roughnessMap = textures[metallicRoughnessTexture.index];
-						// parseTextureTransform(material, 'metalnessMap', metallicRoughnessTexture.extensions);
-						// parseTextureTransform(material, 'roughnessMap', metallicRoughnessTexture.extensions);
+						// metallicRoughnessTexture transform not supported yet
 					}
 				}
 			}
@@ -96,7 +90,7 @@ export class MaterialParser {
 				material.emissiveMapCoord = emissiveTexture.texCoord || 0;
 				if (material.emissiveMap) {
 					material.emissiveMap.encoding = TEXEL_ENCODING_TYPE.SRGB;
-					parseTextureTransform(material, 'emissiveMap', emissiveTexture.extensions);
+					transformExt && transformExt.handleMaterialMap(material, 'emissiveMap', emissiveTexture);
 				}
 			}
 
@@ -107,7 +101,7 @@ export class MaterialParser {
 					material.aoMapIntensity = occlusionTexture.strength;
 				}
 				if (material.aoMap) {
-					parseTextureTransform(material, 'aoMap', occlusionTexture.extensions);
+					transformExt && transformExt.handleMaterialMap(material, 'aoMap', occlusionTexture);
 				}
 			}
 
@@ -122,9 +116,7 @@ export class MaterialParser {
 						material.normalScale.set(normalTexture.scale, -normalTexture.scale);
 					}
 
-					if (material.normalMap) {
-						// parseTextureTransform(material, 'normalMap', normalTexture.extensions);
-					}
+					// normal map transform not supported yet
 				}
 			}
 
@@ -146,11 +138,4 @@ export class MaterialParser {
 		context.materials = materials;
 	}
 
-}
-
-function parseTextureTransform(material, key, extensions = {}) {
-	const extension = extensions.KHR_texture_transform;
-	if (extension) {
-		KHR_texture_transform.transform(material[key + 'Transform'], extension);
-	}
 }

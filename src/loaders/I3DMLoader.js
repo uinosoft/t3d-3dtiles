@@ -19,6 +19,11 @@ import { MaterialParser } from './parsers/i3dm/MaterialParser.js';
 import { PrimitiveParser } from './parsers/i3dm/PrimitiveParser.js';
 import { I3DMRootParser } from './parsers/i3dm/I3DMRootParser.js';
 
+import { KHR_techniques_webgl_i } from './extensions/KHR_techniques_webgl_i.js';
+import { KHR_materials_unlit_i } from './extensions/KHR_materials_unlit_i.js';
+import { KHR_materials_pbrSpecularGlossiness_i } from './extensions/KHR_materials_pbrSpecularGlossiness_i.js';
+import { KHR_materials_clearcoat_i } from './extensions/KHR_materials_clearcoat_i.js';
+
 /**
  * I3DMLoader is a loader for the I3DM format.
  */
@@ -44,6 +49,12 @@ export class I3DMLoader extends GLTFLoader {
 			AnimationParser,
 			I3DMRootParser // insert I3DMSetupParser
 		]);
+
+		this.extensions.set('KHR_techniques_webgl', KHR_techniques_webgl_i);
+
+		this.extensions.set('KHR_materials_unlit', KHR_materials_unlit_i);
+		this.extensions.set('KHR_materials_pbrSpecularGlossiness', KHR_materials_pbrSpecularGlossiness_i);
+		this.extensions.set('KHR_materials_clearcoat', KHR_materials_clearcoat_i);
 	}
 
 }

@@ -19,6 +19,8 @@ import { B3DMParser } from './parsers/b3dm/B3DMParser.js';
 import { MaterialParser } from './parsers/b3dm/MaterialParser.js';
 import { B3DMRootParser } from './parsers/b3dm/B3DMRootParser.js';
 
+import { KHR_techniques_webgl } from './extensions/KHR_techniques_webgl.js';
+
 /**
  * B3DMLoader is a loader for the B3DM format.
  */
@@ -44,6 +46,8 @@ export class B3DMLoader extends GLTFLoader {
 			AnimationParser,
 			B3DMRootParser // insert B3DMRootParser
 		]);
+
+		this.extensions.set('KHR_techniques_webgl', KHR_techniques_webgl);
 	}
 
 }

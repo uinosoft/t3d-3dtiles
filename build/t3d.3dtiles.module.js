@@ -1,5 +1,5 @@
 // t3d-3dtiles
-import { Matrix4, Ray, Vector3, Matrix3, Frustum, Vector2, Box3, Plane, Spherical, Sphere, Loader, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, BasicMaterial, PBR2Material, TEXEL_ENCODING_TYPE, PBRMaterial, DRAW_SIDE, Buffer, Attribute, Geometry, PointsMaterial, Material, VERTEX_COLOR, SHADING_TYPE, DirectionalLight, PointLight, SpotLight, Vector4, Bone, Object3D, Camera, SkinnedMesh, Mesh, Skeleton, KeyframeClip, QuaternionLinearInterpolant, LinearInterpolant, QuaternionCubicSplineInterpolant, CubicSplineInterpolant, StepInterpolant, VectorKeyframeTrack, NumberKeyframeTrack, QuaternionKeyframeTrack, FileLoader, ImageLoader, DefaultLoadingManager, ShaderLib, MATERIAL_TYPE, Color3, Quaternion, EventDispatcher, LoadingManager } from 't3d';
+import { Matrix4, Ray, Vector3, Matrix3, Frustum, Vector2, Box3, Plane, Spherical, Sphere, Loader, Vector4, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Buffer, Attribute, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Bone, Object3D, Camera, SkinnedMesh, Mesh, Skeleton, KeyframeClip, QuaternionLinearInterpolant, LinearInterpolant, QuaternionCubicSplineInterpolant, CubicSplineInterpolant, StepInterpolant, VectorKeyframeTrack, NumberKeyframeTrack, QuaternionKeyframeTrack, DirectionalLight, PointLight, SpotLight, PBR2Material, FileLoader, ImageLoader, DefaultLoadingManager, ShaderLib, MATERIAL_TYPE, Quaternion, Color3, EventDispatcher, LoadingManager } from 't3d';
 
 /**
  * Returns the file extension of the path component of a URL
@@ -1962,18 +1962,11 @@ class ImageBitmapLoader extends Loader {
 
 }
 
-// Characters [].:/ are reserved for track binding syntax.
-const RESERVED_CHARS_RE = '\\[\\]\\.:\\/';
-const reservedRe = new RegExp('[' + RESERVED_CHARS_RE + ']', 'g');
+const _vec4_1 = new Vector4();
 
 class GLTFUtils {
 
 	constructor() {}
-
-	// deprecated since v0.2.0
-	static sanitizeNodeName(name) {
-		return name.replace(/\s/g, '_').replace(reservedRe, '');
-	}
 
 	static extractUrlBase(url) {
 		const parts = url.split('/');
@@ -2089,6 +2082,22 @@ class GLTFUtils {
 			return 1 / 65535;
 		} else {
 			throw new Error('Unsupported normalized accessor component type.');
+		}
+	}
+
+	static normalizeSkinWeights(skinWeight) {
+		const offset = skinWeight.offset;
+		const buffer = skinWeight.buffer;
+		const stride = buffer.stride;
+		for (let i = 0, l = buffer.count; i < l; i++) {
+			_vec4_1.fromArray(buffer.array, i * stride + offset);
+			const scale = 1.0 / _vec4_1.getManhattanLength();
+			if (scale !== Infinity) {
+				_vec4_1.multiplyScalar(scale);
+			} else {
+				_vec4_1.set(1, 0, 0, 0); // do something reasonable
+			}
+			_vec4_1.toArray(buffer.array, i * stride + offset);
 		}
 	}
 
@@ -2232,42 +2241,6 @@ class BufferParser {
 
 }
 
-/**
- * meshopt BufferView Compression Extension
- *
- * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Vendor/EXT_meshopt_compression
- */
-class EXT_meshopt_compression {
-
-	static loadBufferView(extensionDef, buffers, meshoptDecoder) {
-		const buffer = buffers[extensionDef.buffer];
-
-		if (!meshoptDecoder || !meshoptDecoder.supported) {
-			throw new Error('GLTFLoader: setMeshoptDecoder must be called before loading compressed files.');
-		}
-
-		const byteOffset = extensionDef.byteOffset || 0;
-		const byteLength = extensionDef.byteLength || 0;
-
-		const count = extensionDef.count;
-		const stride = extensionDef.byteStride;
-
-		const source = new Uint8Array(buffer, byteOffset, byteLength);
-
-		if (meshoptDecoder.decodeGltfBufferAsync) {
-			return meshoptDecoder.decodeGltfBufferAsync(count, stride, source, extensionDef.mode, extensionDef.filter).then(res => res.buffer);
-		} else {
-			// Support for MeshoptDecoder 0.18 or earlier, without decodeGltfBufferAsync
-			return meshoptDecoder.ready.then(() => {
-				const result = new ArrayBuffer(count * stride);
-				meshoptDecoder.decodeGltfBuffer(new Uint8Array(result), count, stride, source, extensionDef.mode, extensionDef.filter);
-				return result;
-			});
-		}
-	}
-
-}
-
 class BufferViewParser {
 
 	static parse(context, loader) {
@@ -2275,36 +2248,24 @@ class BufferViewParser {
 
 		if (!gltf.bufferViews) return;
 
+		const meshoptExt = loader.extensions.get('EXT_meshopt_compression');
+
 		return Promise.all(
 			gltf.bufferViews.map(bufferView => {
 				const { buffer, byteOffset = 0, byteLength = 0 } = bufferView;
 
 				if (bufferView.extensions) {
-					const { EXT_meshopt_compression: EXT_meshopt_compression$1 } = bufferView.extensions;
-					if (EXT_meshopt_compression$1) {
-						return EXT_meshopt_compression.loadBufferView(EXT_meshopt_compression$1, buffers, loader.getMeshoptDecoder());
+					const { EXT_meshopt_compression } = bufferView.extensions;
+					if (EXT_meshopt_compression && meshoptExt) {
+						return meshoptExt.loadBufferView(EXT_meshopt_compression, buffers, loader.getMeshoptDecoder());
 					}
 				}
+
 				const arrayBuffer = buffers[buffer];
 				return arrayBuffer.slice(byteOffset, byteOffset + byteLength);
 			})
 		).then(bufferViews => {
 			context.bufferViews = bufferViews;
-		});
-	}
-
-}
-
-/**
- * BasisU Texture Extension
- *
- * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_basisu
- */
-class KHR_texture_basisu {
-
-	static loadTextureData(url, ktx2Loader) {
-		return new Promise((resolve, reject) => {
-			ktx2Loader.load(url, resolve, undefined, reject);
 		});
 	}
 
@@ -2316,6 +2277,8 @@ class ImageParser {
 		const { gltf, bufferViews, path, loadItems } = context;
 
 		if (!gltf.images) return;
+
+		const basisuExt = loader.extensions.get('KHR_texture_basisu');
 
 		return Promise.all(
 			gltf.images.map((params, index) => {
@@ -2335,8 +2298,8 @@ class ImageParser {
 					loadItems.delete(imageUrl);
 				}
 				let promise;
-				if (mimeType && mimeType.includes('ktx2')) {
-					promise = KHR_texture_basisu.loadTextureData(imageUrl, loader.getKTX2Loader()).then(transcodeResult => {
+				if (mimeType && mimeType.includes('ktx2') && basisuExt) {
+					promise = basisuExt.loadTextureData(imageUrl, loader.getKTX2Loader()).then(transcodeResult => {
 						if (loader.detailLoadProgress) {
 							if (isObjectURL) {
 								loader.manager.itemEnd(GLTFUtils.resolveURL('blob<' + index + '>', path));
@@ -2493,37 +2456,49 @@ class TextureParser {
 
 		if (!gltf.textures) return;
 
-		// TODO need to cache textures by source and samplers?
+		const textureCache = new Map();
 
 		return Promise.all(
 			gltf.textures.map((params, index) => {
 				const { sampler, source = 0, name: textureName } = params;
 
-				const texture = new Texture2D();
+				let sourceIndex = source, isTextureData = false;
 
 				if (params.extensions) {
 					const { KHR_texture_basisu } = params.extensions;
-					if (KHR_texture_basisu) {
-						const transcodeResult = images[KHR_texture_basisu.source];
 
-						const { image, mipmaps, type, format, minFilter, magFilter, generateMipmaps, encoding, premultiplyAlpha } = transcodeResult;
-						texture.image = image;
-						texture.mipmaps = mipmaps;
-						texture.type = type;
-						texture.format = format;
-						texture.minFilter = minFilter;
-						texture.magFilter = magFilter;
-						texture.generateMipmaps = generateMipmaps;
-						texture.encoding = encoding;
-						texture.premultiplyAlpha = premultiplyAlpha;
+					if (KHR_texture_basisu) {
+						sourceIndex = KHR_texture_basisu.source;
+						isTextureData = true;
 					} else if (Object.values(params.extensions).length && Object.values(params.extensions)[0].hasOwnProperty('source')) {
-						texture.image = images[Object.values(params.extensions)[0].source];
+						sourceIndex = Object.values(params.extensions)[0].source;
 					} else {
-						console.error('GLTFLoader: Couldn\'t load texture');
-						return null;
+						console.warn('GLTFLoader: unknown texture extension');
 					}
+				}
+
+				const cacheKey = sourceIndex + ':' + sampler;
+
+				if (textureCache.has(cacheKey)) {
+					return textureCache.get(cacheKey);
+				}
+
+				const texture = new Texture2D();
+
+				if (isTextureData) {
+					const { image, mipmaps, type, format, minFilter, magFilter, generateMipmaps, encoding, premultiplyAlpha } = images[sourceIndex];
+
+					texture.image = image;
+					texture.mipmaps = mipmaps;
+					texture.type = type;
+					texture.format = format;
+					texture.minFilter = minFilter;
+					texture.magFilter = magFilter;
+					texture.generateMipmaps = generateMipmaps;
+					texture.encoding = encoding;
+					texture.premultiplyAlpha = premultiplyAlpha;
 				} else {
-					texture.image = images[source];
+					texture.image = images[sourceIndex];
 				}
 
 				texture.version++;
@@ -2533,10 +2508,13 @@ class TextureParser {
 				const samplers = gltf.samplers || {};
 				parseSampler(texture, samplers[sampler]);
 
+				textureCache.set(cacheKey, texture);
+
 				return texture;
 			})
 		).then(textures => {
 			context.textures = textures;
+			textureCache.clear();
 		});
 	}
 
@@ -2551,149 +2529,17 @@ function parseSampler(texture, sampler = {}) {
 	texture.wrapT = WEBGL_WRAPPINGS[wrapT] || TEXTURE_WRAP.REPEAT;
 }
 
-/**
- * KHR_materials_unlit extension
- * https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_unlit
- */
-class KHR_materials_unlit {
-
-	static getMaterial() {
-		return new BasicMaterial();
-	}
-
-}
-
-/**
- * KHR_texture_transform extension
- * https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_transform
- */
-class KHR_texture_transform {
-
-	static transform(matrix, transform) {
-		let offsetX = 0, offsetY = 0, repeatX = 1, repeatY = 1, rotation = 0;
-
-		if (transform.offset !== undefined) {
-			offsetX = transform.offset[0];
-			offsetY = transform.offset[1];
-		}
-
-		if (transform.rotation !== undefined) {
-			rotation = transform.rotation;
-		}
-
-		if (transform.scale !== undefined) {
-			repeatX = transform.scale[0];
-			repeatY = transform.scale[1];
-		}
-
-		matrix.setUvTransform(offsetX, offsetY, repeatX, repeatY, rotation, 0, 0);
-
-		if (transform.texCoord !== undefined) {
-			console.warn('Custom UV sets in KHR_texture_transform extension not yet supported.');
-		}
-	}
-
-}
-
-/**
- * KHR_materials_pbrSpecularGlossiness extension
- * https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_pbrSpecularGlossiness
- */
-class KHR_materials_pbrSpecularGlossiness {
-
-	static getMaterial() {
-		return new PBR2Material();
-	}
-
-	static parseParams(material, params, textures) {
-		const { diffuseFactor, diffuseTexture, specularFactor, glossinessFactor, specularGlossinessTexture } = params;
-
-		if (Array.isArray(diffuseFactor)) {
-			material.diffuse.fromArray(diffuseFactor);
-			material.opacity = diffuseFactor[3] || 1;
-		}
-
-		if (diffuseTexture) {
-			material.diffuseMap = textures[diffuseTexture.index];
-			material.diffuseMapCoord = diffuseTexture.texCoord || 0;
-			if (material.diffuseMap) {
-				material.diffuseMap.encoding = TEXEL_ENCODING_TYPE.SRGB;
-			}
-			parseTextureTransform$3(material, 'diffuseMap', diffuseTexture.extensions);
-		}
-
-		material.glossiness = glossinessFactor !== undefined ? glossinessFactor : 1.0;
-
-		if (Array.isArray(specularFactor)) {
-			material.specular.fromArray(specularFactor);
-		}
-
-		if (specularGlossinessTexture) {
-			material.glossinessMap = textures[specularGlossinessTexture.index];
-			material.specularMap = textures[specularGlossinessTexture.index];
-			// material does not yet support the transform of glossinessMap and specularMap.
-			// parseTextureTransform(material, 'glossinessMap', specularGlossinessTexture.extensions);
-			// parseTextureTransform(material, 'specularMap', specularGlossinessTexture.extensions);
-		}
-	}
-
-}
-
-function parseTextureTransform$3(material, key, extensions = {}) {
-	const extension = extensions.KHR_texture_transform;
-	if (extension) {
-		material[key] = KHR_texture_transform.transform(material[key + 'Transform'], extension);
-	}
-}
-
-/**
- * Clearcoat Materials Extension
- * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_clearcoat
- */
-class KHR_materials_clearcoat {
-
-	static getMaterial() {
-		return new PBRMaterial();
-	}
-
-	static parseParams(material, extension, textures) {
-		const { clearcoatFactor, clearcoatTexture, clearcoatRoughnessFactor, clearcoatRoughnessTexture, clearcoatNormalTexture } = extension;
-
-		if (clearcoatFactor) {
-			material.clearcoat = clearcoatFactor;
-		}
-		if (clearcoatTexture) {
-			material.clearcoatMap = textures[clearcoatTexture.index];
-			// material does not yet support the transform of clearcoatMap.
-			// parseTextureTransform(material, 'clearcoatMap', clearcoatTexture.extensions);
-		}
-		if (clearcoatRoughnessFactor) {
-			material.clearcoatRoughness = clearcoatRoughnessFactor;
-		}
-		if (clearcoatRoughnessTexture) {
-			material.clearcoatRoughnessMap = textures[clearcoatRoughnessTexture.index];
-			// material does not yet support the transform of clearcoatRoughnessMap.
-			// parseTextureTransform(material, 'clearcoatRoughnessMap', clearcoatRoughnessTexture.extensions);
-		}
-		if (clearcoatNormalTexture) {
-			material.clearcoatNormalMap = textures[clearcoatNormalTexture.index];
-			// material does not yet support the transform of clearcoatNormalMap.
-			// parseTextureTransform(material, 'clearcoatNormalMap', clearcoatNormalTexture.extensions);
-			if (clearcoatNormalTexture.scale) {
-				const scale = clearcoatNormalTexture.scale;
-				material.clearcoatNormalScale = new Vector2(scale, scale);
-			}
-		}
-	}
-
-}
-
 let MaterialParser$2 = class MaterialParser {
 
-	static parse(context) {
+	static parse(context, loader) {
 		const { gltf, textures } = context;
 
 		if (!gltf.materials) return;
+
+		const transformExt = loader.extensions.get('KHR_texture_transform');
+		const unlitExt = loader.extensions.get('KHR_materials_unlit');
+		const pbrSpecularGlossinessExt = loader.extensions.get('KHR_materials_pbrSpecularGlossiness');
+		const clearcoatExt = loader.extensions.get('KHR_materials_clearcoat');
 
 		const materials = [];
 		for (let i = 0; i < gltf.materials.length; i++) {
@@ -2710,17 +2556,17 @@ let MaterialParser$2 = class MaterialParser {
 				name = ''
 			} = gltf.materials[i];
 
-			const { KHR_materials_unlit: KHR_materials_unlit$1, KHR_materials_pbrSpecularGlossiness: KHR_materials_pbrSpecularGlossiness$1, KHR_materials_clearcoat: KHR_materials_clearcoat$1 } = extensions;
+			const { KHR_materials_unlit, KHR_materials_pbrSpecularGlossiness, KHR_materials_clearcoat } = extensions;
 
 			let material = null;
-			if (KHR_materials_unlit$1) {
-				material = KHR_materials_unlit.getMaterial();
-			} else if (KHR_materials_pbrSpecularGlossiness$1) {
-				material = KHR_materials_pbrSpecularGlossiness.getMaterial();
-				KHR_materials_pbrSpecularGlossiness.parseParams(material, KHR_materials_pbrSpecularGlossiness$1, textures);
-			} else if (KHR_materials_clearcoat$1) {
-				material = KHR_materials_clearcoat.getMaterial();
-				KHR_materials_clearcoat.parseParams(material, KHR_materials_clearcoat$1, textures);
+			if (KHR_materials_unlit && unlitExt) {
+				material = unlitExt.getMaterial();
+			} else if (KHR_materials_pbrSpecularGlossiness && pbrSpecularGlossinessExt) {
+				material = pbrSpecularGlossinessExt.getMaterial();
+				pbrSpecularGlossinessExt.parseParams(material, KHR_materials_pbrSpecularGlossiness, textures, transformExt);
+			} else if (KHR_materials_clearcoat && clearcoatExt) {
+				material = clearcoatExt.getMaterial();
+				clearcoatExt.parseParams(material, KHR_materials_clearcoat, textures);
 			} else {
 				material = new PBRMaterial();
 			}
@@ -2740,18 +2586,17 @@ let MaterialParser$2 = class MaterialParser {
 					material.diffuseMapCoord = baseColorTexture.texCoord || 0;
 					if (material.diffuseMap) {
 						material.diffuseMap.encoding = TEXEL_ENCODING_TYPE.SRGB;
-						parseTextureTransform$2(material, 'diffuseMap', baseColorTexture.extensions);
+						transformExt && transformExt.handleMaterialMap(material, 'diffuseMap', baseColorTexture);
 					}
 				}
 
-				if (!KHR_materials_unlit$1 && !KHR_materials_pbrSpecularGlossiness$1) {
+				if (!KHR_materials_unlit && !KHR_materials_pbrSpecularGlossiness) {
 					material.metalness = metallicFactor !== undefined ? metallicFactor : 1;
 					material.roughness = roughnessFactor !== undefined ? roughnessFactor : 1;
 					if (metallicRoughnessTexture) {
 						material.metalnessMap = textures[metallicRoughnessTexture.index];
 						material.roughnessMap = textures[metallicRoughnessTexture.index];
-						// parseTextureTransform(material, 'metalnessMap', metallicRoughnessTexture.extensions);
-						// parseTextureTransform(material, 'roughnessMap', metallicRoughnessTexture.extensions);
+						// metallicRoughnessTexture transform not supported yet
 					}
 				}
 			}
@@ -2765,7 +2610,7 @@ let MaterialParser$2 = class MaterialParser {
 				material.emissiveMapCoord = emissiveTexture.texCoord || 0;
 				if (material.emissiveMap) {
 					material.emissiveMap.encoding = TEXEL_ENCODING_TYPE.SRGB;
-					parseTextureTransform$2(material, 'emissiveMap', emissiveTexture.extensions);
+					transformExt && transformExt.handleMaterialMap(material, 'emissiveMap', emissiveTexture);
 				}
 			}
 
@@ -2776,11 +2621,11 @@ let MaterialParser$2 = class MaterialParser {
 					material.aoMapIntensity = occlusionTexture.strength;
 				}
 				if (material.aoMap) {
-					parseTextureTransform$2(material, 'aoMap', occlusionTexture.extensions);
+					transformExt && transformExt.handleMaterialMap(material, 'aoMap', occlusionTexture);
 				}
 			}
 
-			if (!KHR_materials_unlit$1) {
+			if (!KHR_materials_unlit) {
 				if (normalTexture) {
 					material.normalMap = textures[normalTexture.index];
 
@@ -2791,7 +2636,7 @@ let MaterialParser$2 = class MaterialParser {
 						material.normalScale.set(normalTexture.scale, -normalTexture.scale);
 					}
 
-					if (material.normalMap) ;
+					// normal map transform not supported yet
 				}
 			}
 
@@ -2814,13 +2659,6 @@ let MaterialParser$2 = class MaterialParser {
 	}
 
 };
-
-function parseTextureTransform$2(material, key, extensions = {}) {
-	const extension = extensions.KHR_texture_transform;
-	if (extension) {
-		KHR_texture_transform.transform(material[key + 'Transform'], extension);
-	}
-}
 
 class AccessorParser {
 
@@ -2919,65 +2757,14 @@ class AccessorParser {
 
 }
 
-/**
- * KHR_draco_mesh_compression extension
- * https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_draco_mesh_compression
- */
-class KHR_draco_mesh_compression {
-
-	static getGeometry(params, bufferViews, attributes, accessors, dracoLoader) {
-		const { bufferView: bufferViewIndex, attributes: gltfAttributeMap } = params;
-
-		if (!dracoLoader) {
-			throw new Error('GLTFLoader: No DRACOLoader instance provided.');
-		}
-
-		const attributeMap = {};
-
-		for (const attributeSemantic in gltfAttributeMap) {
-			const attributeName = ATTRIBUTES[attributeSemantic] === undefined ? attributeSemantic : ATTRIBUTES[attributeSemantic];
-			attributeMap[attributeName] = gltfAttributeMap[attributeSemantic];
-		}
-
-		const attributeNormalizedMap = {};
-		const attributeTypeMap = {};
-
-		for (const attributeNameItem in attributes) {
-			const attributeName = ATTRIBUTES[attributeNameItem] || attributeNameItem.toLowerCase();
-
-			if (gltfAttributeMap[attributeNameItem] !== undefined) {
-				const accessorDef = accessors[attributes[attributeNameItem]];
-				const componentType = ACCESSOR_COMPONENT_TYPES[accessorDef.componentType];
-
-				attributeTypeMap[attributeName] = componentType.name;
-				attributeNormalizedMap[attributeName] = accessorDef.normalized === true;
-			}
-		}
-
-		const bufferView = bufferViews[bufferViewIndex];
-
-		return new Promise(function(resolve) {
-			dracoLoader.decodeDracoFile(bufferView, function(geometry) {
-				for (const attributeName in geometry.attributes) {
-					const attribute = geometry.attributes[attributeName];
-					const normalized = attributeNormalizedMap[attributeName];
-
-					if (normalized !== undefined) attribute.normalized = normalized;
-				}
-
-				resolve(geometry);
-			}, attributeMap, attributeTypeMap);
-		});
-	}
-
-}
-
 let PrimitiveParser$1 = class PrimitiveParser {
 
 	static parse(context, loader) {
 		const { gltf, accessors, materials, bufferViews } = context;
 
 		if (!gltf.meshes) return;
+
+		const dracoExt = loader.extensions.get('KHR_draco_mesh_compression');
 
 		const materialCache = new Map();
 		const geometryPromiseCache = new Map();
@@ -2994,7 +2781,7 @@ let PrimitiveParser$1 = class PrimitiveParser {
 					mode,
 					material
 				} = gltfPrimitive;
-				const { KHR_draco_mesh_compression: KHR_draco_mesh_compression$1 } = extensions;
+				const { KHR_draco_mesh_compression } = extensions;
 
 				let geometryPromise;
 
@@ -3002,8 +2789,8 @@ let PrimitiveParser$1 = class PrimitiveParser {
 				if (geometryPromiseCache.has(geometryKey)) {
 					geometryPromise = geometryPromiseCache.get(geometryKey);
 				} else {
-					if (KHR_draco_mesh_compression$1) {
-						geometryPromise = KHR_draco_mesh_compression.getGeometry(KHR_draco_mesh_compression$1, bufferViews, gltfPrimitive.attributes, gltf.accessors, loader.getDRACOLoader());
+					if (KHR_draco_mesh_compression && dracoExt) {
+						geometryPromise = dracoExt.getGeometry(KHR_draco_mesh_compression, bufferViews, gltfPrimitive.attributes, gltf.accessors, loader.getDRACOLoader());
 					} else {
 						geometryPromise = Promise.resolve(new Geometry());
 					}
@@ -3257,66 +3044,17 @@ function createAttributesKey$1(attributes) {
 	return attributesKey;
 }
 
-/**
- * KHR_lights_punctual extension
- * https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md
- */
-class KHR_lights_punctual {
-
-	static getLight(params) {
-		const { color, intensity = 1, type, range, spot } = params;
-
-		let lightNode;
-
-		if (type === 'directional') {
-			lightNode = new DirectionalLight();
-		} else if (type === 'point') {
-			lightNode = new PointLight();
-
-			if (range !== undefined) {
-				lightNode.distance = range;
-			}
-
-			// https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
-			// lightNode.decay = 2;
-		} else if (type === 'spot') {
-			lightNode = new SpotLight();
-
-			if (range !== undefined) {
-				lightNode.distance = range;
-			}
-
-			// https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
-			// lightNode.decay = 2;
-
-			if (spot) {
-				const { innerConeAngle = 0, outerConeAngle = Math.PI / 4 } = spot;
-				lightNode.angle = outerConeAngle;
-				lightNode.penumbra = 1.0 - innerConeAngle / outerConeAngle;
-			}
-		} else {
-			throw new Error('Unexpected light type: ' + type);
-		}
-
-		if (color) {
-			lightNode.color.fromArray(color);
-		}
-
-		lightNode.intensity = intensity;
-
-		return lightNode;
-	}
-
-}
-
 class NodeParser {
 
-	static parse(context) {
+	static parse(context, loader) {
 		const {
 			gltf: { nodes: gltfNodes, cameras: gltfCameras, extensions: gltfExtensions }
 		} = context;
 
 		if (!gltfNodes) return;
+
+		const lightsExt = loader.extensions.get('KHR_lights_punctual');
+		const instancingExt = loader.extensions.get('EXT_mesh_gpu_instancing');
 
 		const cameras = [];
 		const lights = [];
@@ -3326,7 +3064,7 @@ class NodeParser {
 				camera: cameraID, mesh: meshID,
 				extensions = {}
 			} = gltfNode;
-			const { KHR_lights_punctual: KHR_lights_punctual$1 } = extensions;
+			const { KHR_lights_punctual, EXT_mesh_gpu_instancing } = extensions;
 
 			let node = null;
 
@@ -3334,14 +3072,18 @@ class NodeParser {
 				// .isBone isn't in glTF spec. Marked in IndexParser
 				node = new Bone();
 			} else if (meshID !== undefined) {
-				node = createMesh(context, gltfNode);
+				if (EXT_mesh_gpu_instancing && instancingExt) {
+					node = instancingExt.getInstancedMesh(context, gltfNode);
+				} else {
+					node = createMesh(context, gltfNode);
+				}
 			} else if (cameraID !== undefined) {
 				node = createCamera(gltfCameras[cameraID]);
 				cameras.push(node);
-			} else if (KHR_lights_punctual$1) {
-				const lightIndex = KHR_lights_punctual$1.light;
+			} else if (KHR_lights_punctual && lightsExt) {
+				const lightIndex = KHR_lights_punctual.light;
 				const gltfLights = gltfExtensions.KHR_lights_punctual.lights;
-				node = KHR_lights_punctual.getLight(gltfLights[lightIndex]);
+				node = lightsExt.getLight(gltfLights[lightIndex]);
 				lights.push(node);
 			} else {
 				node = new Object3D();
@@ -3412,7 +3154,7 @@ function createMesh(context, gltfNode) {
 			mesh = new SkinnedMesh(geometry, material);
 
 			if (geometry.attributes.skinWeight && !geometry.attributes.skinWeight.normalized) {
-				normalizeSkinWeights(geometry.attributes.skinWeight);
+				GLTFUtils.normalizeSkinWeights(geometry.attributes.skinWeight);
 			}
 		} else {
 			mesh = new Mesh(geometry, material);
@@ -3431,24 +3173,6 @@ function createMesh(context, gltfNode) {
 		return parent;
 	} else {
 		return meshes[0];
-	}
-}
-
-const _vec4_1 = new Vector4();
-
-function normalizeSkinWeights(skinWeight) {
-	const offset = skinWeight.offset;
-	const buffer = skinWeight.buffer;
-	const stride = buffer.stride;
-	for (let i = 0, l = buffer.count; i < l; i++) {
-		_vec4_1.fromArray(buffer.array, i * stride + offset);
-		const scale = 1.0 / _vec4_1.getManhattanLength();
-		if (scale !== Infinity) {
-			_vec4_1.multiplyScalar(scale);
-		} else {
-			_vec4_1.set(1, 0, 0, 0); // do something reasonable
-		}
-		_vec4_1.toArray(buffer.array, i * stride + offset);
 	}
 }
 
@@ -3678,6 +3402,300 @@ class GLTFResource {
 
 }
 
+/**
+ * meshopt BufferView Compression Extension
+ *
+ * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Vendor/EXT_meshopt_compression
+ */
+class EXT_meshopt_compression {
+
+	static loadBufferView(extensionDef, buffers, meshoptDecoder) {
+		const buffer = buffers[extensionDef.buffer];
+
+		if (!meshoptDecoder || !meshoptDecoder.supported) {
+			throw new Error('GLTFLoader: setMeshoptDecoder must be called before loading compressed files.');
+		}
+
+		const byteOffset = extensionDef.byteOffset || 0;
+		const byteLength = extensionDef.byteLength || 0;
+
+		const count = extensionDef.count;
+		const stride = extensionDef.byteStride;
+
+		const source = new Uint8Array(buffer, byteOffset, byteLength);
+
+		if (meshoptDecoder.decodeGltfBufferAsync) {
+			return meshoptDecoder.decodeGltfBufferAsync(count, stride, source, extensionDef.mode, extensionDef.filter).then(res => res.buffer);
+		} else {
+			// Support for MeshoptDecoder 0.18 or earlier, without decodeGltfBufferAsync
+			return meshoptDecoder.ready.then(() => {
+				const result = new ArrayBuffer(count * stride);
+				meshoptDecoder.decodeGltfBuffer(new Uint8Array(result), count, stride, source, extensionDef.mode, extensionDef.filter);
+				return result;
+			});
+		}
+	}
+
+}
+
+/**
+ * KHR_draco_mesh_compression extension
+ * https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_draco_mesh_compression
+ */
+class KHR_draco_mesh_compression {
+
+	static getGeometry(params, bufferViews, attributes, accessors, dracoLoader) {
+		const { bufferView: bufferViewIndex, attributes: gltfAttributeMap } = params;
+
+		if (!dracoLoader) {
+			throw new Error('GLTFLoader: No DRACOLoader instance provided.');
+		}
+
+		const attributeMap = {};
+
+		for (const attributeSemantic in gltfAttributeMap) {
+			const attributeName = ATTRIBUTES[attributeSemantic] === undefined ? attributeSemantic : ATTRIBUTES[attributeSemantic];
+			attributeMap[attributeName] = gltfAttributeMap[attributeSemantic];
+		}
+
+		const attributeNormalizedMap = {};
+		const attributeTypeMap = {};
+
+		for (const attributeNameItem in attributes) {
+			const attributeName = ATTRIBUTES[attributeNameItem] || attributeNameItem.toLowerCase();
+
+			if (gltfAttributeMap[attributeNameItem] !== undefined) {
+				const accessorDef = accessors[attributes[attributeNameItem]];
+				const componentType = ACCESSOR_COMPONENT_TYPES[accessorDef.componentType];
+
+				attributeTypeMap[attributeName] = componentType.name;
+				attributeNormalizedMap[attributeName] = accessorDef.normalized === true;
+			}
+		}
+
+		const bufferView = bufferViews[bufferViewIndex];
+
+		return new Promise(function(resolve) {
+			dracoLoader.decodeDracoFile(bufferView, function(geometry) {
+				for (const attributeName in geometry.attributes) {
+					const attribute = geometry.attributes[attributeName];
+					const normalized = attributeNormalizedMap[attributeName];
+
+					if (normalized !== undefined) attribute.normalized = normalized;
+				}
+
+				resolve(geometry);
+			}, attributeMap, attributeTypeMap);
+		});
+	}
+
+}
+
+/**
+ * KHR_lights_punctual extension
+ * https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md
+ */
+class KHR_lights_punctual {
+
+	static getLight(params) {
+		const { color, intensity = 1, type, range, spot } = params;
+
+		let lightNode;
+
+		if (type === 'directional') {
+			lightNode = new DirectionalLight();
+		} else if (type === 'point') {
+			lightNode = new PointLight();
+
+			if (range !== undefined) {
+				lightNode.distance = range;
+			}
+
+			// https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
+			// lightNode.decay = 2;
+		} else if (type === 'spot') {
+			lightNode = new SpotLight();
+
+			if (range !== undefined) {
+				lightNode.distance = range;
+			}
+
+			// https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
+			// lightNode.decay = 2;
+
+			if (spot) {
+				const { innerConeAngle = 0, outerConeAngle = Math.PI / 4 } = spot;
+				lightNode.angle = outerConeAngle;
+				lightNode.penumbra = 1.0 - innerConeAngle / outerConeAngle;
+			}
+		} else {
+			throw new Error('Unexpected light type: ' + type);
+		}
+
+		if (color) {
+			lightNode.color.fromArray(color);
+		}
+
+		lightNode.intensity = intensity;
+
+		return lightNode;
+	}
+
+}
+
+/**
+ * Clearcoat Materials Extension
+ * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_clearcoat
+ */
+class KHR_materials_clearcoat {
+
+	static getMaterial() {
+		return new PBRMaterial();
+	}
+
+	static parseParams(material, extension, textures) {
+		const { clearcoatFactor, clearcoatTexture, clearcoatRoughnessFactor, clearcoatRoughnessTexture, clearcoatNormalTexture } = extension;
+
+		if (clearcoatFactor) {
+			material.clearcoat = clearcoatFactor;
+		}
+		if (clearcoatTexture) {
+			material.clearcoatMap = textures[clearcoatTexture.index];
+			// material does not yet support the transform of clearcoatMap.
+			// parseTextureTransform(material, 'clearcoatMap', clearcoatTexture.extensions);
+		}
+		if (clearcoatRoughnessFactor) {
+			material.clearcoatRoughness = clearcoatRoughnessFactor;
+		}
+		if (clearcoatRoughnessTexture) {
+			material.clearcoatRoughnessMap = textures[clearcoatRoughnessTexture.index];
+			// material does not yet support the transform of clearcoatRoughnessMap.
+			// parseTextureTransform(material, 'clearcoatRoughnessMap', clearcoatRoughnessTexture.extensions);
+		}
+		if (clearcoatNormalTexture) {
+			material.clearcoatNormalMap = textures[clearcoatNormalTexture.index];
+			// material does not yet support the transform of clearcoatNormalMap.
+			// parseTextureTransform(material, 'clearcoatNormalMap', clearcoatNormalTexture.extensions);
+			if (clearcoatNormalTexture.scale) {
+				const scale = clearcoatNormalTexture.scale;
+				material.clearcoatNormalScale = new Vector2(scale, scale);
+			}
+		}
+	}
+
+}
+
+/**
+ * KHR_materials_pbrSpecularGlossiness extension
+ * https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Archived/KHR_materials_pbrSpecularGlossiness/README.md
+ */
+class KHR_materials_pbrSpecularGlossiness {
+
+	static getMaterial() {
+		return new PBR2Material();
+	}
+
+	static parseParams(material, params, textures, transformExt) {
+		const { diffuseFactor, diffuseTexture, specularFactor, glossinessFactor, specularGlossinessTexture } = params;
+
+		if (Array.isArray(diffuseFactor)) {
+			material.diffuse.fromArray(diffuseFactor);
+			material.opacity = diffuseFactor[3] || 1;
+		}
+
+		if (diffuseTexture) {
+			material.diffuseMap = textures[diffuseTexture.index];
+			material.diffuseMapCoord = diffuseTexture.texCoord || 0;
+			if (material.diffuseMap) {
+				material.diffuseMap.encoding = TEXEL_ENCODING_TYPE.SRGB;
+				transformExt && transformExt.handleMaterialMap(material, 'diffuseMap', diffuseTexture);
+			}
+		}
+
+		material.glossiness = glossinessFactor !== undefined ? glossinessFactor : 1.0;
+
+		if (Array.isArray(specularFactor)) {
+			material.specular.fromArray(specularFactor);
+		}
+
+		if (specularGlossinessTexture) {
+			material.glossinessMap = textures[specularGlossinessTexture.index];
+			material.specularMap = textures[specularGlossinessTexture.index];
+			// specularGlossinessTexture transform not supported yet
+		}
+	}
+
+}
+
+/**
+ * KHR_materials_unlit extension
+ * https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_unlit
+ */
+class KHR_materials_unlit {
+
+	static getMaterial() {
+		return new BasicMaterial();
+	}
+
+}
+
+/**
+ * BasisU Texture Extension
+ *
+ * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_basisu
+ */
+class KHR_texture_basisu {
+
+	static loadTextureData(url, ktx2Loader) {
+		return new Promise((resolve, reject) => {
+			ktx2Loader.load(url, resolve, undefined, reject);
+		});
+	}
+
+}
+
+/**
+ * KHR_texture_transform extension
+ * https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_transform
+ */
+class KHR_texture_transform {
+
+	static handleMaterialMap(material, mapType, textureDef) {
+		if (!textureDef.extensions) return;
+
+		const extDef = textureDef.extensions.KHR_texture_transform;
+
+		if (!extDef) return;
+
+		let offsetX = 0, offsetY = 0, repeatX = 1, repeatY = 1, rotation = 0;
+
+		if (extDef.offset !== undefined) {
+			offsetX = extDef.offset[0];
+			offsetY = extDef.offset[1];
+		}
+
+		if (extDef.rotation !== undefined) {
+			rotation = extDef.rotation;
+		}
+
+		if (extDef.scale !== undefined) {
+			repeatX = extDef.scale[0];
+			repeatY = extDef.scale[1];
+		}
+
+		const matrix = material[mapType + 'Transform'];
+		if (matrix) {
+			matrix.setUvTransform(offsetX, offsetY, repeatX, repeatY, rotation, 0, 0);
+		}
+
+		// If texCoord is present, it overrides the texture's texCoord
+		if (extDef.texCoord !== undefined) {
+			material[mapType + 'Coord'] = extDef.texCoord;
+		}
+	}
+
+}
+
 const DefaultParsePipeline = [
 	IndexParser$1,
 	ReferenceParser,
@@ -3695,9 +3713,21 @@ const DefaultParsePipeline = [
 	AnimationParser
 ];
 
+const DefaultExtensions = new Map([
+	['EXT_meshopt_compression', EXT_meshopt_compression],
+	['KHR_draco_mesh_compression', KHR_draco_mesh_compression],
+	['KHR_lights_punctual', KHR_lights_punctual],
+	['KHR_materials_clearcoat', KHR_materials_clearcoat],
+	['KHR_materials_pbrSpecularGlossiness', KHR_materials_pbrSpecularGlossiness],
+	['KHR_materials_unlit', KHR_materials_unlit],
+	['KHR_mesh_quantization', {}], // This is supported by default
+	['KHR_texture_basisu', KHR_texture_basisu],
+	['KHR_texture_transform', KHR_texture_transform]
+]);
+
 class GLTFLoader {
 
-	constructor(manager = DefaultLoadingManager, parsers = DefaultParsePipeline) {
+	constructor(manager = DefaultLoadingManager, parsers = DefaultParsePipeline, extensions = DefaultExtensions) {
 		this.manager = manager;
 
 		// If ture, loading manager will dispatch progress for every buffer and image.
@@ -3707,6 +3737,8 @@ class GLTFLoader {
 		// If set false, need add Promise.catch to catch errors.
 		this.autoLogError = true;
 
+		this.extensions = new Map(extensions);
+
 		this._parsers = parsers.slice(0);
 
 		this._dracoLoader = null;
@@ -3715,11 +3747,16 @@ class GLTFLoader {
 
 		this._fileLoader = new FileLoader();
 
-		const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent) === true;
-		const isFirefox = navigator.userAgent.indexOf('Firefox') > -1;
-		const firefoxVersion = isFirefox ? navigator.userAgent.match(/Firefox\/([0-9]+)\./)[1] : -1;
+		const userAgent = navigator.userAgent;
 
-		if (typeof createImageBitmap === 'undefined' || isSafari || (isFirefox && firefoxVersion < 98)) {
+		const isSafari = /^((?!chrome|android).)*safari/i.test(userAgent) === true;
+		const safariMatch = userAgent.match(/Version\/(\d+)/);
+		const safariVersion = isSafari && safariMatch ? parseInt(safariMatch[1], 10) : -1;
+
+		const isFirefox = userAgent.indexOf('Firefox') > -1;
+		const firefoxVersion = isFirefox ? userAgent.match(/Firefox\/([0-9]+)\./)[1] : -1;
+
+		if (typeof createImageBitmap === 'undefined' || (isSafari && safariVersion < 17) || (isFirefox && firefoxVersion < 98)) {
 			this._imageLoader = new ImageLoader();
 		} else {
 			this._imageLoader = new ImageBitmapLoader();
@@ -4131,10 +4168,16 @@ class B3DMParser {
 
 let MaterialParser$1 = class MaterialParser {
 
-	static parse(context) {
+	static parse(context, loader) {
 		const { gltf, textures } = context;
 
 		if (!gltf.materials) return;
+
+		const transformExt = loader.extensions.get('KHR_texture_transform');
+		const unlitExt = loader.extensions.get('KHR_materials_unlit');
+		const pbrSpecularGlossinessExt = loader.extensions.get('KHR_materials_pbrSpecularGlossiness');
+		const clearcoatExt = loader.extensions.get('KHR_materials_clearcoat');
+		const techniquesExt = loader.extensions.get('KHR_techniques_webgl');
 
 		const materials = [];
 		for (let i = 0; i < gltf.materials.length; i++) {
@@ -4151,27 +4194,20 @@ let MaterialParser$1 = class MaterialParser {
 				name = ''
 			} = gltf.materials[i];
 
-			const { KHR_materials_unlit: KHR_materials_unlit$1, KHR_materials_pbrSpecularGlossiness: KHR_materials_pbrSpecularGlossiness$1, KHR_materials_clearcoat: KHR_materials_clearcoat$1, KHR_techniques_webgl } = extensions;
+			const { KHR_materials_unlit, KHR_materials_pbrSpecularGlossiness, KHR_materials_clearcoat, KHR_techniques_webgl } = extensions;
 
 			let material = null;
-			if (KHR_materials_unlit$1) {
-				material = KHR_materials_unlit.getMaterial();
-			} else if (KHR_materials_pbrSpecularGlossiness$1) {
-				material = KHR_materials_pbrSpecularGlossiness.getMaterial();
-				KHR_materials_pbrSpecularGlossiness.parseParams(material, KHR_materials_pbrSpecularGlossiness$1, textures);
-			} else if (KHR_materials_clearcoat$1) {
-				material = KHR_materials_clearcoat.getMaterial();
-				KHR_materials_clearcoat.parseParams(material, KHR_materials_clearcoat$1, textures);
-			} else if (KHR_techniques_webgl) { // @parser-modification - add KHR_techniques_webgl
-				material = new PBRMaterial();
-
-				const { values } = KHR_techniques_webgl;
-				const { u_diffuse } = values;
-
-				if (u_diffuse) {
-					material.diffuseMap = textures[u_diffuse.index];
-					material.diffuseMapCoord = u_diffuse.texCoord || 0;
-				}
+			if (KHR_materials_unlit && unlitExt) {
+				material = unlitExt.getMaterial();
+			} else if (KHR_materials_pbrSpecularGlossiness && pbrSpecularGlossinessExt) {
+				material = pbrSpecularGlossinessExt.getMaterial();
+				pbrSpecularGlossinessExt.parseParams(material, KHR_materials_pbrSpecularGlossiness, textures, transformExt);
+			} else if (KHR_materials_clearcoat && clearcoatExt) {
+				material = clearcoatExt.getMaterial();
+				clearcoatExt.parseParams(material, KHR_materials_clearcoat, textures);
+			} else if (KHR_techniques_webgl && techniquesExt) { // @parser-modification - add KHR_techniques_webgl
+				material = techniquesExt.getMaterial();
+				techniquesExt.parseParams(material, KHR_techniques_webgl, textures);
 			} else {
 				material = new PBRMaterial();
 			}
@@ -4191,18 +4227,17 @@ let MaterialParser$1 = class MaterialParser {
 					material.diffuseMapCoord = baseColorTexture.texCoord || 0;
 					if (material.diffuseMap) {
 						material.diffuseMap.encoding = TEXEL_ENCODING_TYPE.SRGB;
-						parseTextureTransform$1(material, 'diffuseMap', baseColorTexture.extensions);
+						transformExt && transformExt.handleMaterialMap(material, 'diffuseMap', baseColorTexture);
 					}
 				}
 
-				if (!KHR_materials_unlit$1 && !KHR_materials_pbrSpecularGlossiness$1) {
+				if (!KHR_materials_unlit && !KHR_materials_pbrSpecularGlossiness) {
 					material.metalness = metallicFactor !== undefined ? metallicFactor : 1;
 					material.roughness = roughnessFactor !== undefined ? roughnessFactor : 1;
 					if (metallicRoughnessTexture) {
 						material.metalnessMap = textures[metallicRoughnessTexture.index];
 						material.roughnessMap = textures[metallicRoughnessTexture.index];
-						// parseTextureTransform(material, 'metalnessMap', metallicRoughnessTexture.extensions);
-						// parseTextureTransform(material, 'roughnessMap', metallicRoughnessTexture.extensions);
+						// metallicRoughnessTexture transform not supported yet
 					}
 				}
 			}
@@ -4216,7 +4251,7 @@ let MaterialParser$1 = class MaterialParser {
 				material.emissiveMapCoord = emissiveTexture.texCoord || 0;
 				if (material.emissiveMap) {
 					material.emissiveMap.encoding = TEXEL_ENCODING_TYPE.SRGB;
-					parseTextureTransform$1(material, 'emissiveMap', emissiveTexture.extensions);
+					transformExt && transformExt.handleMaterialMap(material, 'emissiveMap', emissiveTexture);
 				}
 			}
 
@@ -4227,11 +4262,11 @@ let MaterialParser$1 = class MaterialParser {
 					material.aoMapIntensity = occlusionTexture.strength;
 				}
 				if (material.aoMap) {
-					parseTextureTransform$1(material, 'aoMap', occlusionTexture.extensions);
+					transformExt && transformExt.handleMaterialMap(material, 'aoMap', occlusionTexture);
 				}
 			}
 
-			if (!KHR_materials_unlit$1) {
+			if (!KHR_materials_unlit) {
 				if (normalTexture) {
 					material.normalMap = textures[normalTexture.index];
 
@@ -4242,7 +4277,7 @@ let MaterialParser$1 = class MaterialParser {
 						material.normalScale.set(normalTexture.scale, -normalTexture.scale);
 					}
 
-					if (material.normalMap) ;
+					// normal map transform not supported yet
 				}
 			}
 
@@ -4266,13 +4301,6 @@ let MaterialParser$1 = class MaterialParser {
 
 };
 
-function parseTextureTransform$1(material, key, extensions = {}) {
-	const extension = extensions.KHR_texture_transform;
-	if (extension) {
-		KHR_texture_transform.transform(material[key + 'Transform'], extension);
-	}
-}
-
 class B3DMRootParser {
 
 	static parse(context, loader) {
@@ -4291,6 +4319,29 @@ class B3DMRootParser {
 			root.matrix.transform(root.position, root.scale, root.quaternion);
 			root.matrix.multiply(options.adjustmentTransform);
 			root.matrix.decompose(root.position, root.quaternion, root.scale);
+		}
+	}
+
+}
+
+/**
+ * KHR_techniques_webgl extension
+ * https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Archived/KHR_techniques_webgl/README.md
+ * This extension has been archived, so we only provide a basic implementation.
+ */
+class KHR_techniques_webgl {
+
+	static getMaterial() {
+		return new PBRMaterial();
+	}
+
+	static parseParams(material, extension, textures) {
+		const { values } = extension;
+		const { u_diffuse } = values;
+
+		if (u_diffuse) {
+			material.diffuseMap = textures[u_diffuse.index];
+			material.diffuseMapCoord = u_diffuse.texCoord || 0;
 		}
 	}
 
@@ -4321,6 +4372,8 @@ class B3DMLoader extends GLTFLoader {
 			AnimationParser,
 			B3DMRootParser // insert B3DMRootParser
 		]);
+
+		this.extensions.set('KHR_techniques_webgl', KHR_techniques_webgl);
 	}
 
 }
@@ -4406,42 +4459,18 @@ vertexShader$1 = vertexShader$1.replace('#include <normal_vert>', `
     #include <normal_vert>
 `);
 
-class InstancedBasicMaterial extends BasicMaterial {
-
-	constructor() {
-		super();
-		this.type = MATERIAL_TYPE.SHADER;
-		this.shaderName = 'TILE_I_BASIC';
-		this.vertexShader = vertexShader;
-		this.fragmentShader = ShaderLib.basic_frag;
-		this.defines.USE_INSTANCING = true;
-	}
-
-}
-
-InstancedBasicMaterial.prototype.isInstancedBasicMaterial = true;
-
-let vertexShader = ShaderLib.basic_vert;
-
-vertexShader = vertexShader.replace('#include <logdepthbuf_pars_vert>', `
-    #include <logdepthbuf_pars_vert>
-    ${instancingParsVert}
-`);
-vertexShader = vertexShader.replace('#include <pvm_vert>', `
-    ${instancingPositionVert}
-    #include <pvm_vert>
-`);
-vertexShader = vertexShader.replace('#include <normal_vert>', `
-    ${instancingNormalVert}
-    #include <normal_vert>
-`);
-
 class MaterialParser {
 
-	static parse(context) {
+	static parse(context, loader) {
 		const { gltf, textures } = context;
 
 		if (!gltf.materials) return;
+
+		const transformExt = loader.extensions.get('KHR_texture_transform');
+		const unlitExt = loader.extensions.get('KHR_materials_unlit');
+		const pbrSpecularGlossinessExt = loader.extensions.get('KHR_materials_pbrSpecularGlossiness');
+		const clearcoatExt = loader.extensions.get('KHR_materials_clearcoat');
+		const techniquesExt = loader.extensions.get('KHR_techniques_webgl');
 
 		const materials = [];
 		for (let i = 0; i < gltf.materials.length; i++) {
@@ -4458,19 +4487,20 @@ class MaterialParser {
 				name = ''
 			} = gltf.materials[i];
 
-			const { KHR_materials_unlit, KHR_materials_pbrSpecularGlossiness: KHR_materials_pbrSpecularGlossiness$1, KHR_materials_clearcoat: KHR_materials_clearcoat$1 } = extensions;
+			const { KHR_materials_unlit, KHR_materials_pbrSpecularGlossiness, KHR_materials_clearcoat, KHR_techniques_webgl } = extensions;
 
 			let material = null;
-			if (KHR_materials_unlit) {
-				material = new InstancedBasicMaterial(); // @parser-modification - instanced materials
-			} else if (KHR_materials_pbrSpecularGlossiness$1) {
-				// TODO - InstancedPBR2Material
-				material = new InstancedPBRMaterial(); // @parser-modification - instanced materials
-				material.specular = new Color3(0x111111);
-				KHR_materials_pbrSpecularGlossiness.parseParams(material, KHR_materials_pbrSpecularGlossiness$1, textures);
-			} else if (KHR_materials_clearcoat$1) {
-				material = new InstancedPBRMaterial(); // @parser-modification - instanced materials
-				KHR_materials_clearcoat.parseParams(material, KHR_materials_clearcoat$1, textures);
+			if (KHR_materials_unlit && unlitExt) {
+				material = unlitExt.getMaterial();
+			} else if (KHR_materials_pbrSpecularGlossiness && pbrSpecularGlossinessExt) {
+				material = pbrSpecularGlossinessExt.getMaterial();
+				pbrSpecularGlossinessExt.parseParams(material, KHR_materials_pbrSpecularGlossiness, textures, transformExt);
+			} else if (KHR_materials_clearcoat && clearcoatExt) {
+				material = clearcoatExt.getMaterial();
+				clearcoatExt.parseParams(material, KHR_materials_clearcoat, textures);
+			} else if (KHR_techniques_webgl && techniquesExt) { // @parser-modification - add KHR_techniques_webgl
+				material = techniquesExt.getMaterial();
+				techniquesExt.parseParams(material, KHR_techniques_webgl, textures);
 			} else {
 				material = new InstancedPBRMaterial(); // @parser-modification - instanced materials
 			}
@@ -4490,18 +4520,17 @@ class MaterialParser {
 					material.diffuseMapCoord = baseColorTexture.texCoord || 0;
 					if (material.diffuseMap) {
 						material.diffuseMap.encoding = TEXEL_ENCODING_TYPE.SRGB;
-						parseTextureTransform(material, 'diffuseMap', baseColorTexture.extensions);
+						transformExt && transformExt.handleMaterialMap(material, 'diffuseMap', baseColorTexture);
 					}
 				}
 
-				if (!KHR_materials_unlit && !KHR_materials_pbrSpecularGlossiness$1) {
+				if (!KHR_materials_unlit && !KHR_materials_pbrSpecularGlossiness) {
 					material.metalness = metallicFactor !== undefined ? metallicFactor : 1;
 					material.roughness = roughnessFactor !== undefined ? roughnessFactor : 1;
 					if (metallicRoughnessTexture) {
 						material.metalnessMap = textures[metallicRoughnessTexture.index];
 						material.roughnessMap = textures[metallicRoughnessTexture.index];
-						// parseTextureTransform(material, 'metalnessMap', metallicRoughnessTexture.extensions);
-						// parseTextureTransform(material, 'roughnessMap', metallicRoughnessTexture.extensions);
+						// metallicRoughnessTexture transform not supported yet
 					}
 				}
 			}
@@ -4515,7 +4544,7 @@ class MaterialParser {
 				material.emissiveMapCoord = emissiveTexture.texCoord || 0;
 				if (material.emissiveMap) {
 					material.emissiveMap.encoding = TEXEL_ENCODING_TYPE.SRGB;
-					parseTextureTransform(material, 'emissiveMap', emissiveTexture.extensions);
+					transformExt && transformExt.handleMaterialMap(material, 'emissiveMap', emissiveTexture);
 				}
 			}
 
@@ -4526,7 +4555,7 @@ class MaterialParser {
 					material.aoMapIntensity = occlusionTexture.strength;
 				}
 				if (material.aoMap) {
-					parseTextureTransform(material, 'aoMap', occlusionTexture.extensions);
+					transformExt && transformExt.handleMaterialMap(material, 'aoMap', occlusionTexture);
 				}
 			}
 
@@ -4541,7 +4570,7 @@ class MaterialParser {
 						material.normalScale.set(normalTexture.scale, -normalTexture.scale);
 					}
 
-					if (material.normalMap) ;
+					// normal map transform not supported yet
 				}
 			}
 
@@ -4565,19 +4594,14 @@ class MaterialParser {
 
 }
 
-function parseTextureTransform(material, key, extensions = {}) {
-	const extension = extensions.KHR_texture_transform;
-	if (extension) {
-		KHR_texture_transform.transform(material[key + 'Transform'], extension);
-	}
-}
-
 class PrimitiveParser {
 
 	static parse(context, loader) {
 		const { gltf, accessors, materials, bufferViews } = context;
 
 		if (!gltf.meshes) return;
+
+		const dracoExt = loader.extensions.get('KHR_draco_mesh_compression');
 
 		const materialCache = new Map();
 		const geometryPromiseCache = new Map();
@@ -4594,7 +4618,7 @@ class PrimitiveParser {
 					mode,
 					material
 				} = gltfPrimitive;
-				const { KHR_draco_mesh_compression: KHR_draco_mesh_compression$1 } = extensions;
+				const { KHR_draco_mesh_compression } = extensions;
 
 				let geometryPromise;
 
@@ -4602,8 +4626,8 @@ class PrimitiveParser {
 				if (geometryPromiseCache.has(geometryKey)) {
 					geometryPromise = geometryPromiseCache.get(geometryKey);
 				} else {
-					if (KHR_draco_mesh_compression$1) {
-						geometryPromise = KHR_draco_mesh_compression.getGeometry(KHR_draco_mesh_compression$1, bufferViews, gltfPrimitive.attributes, gltf.accessors, loader.getDRACOLoader());
+					if (KHR_draco_mesh_compression && dracoExt) {
+						geometryPromise = dracoExt.getGeometry(KHR_draco_mesh_compression, bufferViews, gltfPrimitive.attributes, gltf.accessors, loader.getDRACOLoader());
 					} else {
 						geometryPromise = Promise.resolve(new Geometry());
 					}
@@ -4979,6 +5003,74 @@ const tempQuat = new Quaternion();
 const tempSca = new Vector3();
 const tempMat$1 = new Matrix4();
 
+class KHR_techniques_webgl_i extends KHR_techniques_webgl {
+
+	static getMaterial() {
+		return new InstancedPBRMaterial();
+	}
+
+}
+
+class InstancedBasicMaterial extends BasicMaterial {
+
+	constructor() {
+		super();
+		this.type = MATERIAL_TYPE.SHADER;
+		this.shaderName = 'TILE_I_BASIC';
+		this.vertexShader = vertexShader;
+		this.fragmentShader = ShaderLib.basic_frag;
+		this.defines.USE_INSTANCING = true;
+	}
+
+}
+
+InstancedBasicMaterial.prototype.isInstancedBasicMaterial = true;
+
+let vertexShader = ShaderLib.basic_vert;
+
+vertexShader = vertexShader.replace('#include <logdepthbuf_pars_vert>', `
+    #include <logdepthbuf_pars_vert>
+    ${instancingParsVert}
+`);
+vertexShader = vertexShader.replace('#include <pvm_vert>', `
+    ${instancingPositionVert}
+    #include <pvm_vert>
+`);
+vertexShader = vertexShader.replace('#include <normal_vert>', `
+    ${instancingNormalVert}
+    #include <normal_vert>
+`);
+
+class KHR_materials_unlit_i {
+
+	static getMaterial() {
+		return new InstancedBasicMaterial();
+	}
+
+}
+
+class KHR_materials_pbrSpecularGlossiness_i extends KHR_materials_pbrSpecularGlossiness {
+
+	static getMaterial() {
+		const material = new InstancedPBRMaterial();
+		material.specular = new Color3(0x111111);
+		return material;
+	}
+
+}
+
+/**
+ * Clearcoat Materials Extension
+ * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_clearcoat
+ */
+class KHR_materials_clearcoat_i extends KHR_materials_clearcoat {
+
+	static getMaterial() {
+		return new InstancedPBRMaterial();
+	}
+
+}
+
 /**
  * I3DMLoader is a loader for the I3DM format.
  */
@@ -5004,6 +5096,12 @@ class I3DMLoader extends GLTFLoader {
 			AnimationParser,
 			I3DMRootParser // insert I3DMSetupParser
 		]);
+
+		this.extensions.set('KHR_techniques_webgl', KHR_techniques_webgl_i);
+
+		this.extensions.set('KHR_materials_unlit', KHR_materials_unlit_i);
+		this.extensions.set('KHR_materials_pbrSpecularGlossiness', KHR_materials_pbrSpecularGlossiness_i);
+		this.extensions.set('KHR_materials_clearcoat', KHR_materials_clearcoat_i);
 	}
 
 }
