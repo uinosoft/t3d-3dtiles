@@ -1290,26 +1290,20 @@
 				priorityCallback
 			});
 		}
-		fetchTileSet(url, parent = null, fetchOptions = {}) {
-			return fetch(url, fetchOptions).then(res => {
-				if (res.ok) {
-					return res.json();
-				} else {
-					throw new Error(`TilesLoader: Failed to load tileset "${url}" with status ${res.status} : ${res.statusText}`);
-				}
-			}).then(json => {
-				const version = json.asset.version;
-				const [major, minor] = version.split('.').map(v => parseInt(v));
-				console.assert(major <= 1, 'TilesLoader: asset.version is expected to be a 1.x or a compatible version.');
-				if (major === 1 && minor > 0) {
-					console.warn('TilesLoader: tiles versions at 1.1 or higher have limited support. Some new extensions and features may not be supported.');
-				}
+		preprocessTileSet(json, url, parent = null) {
+			const version = json.asset.version;
+			const [major, minor] = version.split('.').map(v => parseInt(v));
+			console.assert(major <= 1, 'TilesLoader: asset.version is expected to be a 1.x or a compatible version.');
+			if (major === 1 && minor > 0) {
+				console.warn('TilesLoader: tiles versions at 1.1 or higher have limited support. Some new extensions and features may not be supported.');
+			}
 
-				// remove trailing slash and last path-segment from the URL
-				const basePath = url.replace(/\/[^/]*\/?$/, '');
-				traverseSet(json.root, (node, parent) => preprocessTile(node, parent, basePath), null, parent, parent ? parent.__depth : 0);
-				return json;
-			});
+			// remove the last file path path-segment from the URL including the trailing slash
+			let basePath = url.replace(/\/[^/]*$/, '');
+			basePath = new URL(basePath, window.location.href).toString();
+
+			// this.preprocessNode(json.root, basePath, parent);
+			traverseSet(json.root, (node, parent) => preprocessTile(node, parent, basePath), null, parent, parent ? parent.__depth : 0);
 		}
 		requestTileContents(tile, tiles3D) {
 			// If the tile is already being loaded then don't
@@ -1380,18 +1374,27 @@
 					lruCache.remove(tile);
 				}
 			};
+			let uri = tile.content.uri;
+			tiles3D.invokeAllPlugins(plugin => uri = plugin.preprocessURL ? plugin.preprocessURL(uri, tile) : uri);
 			if (isExternalTileSet) {
 				downloadQueue.add(tile, tileCb => {
 					// if it has been unloaded then the tile has been disposed
 					if (tileCb.__loadIndex !== loadIndex) {
 						return Promise.resolve();
 					}
-					const preprocessURL = tiles3D.preprocessURL;
-					const fetchOptions = tiles3D.fetchOptions;
-					const uri = preprocessURL ? preprocessURL(tileCb.content.uri) : tileCb.content.uri;
-					return this.fetchTileSet(uri, tileCb, Object.assign({
+					return tiles3D.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, {
+						...tiles3D.fetchOptions,
 						signal
-					}, fetchOptions));
+					}));
+				}).then(res => {
+					if (res.ok) {
+						return res.json();
+					} else {
+						throw new Error(`TilesLoader: Failed to load tileset "${uri}" with status ${res.status} : ${res.statusText}`);
+					}
+				}).then(json => {
+					this.preprocessTileSet(json, uri, tile);
+					return json;
 				}).then(json => {
 					// if it has been unloaded then the tile has been disposed
 					if (tile.__loadIndex !== loadIndex) {
@@ -1403,16 +1406,14 @@
 					tile.children.push(json.root);
 				}).catch(errorCallback);
 			} else {
-				downloadQueue.add(tile, downloadTile => {
-					if (downloadTile.__loadIndex !== loadIndex) {
+				downloadQueue.add(tile, tileCb => {
+					if (tileCb.__loadIndex !== loadIndex) {
 						return Promise.resolve();
 					}
-					const preprocessURL = tiles3D.preprocessURL;
-					const fetchOptions = tiles3D.fetchOptions;
-					const uri = preprocessURL ? preprocessURL(downloadTile.content.uri) : downloadTile.content.uri;
-					return fetch(uri, Object.assign({
+					return tiles3D.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, {
+						...tiles3D.fetchOptions,
 						signal
-					}, fetchOptions));
+					}));
 				}).then(res => {
 					if (tile.__loadIndex !== loadIndex) {
 						return;
@@ -5151,32 +5152,54 @@
 
 			// internals
 
-			this._rootURL = url;
+			this.rootURL = url;
 			this._rootTileSet = null;
 			this._autoDisableRendererCulling = true;
+			this.plugins = [];
 			this.$cameras = new CameraList();
 			this.$tilesLoader = new TilesLoader();
 			this.$modelLoader = new ModelLoader(manager);
 			this.$events = new t3d.EventDispatcher();
 		}
-		get rootURL() {
-			return this._rootURL;
+		loadRootTileSet() {
+			// transform the url
+			let processedUrl = this.rootURL;
+			this.invokeAllPlugins(plugin => processedUrl = plugin.preprocessURL ? plugin.preprocessURL(processedUrl, null) : processedUrl);
+
+			// load the tile set root
+			const pr = this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(processedUrl, this.fetchOptions)).then(res => {
+				if (res.ok) {
+					return res.json();
+				} else {
+					throw new Error(`Tiles3D: Failed to load tileset "${processedUrl}" with status ${res.status} : ${res.statusText}`);
+				}
+			}).then(root => {
+				this.$tilesLoader.preprocessTileSet(root, processedUrl);
+				return root;
+			});
+			return pr;
+		}
+		fetchData(url, options) {
+			return fetch(url, options);
 		}
 		get rootTileSet() {
 			const rootTileSet = this._rootTileSet;
 			if (!rootTileSet) {
-				const url = this._rootURL;
-				this._rootTileSet = this.$tilesLoader.fetchTileSet(this.preprocessURL ? this.preprocessURL(url) : url, null, this.fetchOptions).then(json => {
-					this._rootTileSet = json;
-				}).then(json => {
+				this._rootTileSet = this.invokeOnePlugin(plugin => plugin.loadRootTileSet && plugin.loadRootTileSet()).then(root => {
+					let processedUrl = this.rootURL;
+					if (processedUrl !== null) {
+						this.invokeAllPlugins(plugin => processedUrl = plugin.preprocessURL ? plugin.preprocessURL(processedUrl, null) : processedUrl);
+					}
+					this._rootTileSet = root;
+
 					// Push this onto the end of the event stack to ensure this runs
 					// after the base renderer has placed the provided json where it
 					// needs to be placed and is ready for an update.
 					Promise.resolve().then(() => {
 						// TODO dispatch event only if this is the root tileset for now, we can
 						// dispatch this event for all tilesets in the future
-						_TileSetLoadedEvent.json = json;
-						_TileSetLoadedEvent.url = url;
+						_TileSetLoadedEvent.json = root;
+						_TileSetLoadedEvent.url = processedUrl;
 						this.$events.dispatchEvent(_TileSetLoadedEvent);
 					});
 				}).catch(err => {
@@ -5208,6 +5231,46 @@
 					}
 				});
 			}
+		}
+		registerPlugin(plugin) {
+			if (plugin[PLUGIN_REGISTERED] === true) {
+				throw new Error('Tiles3D: A plugin can only be registered to a single tile set');
+			}
+
+			// insert the plugin based on the priority registered on the plugin
+			const plugins = this.plugins;
+			const priority = plugin.priority || 0;
+			let insertionPoint = plugins.length;
+			for (let i = 0; i < plugins.length; i++) {
+				const otherPriority = plugins[i].priority || 0;
+				if (otherPriority > priority) {
+					insertionPoint = i;
+					break;
+				}
+			}
+			plugins.splice(insertionPoint, 0, plugin);
+			plugin[PLUGIN_REGISTERED] = true;
+			if (plugin.init) {
+				plugin.init(this);
+			}
+		}
+		unregisterPlugin(plugin) {
+			const plugins = this.plugins;
+			if (typeof plugin === 'string') {
+				plugin = this.getPluginByName(name);
+			}
+			if (plugins.includes(plugin)) {
+				const index = plugins.indexOf(plugin);
+				plugins.splice(index, 1);
+				if (plugin.dispose) {
+					plugin.dispose();
+				}
+				return true;
+			}
+			return false;
+		}
+		getPluginByName(name) {
+			return this.plugins.find(p => p.name === name) || null;
 		}
 		setDRACOLoader(dracoLoader) {
 			this.$modelLoader.setDRACOLoader(dracoLoader);
@@ -5353,6 +5416,31 @@
 				}
 			}
 		}
+		getAttributions(target = []) {
+			this.invokeAllPlugins(plugin => plugin !== this && plugin.getAttributions && plugin.getAttributions(target));
+			return target;
+		}
+		invokeOnePlugin(func) {
+			const plugins = [...this.plugins, this];
+			for (let i = 0; i < plugins.length; i++) {
+				const result = func(plugins[i]);
+				if (result) {
+					return result;
+				}
+			}
+			return null;
+		}
+		invokeAllPlugins(func) {
+			const plugins = [...this.plugins, this];
+			const pending = [];
+			for (let i = 0; i < plugins.length; i++) {
+				const result = func(plugins[i]);
+				if (result) {
+					pending.push(result);
+				}
+			}
+			return pending.length === 0 ? null : Promise.all(pending);
+		}
 		$parseTile(buffer, tile, extension) {
 			return this.$modelLoader.loadTileContent(buffer, tile, extension, this).then(scene => {
 				scene.traverse(c => {
@@ -5419,6 +5507,7 @@
 			tile._loadIndex++;
 		}
 	}
+	const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
 	const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
 	const _TileSetLoadedEvent = {
 		type: 'TileSetLoaded',
@@ -5453,6 +5542,140 @@
 		return true;
 	};
 
+	class CesiumIonAuthPlugin {
+		constructor({
+			apiToken,
+			assetId = null,
+			autoRefreshToken = false,
+			useRecommendedSettings = true
+		}) {
+			this.name = 'CESIUM_ION_AUTH_PLUGIN';
+			this.priority = -Infinity;
+			this.apiToken = apiToken;
+			this.assetId = assetId;
+			this.autoRefreshToken = autoRefreshToken;
+			this.useRecommendedSettings = useRecommendedSettings;
+			this.tiles = null;
+			this.endpointURL = null;
+			this._bearerToken = null;
+			this._tileSetVersion = -1;
+			this._tokenRefreshPromise = null;
+			this._attributions = [];
+			this._disposed = false;
+		}
+		init(tiles) {
+			if (this.assetId !== null) {
+				tiles.rootURL = `https://api.cesium.com/v1/assets/${this.assetId}/endpoint`;
+			}
+			this.tiles = tiles;
+			this.endpointURL = tiles.rootURL;
+
+			// reset the tiles in case this plugin was removed and re-added
+			tiles.resetFailedTiles();
+		}
+		loadRootTileSet() {
+			// ensure we have an up-to-date token and root url, then trigger the internal
+			// root tile set load function
+			return this._refreshToken().then(() => {
+				return this.tiles.invokeOnePlugin(plugin => plugin !== this && plugin.loadRootTileSet && plugin.loadRootTileSet());
+			});
+		}
+		preprocessURL(uri) {
+			uri = new URL(uri);
+			if (/^http/.test(uri.protocol) && this._tileSetVersion != -1) {
+				uri.searchParams.append('v', this._tileSetVersion);
+			}
+			return uri.toString();
+		}
+		fetchData(uri, options) {
+			const tiles = this.tiles;
+			if (tiles.getPluginByName('GOOGLE_CLOUD_AUTH_PLUGIN') !== null) {
+				return null;
+			} else {
+				return Promise.resolve().then(async () => {
+					// wait for the token to refresh if loading
+					if (this._tokenRefreshPromise !== null) {
+						await this._tokenRefreshPromise;
+						uri = this.preprocessURL(uri);
+					}
+					const res = await fetch(uri, options);
+					if (res.status >= 400 && res.status <= 499 && this.autoRefreshToken) {
+						await this._refreshToken(options);
+						return fetch(this.preprocessURL(uri), options);
+					} else {
+						return res;
+					}
+				});
+			}
+		}
+		getAttributions(target) {
+			if (this.tiles.visibleTiles.size > 0) {
+				target.push(...this._attributions);
+			}
+		}
+		_refreshToken(options) {
+			if (this._tokenRefreshPromise === null) {
+				// construct the url to fetch the endpoint
+				const url = new URL(this.endpointURL);
+				url.searchParams.append('access_token', this.apiToken);
+				this._tokenRefreshPromise = fetch(url, options).then(res => {
+					if (this._disposed) {
+						return null;
+					}
+					if (!res.ok) {
+						throw new Error(`CesiumIonAuthPlugin: Failed to load data with error code ${res.status}`);
+					}
+					return res.json();
+				}).then(json => {
+					if (this._disposed) {
+						return null;
+					}
+					const tiles = this.tiles;
+					if ('externalType' in json) ; else {
+						// GLTF
+						// CZML
+						// KML
+						// GEOJSON
+						if (json.type === 'TERRAIN' && tiles.getPluginByName('QUANTIZED_MESH_PLUGIN') === null) ; else if (json.type === 'IMAGERY' && tiles.getPluginByName('TMS_TILES_PLUGIN') === null) ;
+						tiles.rootURL = json.url;
+						tiles.fetchOptions.headers = tiles.fetchOptions.headers || {};
+						tiles.fetchOptions.headers.Authorization = `Bearer ${json.accessToken}`;
+
+						// save the version key if present
+						if (url.searchParams.has('v') && this._tileSetVersion === -1) {
+							const url = new URL(json.url);
+							this._tileSetVersion = url.searchParams.get('v');
+						}
+						this._bearerToken = json.accessToken;
+						if (json.attributions) {
+							this._attributions = json.attributions.map(att => ({
+								value: att.html,
+								type: 'html',
+								collapsible: att.collapsible
+							}));
+						}
+					}
+					this._tokenRefreshPromise = null;
+					return json;
+				});
+
+				// dispatch an error if we fail to refresh the token
+				this._tokenRefreshPromise.catch(error => {
+					this.tiles.dispatchEvent({
+						type: 'load-error',
+						tile: null,
+						error,
+						url
+					});
+				});
+			}
+			return this._tokenRefreshPromise;
+		}
+		dispose() {
+			this._disposed = true;
+		}
+	}
+
 	class LoadParser {
 		static parse(context, loader) {
 			const extension = getUrlExtension(context.url);
@@ -5472,6 +5695,7 @@
 
 	exports.B3DMLoader = B3DMLoader;
 	exports.CMPTLoader = CMPTLoader;
+	exports.CesiumIonAuthPlugin = CesiumIonAuthPlugin;
 	exports.DebugLoadParser = LoadParser;
 	exports.I3DMLoader = I3DMLoader;
 	exports.InstancedBasicMaterial = InstancedBasicMaterial;

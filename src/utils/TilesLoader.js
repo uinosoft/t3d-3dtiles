@@ -13,38 +13,30 @@ export class TilesLoader {
 		this.parseQueue = new PriorityQueue({ maxJobs: 1, priorityCallback });
 	}
 
-	fetchTileSet(url, parent = null, fetchOptions = {}) {
-		return fetch(url, fetchOptions).then(res => {
-			if (res.ok) {
-				return res.json();
-			} else {
-				throw new Error(`TilesLoader: Failed to load tileset "${url}" with status ${res.status} : ${res.statusText}`);
-			}
-		}).then(json => {
-			const version = json.asset.version;
-			const [major, minor] = version.split('.').map(v => parseInt(v));
-			console.assert(
-				major <= 1,
-				'TilesLoader: asset.version is expected to be a 1.x or a compatible version.'
-			);
+	preprocessTileSet(json, url, parent = null) {
+		const version = json.asset.version;
+		const [major, minor] = version.split('.').map(v => parseInt(v));
+		console.assert(
+			major <= 1,
+			'TilesLoader: asset.version is expected to be a 1.x or a compatible version.'
+		);
 
-			if (major === 1 && minor > 0) {
-				console.warn('TilesLoader: tiles versions at 1.1 or higher have limited support. Some new extensions and features may not be supported.');
-			}
+		if (major === 1 && minor > 0) {
+			console.warn('TilesLoader: tiles versions at 1.1 or higher have limited support. Some new extensions and features may not be supported.');
+		}
 
-			// remove trailing slash and last path-segment from the URL
-			const basePath = url.replace(/\/[^/]*\/?$/, '');
+		// remove the last file path path-segment from the URL including the trailing slash
+		let basePath = url.replace(/\/[^/]*$/, '');
+		basePath = new URL(basePath, window.location.href).toString();
 
-			traverseSet(
-				json.root,
-				(node, parent) => preprocessTile(node, parent, basePath),
-				null,
-				parent,
-				parent ? parent.__depth : 0
-			);
-
-			return json;
-		});
+		// this.preprocessNode(json.root, basePath, parent);
+		traverseSet(
+			json.root,
+			(node, parent) => preprocessTile(node, parent, basePath),
+			null,
+			parent,
+			parent ? parent.__depth : 0
+		);
 	}
 
 	requestTileContents(tile, tiles3D) {
@@ -127,6 +119,9 @@ export class TilesLoader {
 			}
 		};
 
+		let uri = tile.content.uri;
+		tiles3D.invokeAllPlugins(plugin => uri = plugin.preprocessURL ? plugin.preprocessURL(uri, tile) : uri);
+
 		if (isExternalTileSet) {
 			downloadQueue.add(tile, tileCb => {
 				// if it has been unloaded then the tile has been disposed
@@ -134,10 +129,16 @@ export class TilesLoader {
 					return Promise.resolve();
 				}
 
-				const preprocessURL = tiles3D.preprocessURL;
-				const fetchOptions = tiles3D.fetchOptions;
-				const uri = preprocessURL ? preprocessURL(tileCb.content.uri) : tileCb.content.uri;
-				return this.fetchTileSet(uri, tileCb, Object.assign({ signal }, fetchOptions));
+				return tiles3D.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, { ...tiles3D.fetchOptions, signal }));
+			}).then(res => {
+				if (res.ok) {
+					return res.json();
+				} else {
+					throw new Error(`TilesLoader: Failed to load tileset "${uri}" with status ${res.status} : ${res.statusText}`);
+				}
+			}).then(json => {
+				this.preprocessTileSet(json, uri, tile);
+				return json;
 			}).then(json => {
 				// if it has been unloaded then the tile has been disposed
 				if (tile.__loadIndex !== loadIndex) {
@@ -151,15 +152,12 @@ export class TilesLoader {
 				tile.children.push(json.root);
 			}).catch(errorCallback);
 		} else {
-			downloadQueue.add(tile, downloadTile => {
-				if (downloadTile.__loadIndex !== loadIndex) {
+			downloadQueue.add(tile, tileCb => {
+				if (tileCb.__loadIndex !== loadIndex) {
 					return Promise.resolve();
 				}
 
-				const preprocessURL = tiles3D.preprocessURL;
-				const fetchOptions = tiles3D.fetchOptions;
-				const uri = preprocessURL ? preprocessURL(downloadTile.content.uri) : downloadTile.content.uri;
-				return fetch(uri, Object.assign({ signal }, fetchOptions));
+				return tiles3D.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, { ...tiles3D.fetchOptions, signal }));
 			}).then(res => {
 				if (tile.__loadIndex !== loadIndex) {
 					return;

@@ -41,7 +41,7 @@
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
 		import { KTX2Loader } from 't3d/addons/loaders/KTX2Loader.js';
 
-		import { Tiles3D } from 't3d-3dtiles';
+		import { Tiles3D, CesiumIonAuthPlugin } from 't3d-3dtiles';
 		import {
 			Tiles3DDebugger,
 			NONE,
@@ -55,7 +55,6 @@
 			RANDOM_NODE_COLOR
 		} from './jsm/Tiles3DDebugger.js';
 		import { setTiles3DToOrigin } from './jsm/Tiles3DUtils.js';
-		import CesiumIon from './jsm/CesiumIon.js';
 
 		import { GUI } from './libs/lil-gui.esm.min.js';
 		import * as KTXParse from './libs/ktx-parse.module.js';
@@ -117,10 +116,12 @@
 		let tiles3D, tilesDebugger, tileOptionsFolder, debugFolder;
 
 		async function fetchIonAsset(ionAssetId, ionAccessToken) {
-			const ionAssetJson = await CesiumIon.fetchAssetJson(ionAssetId, ionAccessToken);
-		
-			tiles3D = new Tiles3D(ionAssetJson.url);
-			CesiumIon.initTiles3D(tiles3D, ionAssetJson);
+			tiles3D = new Tiles3D();
+
+			tiles3D.registerPlugin(new CesiumIonAuthPlugin({
+				apiToken: ionAccessToken,
+				assetId: ionAssetId
+			}));
 
 			const dracoLoader = new DRACOLoader();
 			dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');

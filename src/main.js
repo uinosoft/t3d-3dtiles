@@ -11,4 +11,6 @@ export * from './loaders/TileGLTFLoader.js';
 export * from './loaders/I3DMLoader.js';
 export * from './loaders/PNTSLoader.js';
 
+export { CesiumIonAuthPlugin } from './plugins/CesiumIonAuthPlugin.js';
+
 export { LoadParser as DebugLoadParser } from './loaders/parsers/LoadParser.js';

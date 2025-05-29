@@ -51,10 +51,12 @@ export class Tiles3D extends Object3D {
 
 		// internals
 
-		this._rootURL = url;
+		this.rootURL = url;
 		this._rootTileSet = null;
 
 		this._autoDisableRendererCulling = true;
+
+		this.plugins = [];
 
 		this.$cameras = new CameraList();
 		this.$tilesLoader = new TilesLoader();
@@ -62,28 +64,54 @@ export class Tiles3D extends Object3D {
 		this.$events = new EventDispatcher();
 	}
 
-	get rootURL() {
-		return this._rootURL;
+	loadRootTileSet() {
+		// transform the url
+		let processedUrl = this.rootURL;
+		this.invokeAllPlugins(plugin => processedUrl = plugin.preprocessURL ? plugin.preprocessURL(processedUrl, null) : processedUrl);
+
+		// load the tile set root
+		const pr = this
+			.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(processedUrl, this.fetchOptions))
+			.then(res => {
+				if (res.ok) {
+					return res.json();
+				} else {
+					throw new Error(`Tiles3D: Failed to load tileset "${processedUrl}" with status ${res.status} : ${res.statusText}`);
+				}
+			})
+			.then(root => {
+				this.$tilesLoader.preprocessTileSet(root, processedUrl);
+				return root;
+			});
+
+		return pr;
+	}
+
+	fetchData(url, options) {
+		return fetch(url, options);
 	}
 
 	get rootTileSet() {
 		const rootTileSet = this._rootTileSet;
 
 		if (!rootTileSet) {
-			const url = this._rootURL;
-			this._rootTileSet = this.$tilesLoader.fetchTileSet(this.preprocessURL ? this.preprocessURL(url) : url, null, this.fetchOptions)
-				.then(json => {
-					this._rootTileSet = json;
-				})
-				.then(json => {
+			this._rootTileSet = this.invokeOnePlugin(plugin => plugin.loadRootTileSet && plugin.loadRootTileSet())
+				.then(root => {
+					let processedUrl = this.rootURL;
+					if (processedUrl !== null) {
+						this.invokeAllPlugins(plugin => processedUrl = plugin.preprocessURL ? plugin.preprocessURL(processedUrl, null) : processedUrl);
+					}
+
+					this._rootTileSet = root;
+
 					// Push this onto the end of the event stack to ensure this runs
 					// after the base renderer has placed the provided json where it
 					// needs to be placed and is ready for an update.
 					Promise.resolve().then(() => {
 						// TODO dispatch event only if this is the root tileset for now, we can
 						// dispatch this event for all tilesets in the future
-						_TileSetLoadedEvent.json = json;
-						_TileSetLoadedEvent.url = url;
+						_TileSetLoadedEvent.json = root;
+						_TileSetLoadedEvent.url = processedUrl;
 						this.$events.dispatchEvent(_TileSetLoadedEvent);
 					});
 				})
@@ -120,6 +148,53 @@ export class Tiles3D extends Object3D {
 				}
 			});
 		}
+	}
+
+	registerPlugin(plugin) {
+		if (plugin[PLUGIN_REGISTERED] === true) {
+			throw new Error('Tiles3D: A plugin can only be registered to a single tile set');
+		}
+
+		// insert the plugin based on the priority registered on the plugin
+		const plugins = this.plugins;
+		const priority = plugin.priority || 0;
+		let insertionPoint = plugins.length;
+		for (let i = 0; i < plugins.length; i++) {
+			const otherPriority = plugins[i].priority || 0;
+			if (otherPriority > priority) {
+				insertionPoint = i;
+				break;
+			}
+		}
+
+		plugins.splice(insertionPoint, 0, plugin);
+		plugin[PLUGIN_REGISTERED] = true;
+		if (plugin.init) {
+			plugin.init(this);
+		}
+	}
+
+	unregisterPlugin(plugin) {
+		const plugins = this.plugins;
+		if (typeof plugin === 'string') {
+			plugin = this.getPluginByName(name);
+		}
+
+		if (plugins.includes(plugin)) {
+			const index = plugins.indexOf(plugin);
+			plugins.splice(index, 1);
+			if (plugin.dispose) {
+				plugin.dispose();
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+
+	getPluginByName(name) {
+		return this.plugins.find(p => p.name === name) || null;
 	}
 
 	setDRACOLoader(dracoLoader) {
@@ -299,6 +374,36 @@ export class Tiles3D extends Object3D {
 		}
 	}
 
+	getAttributions(target = []) {
+		this.invokeAllPlugins(plugin => plugin !== this && plugin.getAttributions && plugin.getAttributions(target));
+		return target;
+	}
+
+	invokeOnePlugin(func) {
+		const plugins = [...this.plugins, this];
+		for (let i = 0; i < plugins.length; i++) {
+			const result = func(plugins[i]);
+			if (result) {
+				return result;
+			}
+		}
+
+		return null;
+	}
+
+	invokeAllPlugins(func) {
+		const plugins = [...this.plugins, this];
+		const pending = [];
+		for (let i = 0; i < plugins.length; i++) {
+			const result = func(plugins[i]);
+			if (result) {
+				pending.push(result);
+			}
+		}
+
+		return pending.length === 0 ? null : Promise.all(pending);
+	}
+
 	$parseTile(buffer, tile, extension) {
 		return this.$modelLoader.loadTileContent(buffer, tile, extension, this)
 			.then(scene => {
@@ -378,6 +483,8 @@ export class Tiles3D extends Object3D {
 	}
 
 }
+
+const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
 
 const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
 
