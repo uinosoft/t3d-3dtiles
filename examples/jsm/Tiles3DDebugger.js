@@ -23,7 +23,7 @@ export class Tiles3DDebugger {
 		let extremeDebugDepth = -1;
 		let extremeDebugError = -1;
 
-		tiles3D.addEventListener('TileSetLoaded', ({ json, url }) => {
+		tiles3D.addEventListener('load-tile-set', ({ tileSet, url }) => {
 			// only update for the root tileset
 
 			if (url !== tiles3D.rootURL) return;

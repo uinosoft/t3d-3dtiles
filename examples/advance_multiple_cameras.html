@@ -113,7 +113,7 @@
 		
 		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
-		tiles3D.addEventListener('TileSetLoaded', ({ json, url }) => {
+		tiles3D.addEventListener('load-tile-set', ({ tileSet, url }) => {
 			if (url !== tiles3D.rootURL) return;
 			offsetGroup.add(tiles3D);
 			offsetGroup.euler.x = Math.PI / 2;

@@ -1,5 +1,5 @@
 // t3d-3dtiles
-import { Matrix4, Ray, Vector3, Matrix3, Frustum, Vector2, Box3, Plane, Spherical, Sphere, Loader, Vector4, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Buffer, Attribute, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Bone, Object3D, Camera, SkinnedMesh, Mesh, Skeleton, KeyframeClip, QuaternionLinearInterpolant, LinearInterpolant, QuaternionCubicSplineInterpolant, CubicSplineInterpolant, StepInterpolant, VectorKeyframeTrack, NumberKeyframeTrack, QuaternionKeyframeTrack, DirectionalLight, PointLight, SpotLight, PBR2Material, FileLoader, ImageLoader, DefaultLoadingManager, ShaderLib, MATERIAL_TYPE, Quaternion, Color3, EventDispatcher, LoadingManager } from 't3d';
+import { Matrix4, Ray, Vector3, Matrix3, Frustum, Vector2, Box3, Plane, Spherical, Euler, Sphere, Loader, Vector4, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Buffer, Attribute, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Bone, Object3D, Camera, SkinnedMesh, Mesh, Skeleton, KeyframeClip, QuaternionLinearInterpolant, LinearInterpolant, QuaternionCubicSplineInterpolant, CubicSplineInterpolant, StepInterpolant, VectorKeyframeTrack, NumberKeyframeTrack, QuaternionKeyframeTrack, DirectionalLight, PointLight, SpotLight, PBR2Material, FileLoader, ImageLoader, DefaultLoadingManager, ShaderLib, MATERIAL_TYPE, Quaternion, Color3, EventDispatcher, LoadingManager } from 't3d';
 
 /**
  * Returns the file extension of the path component of a URL
@@ -93,10 +93,10 @@ const raycastTraverseFirstHit = (tile, tiles3D, ray, localRay = null) => {
 
 		const boundingVolume = child.cached.boundingVolume;
 
-		if (boundingVolume.intersectRay(localRay, _vec3_1$6)) {
-			_vec3_1$6.applyMatrix4(tiles3D.worldMatrix);
+		if (boundingVolume.intersectRay(localRay, _vec3_1$5)) {
+			_vec3_1$5.applyMatrix4(tiles3D.worldMatrix);
 			array.push({
-				distance: _vec3_1$6.distanceToSquared(ray.origin),
+				distance: _vec3_1$5.distanceToSquared(ray.origin),
 				tile: child
 			});
 		}
@@ -176,7 +176,7 @@ const _intersectTileScene = (tile, ray, intersects) => {
 
 const _mat4_1$1 = new Matrix4();
 const _ray_1$1 = new Ray();
-const _vec3_1$6 = new Vector3();
+const _vec3_1$5 = new Vector3();
 
 const _hitArray = [];
 
@@ -313,9 +313,9 @@ class CameraList {
 
 		_mat4_1.copy(originMatrix).inverse();
 
-		const invScaleX = _vec3_1$5.setFromMatrixColumn(_mat4_1, 0).getLength();
-		const invScaleY = _vec3_1$5.setFromMatrixColumn(_mat4_1, 1).getLength();
-		const invScaleZ = _vec3_1$5.setFromMatrixColumn(_mat4_1, 2).getLength();
+		const invScaleX = _vec3_1$4.setFromMatrixColumn(_mat4_1, 0).getLength();
+		const invScaleY = _vec3_1$4.setFromMatrixColumn(_mat4_1, 1).getLength();
+		const invScaleZ = _vec3_1$4.setFromMatrixColumn(_mat4_1, 2).getLength();
 
 		if (Math.abs(Math.max(invScaleX - invScaleY, invScaleX - invScaleZ)) > 1e-6) {
 			console.warn('CameraList.updateInfos(): Non uniform scale used for tile which may cause issues when calculating screen space error.');
@@ -373,7 +373,7 @@ class CameraList {
 
 const _mat4_1 = new Matrix4();
 const _mat4_2 = new Matrix4();
-const _vec3_1$5 = new Vector3();
+const _vec3_1$4 = new Vector3();
 
 /**
  * An oriented bounding box.
@@ -399,38 +399,38 @@ class OBB {
      * @return {OBB} A reference to this OBB.
      */
 	setFromCenterAndAxes(center, axisX, axisY, axisZ) {
-		_vec3_1$4.copy(axisX);
+		_vec3_1$3.copy(axisX);
 		_vec3_2$1.copy(axisY);
 		_vec3_3$1.copy(axisZ);
 
-		const scaleX = _vec3_1$4.getLength();
+		const scaleX = _vec3_1$3.getLength();
 		const scaleY = _vec3_2$1.getLength();
 		const scaleZ = _vec3_3$1.getLength();
 
-		_vec3_1$4.normalize();
+		_vec3_1$3.normalize();
 		_vec3_2$1.normalize();
 		_vec3_3$1.normalize();
 
 		// handle the case where the box has a dimension of 0 in one axis
 		if (scaleX === 0) {
-			_vec3_1$4.crossVectors(_vec3_2$1, _vec3_3$1);
+			_vec3_1$3.crossVectors(_vec3_2$1, _vec3_3$1);
 		}
 
 		if (scaleY === 0) {
-			_vec3_2$1.crossVectors(_vec3_1$4, _vec3_3$1);
+			_vec3_2$1.crossVectors(_vec3_1$3, _vec3_3$1);
 		}
 
 		if (scaleZ === 0) {
-			_vec3_3$1.crossVectors(_vec3_1$4, _vec3_2$1);
+			_vec3_3$1.crossVectors(_vec3_1$3, _vec3_2$1);
 		}
 
 		this.rotation.set(
-			_vec3_1$4.x, _vec3_2$1.x, _vec3_3$1.x,
-			_vec3_1$4.y, _vec3_2$1.y, _vec3_3$1.y,
-			_vec3_1$4.z, _vec3_2$1.z, _vec3_3$1.z
+			_vec3_1$3.x, _vec3_2$1.x, _vec3_3$1.x,
+			_vec3_1$3.y, _vec3_2$1.y, _vec3_3$1.y,
+			_vec3_1$3.z, _vec3_2$1.z, _vec3_3$1.z
 		);
 
-		const halfSize = _vec3_1$4.set(scaleX, scaleY, scaleZ);
+		const halfSize = _vec3_1$3.set(scaleX, scaleY, scaleZ);
 		this.box.min.copy(center).sub(halfSize);
 		this.box.max.copy(center).add(halfSize);
 
@@ -445,9 +445,9 @@ class OBB {
 	applyMatrix4(matrix) {
 		const e = matrix.elements;
 
-		let sx = _vec3_1$4.set(e[0], e[1], e[2]).getLength();
-		const sy = _vec3_1$4.set(e[4], e[5], e[6]).getLength();
-		const sz = _vec3_1$4.set(e[8], e[9], e[10]).getLength();
+		let sx = _vec3_1$3.set(e[0], e[1], e[2]).getLength();
+		const sy = _vec3_1$3.set(e[4], e[5], e[6]).getLength();
+		const sz = _vec3_1$3.set(e[8], e[9], e[10]).getLength();
 
 		const det = matrix.determinant();
 		if (det < 0) sx = -sx;
@@ -472,7 +472,7 @@ class OBB {
 
 		this.rotation.multiply(_mat3_1);
 
-		const center = this.box.getCenter(_vec3_1$4);
+		const center = this.box.getCenter(_vec3_1$3);
 		const halfSize = this.box.getSize(_vec3_2$1).multiplyScalar(0.5);
 
 		halfSize.x *= sx;
@@ -494,7 +494,7 @@ class OBB {
      * @return {Vector3[]} The array of points.
      */
 	getPoints(points) {
-		const center = this.box.getCenter(_vec3_1$4);
+		const center = this.box.getCenter(_vec3_1$3);
 		const min = _vec3_2$1.subVectors(this.box.min, center);
 		const max = _vec3_3$1.subVectors(this.box.max, center);
 
@@ -524,25 +524,25 @@ class OBB {
      * @return {Plane[]} The array of planes.
      */
 	getPlanes(planes) {
-		const center = this.box.getCenter(_vec3_1$4);
+		const center = this.box.getCenter(_vec3_1$3);
 		const worldMin = _vec3_2$1.subVectors(this.box.min, center).applyMatrix3(this.rotation).add(center);
 		const worldMax = _vec3_3$1.subVectors(this.box.max, center).applyMatrix3(this.rotation).add(center);
 
-		_vec3_1$4.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
-		planes[0].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
-		planes[1].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
+		_vec3_1$3.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
+		planes[0].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
+		planes[1].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
 		planes[1].normal.negate();
 		planes[1].constant *= -1;
 
-		_vec3_1$4.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
-		planes[2].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
-		planes[3].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
+		_vec3_1$3.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
+		planes[2].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
+		planes[3].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
 		planes[3].normal.negate();
 		planes[3].constant *= -1;
 
-		_vec3_1$4.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
-		planes[4].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
-		planes[5].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
+		_vec3_1$3.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
+		planes[4].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
+		planes[5].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
 		planes[5].normal.negate();
 		planes[5].constant *= -1;
 
@@ -552,7 +552,7 @@ class OBB {
 	containsPoint(point) {
 		const obbStruct = getOBBStruct(this, a);
 
-		const v = _vec3_1$4.subVectors(point, obbStruct.c);
+		const v = _vec3_1$3.subVectors(point, obbStruct.c);
 
 		// project _vec3_4 onto each axis and check if these points lie inside the OBB
 
@@ -568,7 +568,7 @@ class OBB {
 	clampPoint(point, result) {
 		const obbStruct = getOBBStruct(this, a);
 
-		const v = _vec3_1$4.subVectors(point, obbStruct.c);
+		const v = _vec3_1$3.subVectors(point, obbStruct.c);
 
 		// start at the center position of the OBB
 
@@ -611,7 +611,7 @@ class OBB {
 
 		// compute translation vector
 
-		const v1 = _vec3_1$4.subVectors(b.c, a.c);
+		const v1 = _vec3_1$3.subVectors(b.c, a.c);
 
 		// bring translation into a's coordinate frame
 
@@ -714,7 +714,7 @@ class OBB {
      * @param {Matrix4} transform - The transformation matrix.
      */
 	toBoundingBoxWithTransform(box3, transform) {
-		const center = this.box.getCenter(_vec3_1$4);
+		const center = this.box.getCenter(_vec3_1$3);
 
 		box3.min.copy(this.box.min).sub(center);
 		box3.max.copy(this.box.max).sub(center);
@@ -733,7 +733,7 @@ class OBB {
 
 const closestPoint = new Vector3();
 
-const _vec3_1$4 = new Vector3();
+const _vec3_1$3 = new Vector3();
 const _vec3_2$1 = new Vector3();
 const _vec3_3$1 = new Vector3();
 const _mat3_1 = new Matrix3();
@@ -797,8 +797,8 @@ class TileOBB extends OBB {
 	}
 
 	containsPoint(point) {
-		_vec3_1$3.copy(point).applyMatrix4(this._originBoxTransformInverse);
-		return this.box.containsPoint(_vec3_1$3);
+		_vec3_1$2.copy(point).applyMatrix4(this._originBoxTransformInverse);
+		return this.box.containsPoint(_vec3_1$2);
 	}
 
 	intersectsRay(ray) {
@@ -853,8 +853,8 @@ class TileOBB extends OBB {
 	distanceToPoint(point) {
 		// originBoxTransformInverse has no scale,
 		// so we don't need to scale the distance
-		_vec3_1$3.copy(point).applyMatrix4(this._originBoxTransformInverse);
-		return this._originBox.distanceToPoint(_vec3_1$3);
+		_vec3_1$2.copy(point).applyMatrix4(this._originBoxTransformInverse);
+		return this._originBox.distanceToPoint(_vec3_1$2);
 	}
 
 	getBoundingSphere(target) {
@@ -868,7 +868,7 @@ class TileOBB extends OBB {
 }
 
 const _ray_1 = new Ray();
-const _vec3_1$3 = new Vector3();
+const _vec3_1$2 = new Vector3();
 
 // Cesium / 3D tiles Spheroid:
 // - Up is Z at 90 degrees latitude
@@ -905,7 +905,50 @@ function latitudeToSphericalPhi(latitude) {
 class Ellipsoid {
 
 	constructor(radius = new Vector3(1, 1, 1)) {
+		this.name = '';
 		this.radius = radius;
+	}
+
+	// returns a frame with Z indicating altitude
+	// Y pointing north
+	// X pointing east
+	getEastNorthUpFrame(lat, lon, target) {
+		this.getEastNorthUpAxes(lat, lon, _vecX, _vecY, _vecZ, _pos);
+		return target.makeBasis(_vecX, _vecY, _vecZ).setPosition(_pos);
+	}
+
+	getEastNorthUpAxes(lat, lon, vecEast, vecNorth, vecUp, point = _pos) {
+		this.getCartographicToPosition(lat, lon, 0, point);
+		this.getCartographicToNormal(lat, lon, vecUp);		// up
+		vecEast.set(-point.y, point.x, 0).normalize();		// east
+		vecNorth.crossVectors(vecUp, vecEast).normalize();	// north
+	}
+
+	getRotationMatrixFromAzElRoll(lat, lon, az, el, roll, target, frame = ENU_FRAME) {
+		this.getEastNorthUpFrame(lat, lon, _matrix);
+		_euler.set(el, roll, -az, 'ZXY');
+
+		target
+			.makeRotationFromEuler(_euler)
+			.premultiply(_matrix)
+			.setPosition(0, 0, 0);
+
+
+		console.log(target.elements[0]);
+
+		// Add in the orientation adjustment for objects and cameras so "forward" and "up" are oriented
+		// correctly
+		if (frame === CAMERA_FRAME) {
+			_euler.set(Math.PI / 2, 0, 0, 'XYZ');
+			_matrix2.makeRotationFromEuler(_euler);
+			target.multiply(_matrix2);
+		} else if (frame === OBJECT_FRAME) {
+			_euler.set(-Math.PI / 2, 0, Math.PI, 'XYZ');
+			_matrix2.makeRotationFromEuler(_euler);
+			target.multiply(_matrix2);
+		}
+
+		return target;
 	}
 
 	getCartographicToPosition(lat, lon, height, target) {
@@ -914,15 +957,29 @@ class Ellipsoid {
 		this.getCartographicToNormal(lat, lon, _norm);
 
 		const radius = this.radius;
-		_vec3_1$2.copy(_norm);
-		_vec3_1$2.x *= radius.x ** 2;
-		_vec3_1$2.y *= radius.y ** 2;
-		_vec3_1$2.z *= radius.z ** 2;
+		_vec.copy(_norm);
+		_vec.x *= radius.x ** 2;
+		_vec.y *= radius.y ** 2;
+		_vec.z *= radius.z ** 2;
 
-		const gamma = Math.sqrt(_norm.dot(_vec3_1$2));
-		_vec3_1$2.multiplyScalar(1 / gamma);
+		const gamma = Math.sqrt(_norm.dot(_vec));
+		_vec.multiplyScalar(1 / gamma);
 
-		return target.copy(_vec3_1$2).addScaledVector(_norm, height);
+		return target.copy(_vec).addScaledVector(_norm, height);
+	}
+
+	getPositionToCartographic(pos, target) {
+		// From Cesium function Ellipsoid.cartesianToCartographic
+		// https://github.com/CesiumGS/cesium/blob/665ec32e813d5d6fe906ec3e87187f6c38ed5e49/packages/engine/Source/Core/Ellipsoid.js#L463
+		this.getPositionToSurfacePoint(pos, _vec);
+		this.getPositionToNormal(pos, _norm);
+
+		const heightDelta = _vec2.subVectors(pos, _vec);
+
+		target.lon = Math.atan2(_norm.y, _norm.x);
+		target.lat = Math.asin(_norm.z);
+		target.height = Math.sign(heightDelta.dot(pos)) * heightDelta.getLength();
+		return target;
 	}
 
 	getCartographicToNormal(lat, lon, target) {
@@ -934,12 +991,121 @@ class Ellipsoid {
 		return target;
 	}
 
+	getPositionToNormal(pos, target) {
+		const radius = this.radius;
+		target.copy(pos);
+		target.x /= radius.x ** 2;
+		target.y /= radius.y ** 2;
+		target.z /= radius.z ** 2;
+		target.normalize();
+
+		return target;
+	}
+
+	getPositionToSurfacePoint(pos, target) {
+		// From Cesium function Ellipsoid.scaleToGeodeticSurface
+		// https://github.com/CesiumGS/cesium/blob/d11b746e5809ac115fcff65b7b0c6bdfe81dcf1c/packages/engine/Source/Core/scaleToGeodeticSurface.js#L25
+		const radius = this.radius;
+		const invRadiusSqX = 1 / (radius.x ** 2);
+		const invRadiusSqY = 1 / (radius.y ** 2);
+		const invRadiusSqZ = 1 / (radius.z ** 2);
+
+		const x2 = pos.x * pos.x * invRadiusSqX;
+		const y2 = pos.y * pos.y * invRadiusSqY;
+		const z2 = pos.z * pos.z * invRadiusSqZ;
+
+		// Compute the squared ellipsoid norm.
+		const squaredNorm = x2 + y2 + z2;
+		const ratio = Math.sqrt(1.0 / squaredNorm);
+
+		// As an initial approximation, assume that the radial intersection is the projection point.
+		const intersection = _vec.copy(pos).multiplyScalar(ratio);
+		if (squaredNorm < CENTER_EPS) {
+			return !isFinite(ratio) ? null : target.copy(intersection);
+		}
+
+		// Use the gradient at the intersection point in place of the true unit normal.
+		// The difference in magnitude will be absorbed in the multiplier.
+		const gradient = _vec2.set(
+			intersection.x * invRadiusSqX * 2.0,
+			intersection.y * invRadiusSqY * 2.0,
+			intersection.z * invRadiusSqZ * 2.0
+		);
+
+		// Compute the initial guess at the normal vector multiplier, lambda.
+		let lambda = (1.0 - ratio) * pos.getLength() / (0.5 * gradient.getLength());
+		let correction = 0.0;
+
+		let func, denominator;
+		let xMultiplier, yMultiplier, zMultiplier;
+		let xMultiplier2, yMultiplier2, zMultiplier2;
+		let xMultiplier3, yMultiplier3, zMultiplier3;
+
+		do {
+			lambda -= correction;
+
+			xMultiplier = 1.0 / (1.0 + lambda * invRadiusSqX);
+			yMultiplier = 1.0 / (1.0 + lambda * invRadiusSqY);
+			zMultiplier = 1.0 / (1.0 + lambda * invRadiusSqZ);
+
+			xMultiplier2 = xMultiplier * xMultiplier;
+			yMultiplier2 = yMultiplier * yMultiplier;
+			zMultiplier2 = zMultiplier * zMultiplier;
+
+			xMultiplier3 = xMultiplier2 * xMultiplier;
+			yMultiplier3 = yMultiplier2 * yMultiplier;
+			zMultiplier3 = zMultiplier2 * zMultiplier;
+
+			func = x2 * xMultiplier2 + y2 * yMultiplier2 + z2 * zMultiplier2 - 1.0;
+
+			// "denominator" here refers to the use of this expression in the velocity and acceleration
+			// computations in the sections to follow.
+			denominator =
+				x2 * xMultiplier3 * invRadiusSqX +
+				y2 * yMultiplier3 * invRadiusSqY +
+				z2 * zMultiplier3 * invRadiusSqZ;
+
+			const derivative = -2.0 * denominator;
+			correction = func / derivative;
+		} while (Math.abs(func) > EPSILON12);
+
+		return target.set(
+			pos.x * xMultiplier,
+			pos.y * yMultiplier,
+			pos.z * zMultiplier
+		);
+	}
+
+	copy(source) {
+		this.radius.copy(source.radius);
+		return this;
+	}
+
+	clone() {
+		return new this.constructor().copy(this);
+	}
+
 }
 
-const _norm = new Vector3();
 const _spherical = new Spherical();
+const _norm = new Vector3();
+const _vec = new Vector3();
+const _vec2 = new Vector3();
+const _matrix = new Matrix4();
+const _matrix2 = new Matrix4();
+const _euler = new Euler();
 
-const _vec3_1$2 = new Vector3();
+const _vecX = new Vector3();
+const _vecY = new Vector3();
+const _vecZ = new Vector3();
+const _pos = new Vector3();
+
+const EPSILON12 = 1e-12;
+const CENTER_EPS = 0.1;
+
+const ENU_FRAME = 0;
+const CAMERA_FRAME = 1;
+const OBJECT_FRAME = 2;
 
 class EllipsoidRegion extends Ellipsoid {
 
@@ -1133,7 +1299,7 @@ class TileBoundingVolume {
 
 	setRegionData(west, south, east, north, minHeight, maxHeight) {
 		const region = new EllipsoidRegion(
-			WGS84_RADIUS.clone(),
+			WGS84_RADIUS$1.clone(),
 			new Vector2(south, north),
 			new Vector2(west, east),
 			new Vector2(minHeight, maxHeight)
@@ -1261,7 +1427,7 @@ class TileBoundingVolume {
 
 }
 
-const WGS84_RADIUS = new Vector3(6378137, 6378137, 6356752.3142451793);
+const WGS84_RADIUS$1 = new Vector3(6378137, 6378137, 6356752.3142451793);
 
 const _vec3_1$1 = new Vector3();
 const _vec3_2 = new Vector3();
@@ -1674,6 +1840,12 @@ class TilesLoader {
 				tile.__loadingState = RequestState$1.LOADED;
 
 				tile.children.push(json.root);
+
+				tiles3D.dispatchEvent({
+					type: 'load-tile-set',
+					tileSet: json,
+					url: uri
+				});
 			}).catch(errorCallback);
 		} else {
 			downloadQueue.add(tile, tileCb => {
@@ -5861,10 +6033,21 @@ const _recursivelyLoadTiles = (tile, depthFromRenderedParent, tiles3D) => {
 	}
 };
 
+// https://en.wikipedia.org/wiki/World_Geodetic_System
+// https://en.wikipedia.org/wiki/Flattening
+const WGS84_RADIUS = 6378137;
+const WGS84_FLATTENING = 1 / 298.257223563;
+const WGS84_HEIGHT = -(WGS84_FLATTENING * WGS84_RADIUS - WGS84_RADIUS);
+
+const WGS84_ELLIPSOID = new Ellipsoid(new Vector3(WGS84_RADIUS, WGS84_RADIUS, WGS84_HEIGHT));
+WGS84_ELLIPSOID.name = 'WGS84 Earth';
+
 class Tiles3D extends Object3D {
 
 	constructor(url, manager = new LoadingManager()) {
 		super();
+
+		this.ellipsoid = WGS84_ELLIPSOID.clone();
 
 		// options
 
@@ -5958,15 +6141,10 @@ class Tiles3D extends Object3D {
 
 					this._rootTileSet = root;
 
-					// Push this onto the end of the event stack to ensure this runs
-					// after the base renderer has placed the provided json where it
-					// needs to be placed and is ready for an update.
-					Promise.resolve().then(() => {
-						// TODO dispatch event only if this is the root tileset for now, we can
-						// dispatch this event for all tilesets in the future
-						_TileSetLoadedEvent.json = root;
-						_TileSetLoadedEvent.url = processedUrl;
-						this.$events.dispatchEvent(_TileSetLoadedEvent);
+					this.dispatchEvent({
+						type: 'load-tile-set',
+						tileSet: root,
+						url: processedUrl
 					});
 				})
 				.catch(err => {
@@ -6065,6 +6243,10 @@ class Tiles3D extends Object3D {
 
 	removeEventListener(type, listener, thisObject) {
 		this.$events.removeEventListener(type, listener, thisObject);
+	}
+
+	dispatchEvent(event) {
+		this.$events.dispatchEvent(event);
 	}
 
 	update() {
@@ -6342,7 +6524,6 @@ const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
 
 const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
 
-const _TileSetLoadedEvent = { type: 'TileSetLoaded', json: null, url: null };
 const _TileLoadedEvent = { type: 'TileLoaded', scene: null, tile: null };
 const _TileDisposedEvent = { type: 'TileDisposed', scene: null, tile: null };
 const _TileVisibilityChangedEvent = { type: 'TileVisibilityChanged', scene: null, tile: null, visible: false };
@@ -6517,6 +6698,121 @@ class CesiumIonAuthPlugin {
 
 }
 
+class ReorientationPlugin {
+
+	constructor(options) {
+		options = {
+			up: '+z',
+			recenter: true,
+
+			lat: null,
+			lon: null,
+			height: 0,
+			...options
+		};
+
+		this.tiles = null;
+
+		this.up = options.up.toLowerCase().replace(/\s+/, '');
+		this.lat = options.lat;
+		this.lon = options.lon;
+		this.height = options.height;
+		this.recenter = options.recenter;
+		this._callback = null;
+	}
+
+	init(tiles) {
+		this.tiles = tiles;
+
+		this._callback = () => {
+			const { up, lat, lon, height, recenter } = this;
+
+			if (lat !== null && lon !== null) {
+				// if the latitude and longitude are provided then remove the position offset
+				this.transformLatLonHeightToOrigin(lat, lon, height);
+			} else {
+				const { ellipsoid } = tiles;
+				const minRadii = Math.min(ellipsoid.radius.x, ellipsoid.radius.y, ellipsoid.radius.z);
+				tiles.getBoundingSphere(sphere);
+				if (sphere.center.getLength() > minRadii * 0.5) {
+					// otherwise see if this is possibly a tile set on the surface of the globe based on the positioning
+					const cart = {};
+					ellipsoid.getPositionToCartographic(sphere.center, cart);
+					this.transformLatLonHeightToOrigin(cart.lat, cart.lon, cart.height);
+					console.log(cart.lat, cart.lon, cart.height);
+				} else {
+					// lastly fall back to orienting the up direction to +Y
+					tiles.euler.set(0, 0, 0);
+					switch (up) {
+						case 'x': case '+x':
+							tiles.euler.z = Math.PI / 2;
+							break;
+						case '-x':
+							tiles.euler.z = -Math.PI / 2;
+							break;
+
+						case 'y': case '+y':
+							break;
+						case '-y':
+							tiles.euler.z = Math.PI;
+							break;
+
+						case 'z': case '+z':
+							tiles.euler.x = -Math.PI / 2;
+							break;
+						case '-z':
+							tiles.euler.x = Math.PI / 2;
+							break;
+					}
+
+					tiles.position
+						.copy(sphere.center)
+						.applyEuler(tiles.euler)
+						.multiplyScalar(-1);
+				}
+			}
+
+			if (!recenter) {
+				tiles.position.setScalar(0);
+			}
+
+			tiles.removeEventListener('load-tile-set', this._callback);
+		};
+
+		tiles.addEventListener('load-tile-set', this._callback);
+	}
+
+	transformLatLonHeightToOrigin(lat, lon, height = 0) {
+		const tiles = this.tiles;
+		const { ellipsoid } = tiles;
+
+		// get ENU orientation (Z facing north and X facing west) and position
+		ellipsoid.getRotationMatrixFromAzElRoll(lat, lon, 0, 0, 0, tiles.matrix, OBJECT_FRAME);
+		ellipsoid.getCartographicToPosition(lat, lon, height, vec);
+
+		// adjust the tiles matrix
+		tiles.matrix
+			.setPosition(vec)
+			.invert()
+			.decompose(tiles.position, tiles.quaternion, tiles.scale);
+		tiles.updateMatrix();
+	}
+
+	dispose() {
+		const tiles = this.tiles;
+
+		tiles.position.setScalar(0);
+		tiles.quaternion.identity();
+		tiles.scale.set(1, 1, 1);
+
+		tiles.addEventListener('load-tile-set', this._callback);
+	}
+
+}
+
+const sphere = new Sphere();
+const vec = new Vector3();
+
 class LoadParser {
 
 	static parse(context, loader) {
@@ -6538,4 +6834,150 @@ class LoadParser {
 
 }
 
-export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, I3DMLoader, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, TileGLTFLoader, Tiles3D };
+Matrix4.prototype.makeBasis = function(xAxis, yAxis, zAxis) {
+	this.set(
+		xAxis.x, yAxis.x, zAxis.x, 0,
+		xAxis.y, yAxis.y, zAxis.y, 0,
+		xAxis.z, yAxis.z, zAxis.z, 0,
+		0, 0, 0, 1
+	);
+
+	return this;
+};
+
+Matrix4.prototype.setPosition = function(x, y, z) {
+	const te = this.elements;
+
+	if (x.isVector3) {
+		te[12] = x.x;
+		te[13] = x.y;
+		te[14] = x.z;
+	} else {
+		te[12] = x;
+		te[13] = y;
+		te[14] = z;
+	}
+
+	return this;
+};
+
+Matrix4.prototype.makeRotationFromEuler = function(euler) {
+	const te = this.elements;
+
+	const x = euler.x, y = euler.y, z = euler.z;
+	const a = Math.cos(x), b = Math.sin(x);
+	const c = Math.cos(y), d = Math.sin(y);
+	const e = Math.cos(z), f = Math.sin(z);
+
+	if (euler.order === 'XYZ') {
+		const ae = a * e, af = a * f, be = b * e, bf = b * f;
+
+		te[0] = c * e;
+		te[4] = -c * f;
+		te[8] = d;
+
+		te[1] = af + be * d;
+		te[5] = ae - bf * d;
+		te[9] = -b * c;
+
+		te[2] = bf - ae * d;
+		te[6] = be + af * d;
+		te[10] = a * c;
+	} else if (euler.order === 'YXZ') {
+		const ce = c * e, cf = c * f, de = d * e, df = d * f;
+
+		te[0] = ce + df * b;
+		te[4] = de * b - cf;
+		te[8] = a * d;
+
+		te[1] = a * f;
+		te[5] = a * e;
+		te[9] = -b;
+
+		te[2] = cf * b - de;
+		te[6] = df + ce * b;
+		te[10] = a * c;
+	} else if (euler.order === 'ZXY') {
+		const ce = c * e, cf = c * f, de = d * e, df = d * f;
+
+		te[0] = ce - df * b;
+		te[4] = -a * f;
+		te[8] = de + cf * b;
+
+		te[1] = cf + de * b;
+		te[5] = a * e;
+		te[9] = df - ce * b;
+
+		te[2] = -a * d;
+		te[6] = b;
+		te[10] = a * c;
+	} else if (euler.order === 'ZYX') {
+		const ae = a * e, af = a * f, be = b * e, bf = b * f;
+
+		te[0] = c * e;
+		te[4] = be * d - af;
+		te[8] = ae * d + bf;
+
+		te[1] = c * f;
+		te[5] = bf * d + ae;
+		te[9] = af * d - be;
+
+		te[2] = -d;
+		te[6] = b * c;
+		te[10] = a * c;
+	} else if (euler.order === 'YZX') {
+		const ac = a * c, ad = a * d, bc = b * c, bd = b * d;
+
+		te[0] = c * e;
+		te[4] = bd - ac * f;
+		te[8] = bc * f + ad;
+
+		te[1] = f;
+		te[5] = a * e;
+		te[9] = -b * e;
+
+		te[2] = -d * e;
+		te[6] = ad * f + bc;
+		te[10] = ac - bd * f;
+	} else if (euler.order === 'XZY') {
+		const ac = a * c, ad = a * d, bc = b * c, bd = b * d;
+
+		te[0] = c * e;
+		te[4] = -f;
+		te[8] = d * e;
+
+		te[1] = ac * f + bd;
+		te[5] = a * e;
+		te[9] = ad * f - bc;
+
+		te[2] = bc * f - ad;
+		te[6] = b * e;
+		te[10] = bd * f + ac;
+	}
+
+	// bottom row
+	te[3] = 0;
+	te[7] = 0;
+	te[11] = 0;
+
+	// last column
+	te[12] = 0;
+	te[13] = 0;
+	te[14] = 0;
+	te[15] = 1;
+
+	return this;
+};
+
+Matrix4.prototype.invert = function() {
+	return this.getInverse(this);
+};
+const _quaternion = new Quaternion();
+
+Vector3.prototype.applyEuler = function(euler) {
+	return this.applyQuaternion(_quaternion.setFromEuler(euler));
+};
+
+Vector3.prototype.isVector3 = true;
+
+export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, I3DMLoader, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, ReorientationPlugin, TileGLTFLoader, Tiles3D };

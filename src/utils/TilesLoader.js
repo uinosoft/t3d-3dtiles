@@ -150,6 +150,12 @@ export class TilesLoader {
 				tile.__loadingState = RequestState.LOADED;
 
 				tile.children.push(json.root);
+
+				tiles3D.dispatchEvent({
+					type: 'load-tile-set',
+					tileSet: json,
+					url: uri
+				});
 			}).catch(errorCallback);
 		} else {
 			downloadQueue.add(tile, tileCb => {

@@ -6,11 +6,14 @@ import { CameraList } from './utils/CameraList.js';
 import { TilesLoader } from './utils/TilesLoader.js';
 import { ModelLoader } from './utils/ModelLoader.js';
 import { schedulingTiles } from './utils/TilesScheduler.js';
+import { WGS84_ELLIPSOID } from './math/GeoConstants.js';
 
 export class Tiles3D extends Object3D {
 
 	constructor(url, manager = new LoadingManager()) {
 		super();
+
+		this.ellipsoid = WGS84_ELLIPSOID.clone();
 
 		// options
 
@@ -104,15 +107,10 @@ export class Tiles3D extends Object3D {
 
 					this._rootTileSet = root;
 
-					// Push this onto the end of the event stack to ensure this runs
-					// after the base renderer has placed the provided json where it
-					// needs to be placed and is ready for an update.
-					Promise.resolve().then(() => {
-						// TODO dispatch event only if this is the root tileset for now, we can
-						// dispatch this event for all tilesets in the future
-						_TileSetLoadedEvent.json = root;
-						_TileSetLoadedEvent.url = processedUrl;
-						this.$events.dispatchEvent(_TileSetLoadedEvent);
+					this.dispatchEvent({
+						type: 'load-tile-set',
+						tileSet: root,
+						url: processedUrl
 					});
 				})
 				.catch(err => {
@@ -211,6 +209,10 @@ export class Tiles3D extends Object3D {
 
 	removeEventListener(type, listener, thisObject) {
 		this.$events.removeEventListener(type, listener, thisObject);
+	}
+
+	dispatchEvent(event) {
+		this.$events.dispatchEvent(event);
 	}
 
 	update() {
@@ -488,7 +490,6 @@ const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
 
 const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
 
-const _TileSetLoadedEvent = { type: 'TileSetLoaded', json: null, url: null };
 const _TileLoadedEvent = { type: 'TileLoaded', scene: null, tile: null };
 const _TileDisposedEvent = { type: 'TileDisposed', scene: null, tile: null };
 const _TileVisibilityChangedEvent = { type: 'TileVisibilityChanged', scene: null, tile: null, visible: false };

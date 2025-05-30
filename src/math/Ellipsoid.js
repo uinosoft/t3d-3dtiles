@@ -1,10 +1,53 @@
-import { Spherical, Vector3 } from 't3d';
+import { Euler, Matrix4, Spherical, Vector3 } from 't3d';
 import { swapToGeoFrame, latitudeToSphericalPhi } from './GeoUtils.js';
 
 export class Ellipsoid {
 
 	constructor(radius = new Vector3(1, 1, 1)) {
+		this.name = '';
 		this.radius = radius;
+	}
+
+	// returns a frame with Z indicating altitude
+	// Y pointing north
+	// X pointing east
+	getEastNorthUpFrame(lat, lon, target) {
+		this.getEastNorthUpAxes(lat, lon, _vecX, _vecY, _vecZ, _pos);
+		return target.makeBasis(_vecX, _vecY, _vecZ).setPosition(_pos);
+	}
+
+	getEastNorthUpAxes(lat, lon, vecEast, vecNorth, vecUp, point = _pos) {
+		this.getCartographicToPosition(lat, lon, 0, point);
+		this.getCartographicToNormal(lat, lon, vecUp);		// up
+		vecEast.set(-point.y, point.x, 0).normalize();		// east
+		vecNorth.crossVectors(vecUp, vecEast).normalize();	// north
+	}
+
+	getRotationMatrixFromAzElRoll(lat, lon, az, el, roll, target, frame = ENU_FRAME) {
+		this.getEastNorthUpFrame(lat, lon, _matrix);
+		_euler.set(el, roll, -az, 'ZXY');
+
+		target
+			.makeRotationFromEuler(_euler)
+			.premultiply(_matrix)
+			.setPosition(0, 0, 0);
+
+
+		console.log(target.elements[0]);
+
+		// Add in the orientation adjustment for objects and cameras so "forward" and "up" are oriented
+		// correctly
+		if (frame === CAMERA_FRAME) {
+			_euler.set(Math.PI / 2, 0, 0, 'XYZ');
+			_matrix2.makeRotationFromEuler(_euler);
+			target.multiply(_matrix2);
+		} else if (frame === OBJECT_FRAME) {
+			_euler.set(-Math.PI / 2, 0, Math.PI, 'XYZ');
+			_matrix2.makeRotationFromEuler(_euler);
+			target.multiply(_matrix2);
+		}
+
+		return target;
 	}
 
 	getCartographicToPosition(lat, lon, height, target) {
@@ -13,15 +56,29 @@ export class Ellipsoid {
 		this.getCartographicToNormal(lat, lon, _norm);
 
 		const radius = this.radius;
-		_vec3_1.copy(_norm);
-		_vec3_1.x *= radius.x ** 2;
-		_vec3_1.y *= radius.y ** 2;
-		_vec3_1.z *= radius.z ** 2;
+		_vec.copy(_norm);
+		_vec.x *= radius.x ** 2;
+		_vec.y *= radius.y ** 2;
+		_vec.z *= radius.z ** 2;
 
-		const gamma = Math.sqrt(_norm.dot(_vec3_1));
-		_vec3_1.multiplyScalar(1 / gamma);
+		const gamma = Math.sqrt(_norm.dot(_vec));
+		_vec.multiplyScalar(1 / gamma);
 
-		return target.copy(_vec3_1).addScaledVector(_norm, height);
+		return target.copy(_vec).addScaledVector(_norm, height);
+	}
+
+	getPositionToCartographic(pos, target) {
+		// From Cesium function Ellipsoid.cartesianToCartographic
+		// https://github.com/CesiumGS/cesium/blob/665ec32e813d5d6fe906ec3e87187f6c38ed5e49/packages/engine/Source/Core/Ellipsoid.js#L463
+		this.getPositionToSurfacePoint(pos, _vec);
+		this.getPositionToNormal(pos, _norm);
+
+		const heightDelta = _vec2.subVectors(pos, _vec);
+
+		target.lon = Math.atan2(_norm.y, _norm.x);
+		target.lat = Math.asin(_norm.z);
+		target.height = Math.sign(heightDelta.dot(pos)) * heightDelta.getLength();
+		return target;
 	}
 
 	getCartographicToNormal(lat, lon, target) {
@@ -33,9 +90,118 @@ export class Ellipsoid {
 		return target;
 	}
 
+	getPositionToNormal(pos, target) {
+		const radius = this.radius;
+		target.copy(pos);
+		target.x /= radius.x ** 2;
+		target.y /= radius.y ** 2;
+		target.z /= radius.z ** 2;
+		target.normalize();
+
+		return target;
+	}
+
+	getPositionToSurfacePoint(pos, target) {
+		// From Cesium function Ellipsoid.scaleToGeodeticSurface
+		// https://github.com/CesiumGS/cesium/blob/d11b746e5809ac115fcff65b7b0c6bdfe81dcf1c/packages/engine/Source/Core/scaleToGeodeticSurface.js#L25
+		const radius = this.radius;
+		const invRadiusSqX = 1 / (radius.x ** 2);
+		const invRadiusSqY = 1 / (radius.y ** 2);
+		const invRadiusSqZ = 1 / (radius.z ** 2);
+
+		const x2 = pos.x * pos.x * invRadiusSqX;
+		const y2 = pos.y * pos.y * invRadiusSqY;
+		const z2 = pos.z * pos.z * invRadiusSqZ;
+
+		// Compute the squared ellipsoid norm.
+		const squaredNorm = x2 + y2 + z2;
+		const ratio = Math.sqrt(1.0 / squaredNorm);
+
+		// As an initial approximation, assume that the radial intersection is the projection point.
+		const intersection = _vec.copy(pos).multiplyScalar(ratio);
+		if (squaredNorm < CENTER_EPS) {
+			return !isFinite(ratio) ? null : target.copy(intersection);
+		}
+
+		// Use the gradient at the intersection point in place of the true unit normal.
+		// The difference in magnitude will be absorbed in the multiplier.
+		const gradient = _vec2.set(
+			intersection.x * invRadiusSqX * 2.0,
+			intersection.y * invRadiusSqY * 2.0,
+			intersection.z * invRadiusSqZ * 2.0
+		);
+
+		// Compute the initial guess at the normal vector multiplier, lambda.
+		let lambda = (1.0 - ratio) * pos.getLength() / (0.5 * gradient.getLength());
+		let correction = 0.0;
+
+		let func, denominator;
+		let xMultiplier, yMultiplier, zMultiplier;
+		let xMultiplier2, yMultiplier2, zMultiplier2;
+		let xMultiplier3, yMultiplier3, zMultiplier3;
+
+		do {
+			lambda -= correction;
+
+			xMultiplier = 1.0 / (1.0 + lambda * invRadiusSqX);
+			yMultiplier = 1.0 / (1.0 + lambda * invRadiusSqY);
+			zMultiplier = 1.0 / (1.0 + lambda * invRadiusSqZ);
+
+			xMultiplier2 = xMultiplier * xMultiplier;
+			yMultiplier2 = yMultiplier * yMultiplier;
+			zMultiplier2 = zMultiplier * zMultiplier;
+
+			xMultiplier3 = xMultiplier2 * xMultiplier;
+			yMultiplier3 = yMultiplier2 * yMultiplier;
+			zMultiplier3 = zMultiplier2 * zMultiplier;
+
+			func = x2 * xMultiplier2 + y2 * yMultiplier2 + z2 * zMultiplier2 - 1.0;
+
+			// "denominator" here refers to the use of this expression in the velocity and acceleration
+			// computations in the sections to follow.
+			denominator =
+				x2 * xMultiplier3 * invRadiusSqX +
+				y2 * yMultiplier3 * invRadiusSqY +
+				z2 * zMultiplier3 * invRadiusSqZ;
+
+			const derivative = -2.0 * denominator;
+			correction = func / derivative;
+		} while (Math.abs(func) > EPSILON12);
+
+		return target.set(
+			pos.x * xMultiplier,
+			pos.y * yMultiplier,
+			pos.z * zMultiplier
+		);
+	}
+
+	copy(source) {
+		this.radius.copy(source.radius);
+		return this;
+	}
+
+	clone() {
+		return new this.constructor().copy(this);
+	}
+
 }
 
-const _norm = new Vector3();
 const _spherical = new Spherical();
+const _norm = new Vector3();
+const _vec = new Vector3();
+const _vec2 = new Vector3();
+const _matrix = new Matrix4();
+const _matrix2 = new Matrix4();
+const _euler = new Euler();
 
-const _vec3_1 = new Vector3();
+const _vecX = new Vector3();
+const _vecY = new Vector3();
+const _vecZ = new Vector3();
+const _pos = new Vector3();
+
+const EPSILON12 = 1e-12;
+const CENTER_EPS = 0.1;
+
+export const ENU_FRAME = 0;
+export const CAMERA_FRAME = 1;
+export const OBJECT_FRAME = 2;

@@ -41,7 +41,7 @@
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
 		import { KTX2Loader } from 't3d/addons/loaders/KTX2Loader.js';
 
-		import { Tiles3D, CesiumIonAuthPlugin } from 't3d-3dtiles';
+		import { Tiles3D, CesiumIonAuthPlugin, ReorientationPlugin } from 't3d-3dtiles';
 		import {
 			Tiles3DDebugger,
 			NONE,
@@ -54,7 +54,6 @@
 			RANDOM_COLOR,
 			RANDOM_NODE_COLOR
 		} from './jsm/Tiles3DDebugger.js';
-		import { setTiles3DToOrigin } from './jsm/Tiles3DUtils.js';
 
 		import { GUI } from './libs/lil-gui.esm.min.js';
 		import * as KTXParse from './libs/ktx-parse.module.js';
@@ -110,18 +109,17 @@
 			fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
 		} }, 'reload');
 
-		const offsetGroup = new t3d.Object3D();
-		scene.add(offsetGroup);
-
 		let tiles3D, tilesDebugger, tileOptionsFolder, debugFolder;
 
 		async function fetchIonAsset(ionAssetId, ionAccessToken) {
 			tiles3D = new Tiles3D();
+			scene.add(tiles3D);
 
 			tiles3D.registerPlugin(new CesiumIonAuthPlugin({
 				apiToken: ionAccessToken,
 				assetId: ionAssetId
 			}));
+			tiles3D.registerPlugin(new ReorientationPlugin());
 
 			const dracoLoader = new DRACOLoader();
 			dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
@@ -136,12 +134,6 @@
 		
 			tiles3D.addCamera(camera);
 			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
-
-			tiles3D.addEventListener('TileSetLoaded', ({ json, url }) => {
-				if (url !== tiles3D.rootURL) return;
-				offsetGroup.add(tiles3D);
-				setTiles3DToOrigin(tiles3D, offsetGroup);
-			});
 
 			tilesDebugger = new Tiles3DDebugger(tiles3D);
 			tilesDebugger.helper.sphereGroup.visible = false;
@@ -169,7 +161,7 @@
 
 		function destroyTiles3D() {
 			if (tiles3D) {
-				offsetGroup.remove(tiles3D);
+				scene.remove(tiles3D);
 				tiles3D.dispose();
 				tiles3D = null;
 			}
