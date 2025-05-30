@@ -41,19 +41,7 @@
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
 		import { KTX2Loader } from 't3d/addons/loaders/KTX2Loader.js';
 
-		import { Tiles3D, CesiumIonAuthPlugin, ReorientationPlugin } from 't3d-3dtiles';
-		import {
-			Tiles3DDebugger,
-			NONE,
-			SCREEN_ERROR,
-			GEOMETRIC_ERROR,
-			DISTANCE,
-			DEPTH,
-			RELATIVE_DEPTH,
-			IS_LEAF,
-			RANDOM_COLOR,
-			RANDOM_NODE_COLOR
-		} from './jsm/Tiles3DDebugger.js';
+		import { Tiles3D, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
 
 		import { GUI } from './libs/lil-gui.esm.min.js';
 		import * as KTXParse from './libs/ktx-parse.module.js';
@@ -109,7 +97,7 @@
 			fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
 		} }, 'reload');
 
-		let tiles3D, tilesDebugger, tileOptionsFolder, debugFolder;
+		let tiles3D, tileOptionsFolder, debugFolder;
 
 		async function fetchIonAsset(ionAssetId, ionAccessToken) {
 			tiles3D = new Tiles3D();
@@ -120,6 +108,7 @@
 				assetId: ionAssetId
 			}));
 			tiles3D.registerPlugin(new ReorientationPlugin());
+			tiles3D.registerPlugin(new DebugTilesPlugin());
 
 			const dracoLoader = new DRACOLoader();
 			dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
@@ -135,28 +124,16 @@
 			tiles3D.addCamera(camera);
 			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
-			tilesDebugger = new Tiles3DDebugger(tiles3D);
-			tilesDebugger.helper.sphereGroup.visible = false;
-
 			tileOptionsFolder = gui.addFolder('Tiles Options');
 			tileOptionsFolder.add(tiles3D, 'errorTarget', 0, 100, 1);
 			tileOptionsFolder.close();
 
+			const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+
 			debugFolder = gui.addFolder('Tiles Debug');
-			debugFolder.add(tilesDebugger.helper.boxGroup, 'visible').name('displayBoxBounds');
-			debugFolder.add(tilesDebugger.helper.sphereGroup, 'visible').name('displaySphereBounds');
-			debugFolder.add(tilesDebugger, 'colorMode', {
-				NONE,
-				SCREEN_ERROR,
-				GEOMETRIC_ERROR,
-				DISTANCE,
-				DEPTH,
-				RELATIVE_DEPTH,
-				IS_LEAF,
-				RANDOM_COLOR,
-				RANDOM_NODE_COLOR
-			});
-			debugFolder.close();
+			debugFolder.add(debugTilesPlugin, 'displayBoxBounds');
+			debugFolder.add(debugTilesPlugin, 'displaySphereBounds');
+			debugFolder.add(debugTilesPlugin, 'colorMode', DebugTilesPlugin.ColorModes);
 		}
 
 		function destroyTiles3D() {
@@ -164,10 +141,6 @@
 				scene.remove(tiles3D);
 				tiles3D.dispose();
 				tiles3D = null;
-			}
-			if (tilesDebugger) {
-				// tilesDebugger.dispose();
-				tilesDebugger = null;
 			}
 			if (tileOptionsFolder) {
 				tileOptionsFolder.destroy();
@@ -188,9 +161,8 @@
 
 			controller.update();
 
-			if (tiles3D && tilesDebugger) {
+			if (tiles3D) {
 				tiles3D.update();
-				tilesDebugger.update();
 
 				const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
 				if (statsContainer.innerHTML !== str) {

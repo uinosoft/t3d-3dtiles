@@ -1,5 +1,7 @@
 // t3d-3dtiles
-import { Matrix4, Ray, Vector3, Matrix3, Frustum, Vector2, Box3, Plane, Spherical, Euler, Sphere, Loader, Vector4, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Buffer, Attribute, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Bone, Object3D, Camera, SkinnedMesh, Mesh, Skeleton, KeyframeClip, QuaternionLinearInterpolant, LinearInterpolant, QuaternionCubicSplineInterpolant, CubicSplineInterpolant, StepInterpolant, VectorKeyframeTrack, NumberKeyframeTrack, QuaternionKeyframeTrack, DirectionalLight, PointLight, SpotLight, PBR2Material, FileLoader, ImageLoader, DefaultLoadingManager, ShaderLib, MATERIAL_TYPE, Quaternion, Color3, EventDispatcher, LoadingManager } from 't3d';
+import { Matrix4, Ray, Vector3, Matrix3, Frustum, Vector2, Box3, Plane, Spherical, Euler, Sphere, Loader, Vector4, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Buffer, Attribute, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Bone, Object3D, Camera, SkinnedMesh, Mesh, Skeleton, KeyframeClip, QuaternionLinearInterpolant, LinearInterpolant, QuaternionCubicSplineInterpolant, CubicSplineInterpolant, StepInterpolant, VectorKeyframeTrack, NumberKeyframeTrack, QuaternionKeyframeTrack, DirectionalLight, PointLight, SpotLight, PBR2Material, FileLoader, ImageLoader, DefaultLoadingManager, ShaderLib, MATERIAL_TYPE, Quaternion, Color3, EventDispatcher, LoadingManager, DRAW_MODE } from 't3d';
+import { Box3Helper } from 't3d/addons/objects/Box3Helper.js';
+import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
 
 /**
  * Returns the file extension of the path component of a URL
@@ -44,6 +46,24 @@ const traverseSet = (tile, beforeCb = null, afterCb = null, parent = null, depth
 		afterCb(tile, parent, depth);
 	}
 };
+
+/**
+ * Traverses the ancestry of the tile up to the root tile.
+ */
+function traverseAncestors(tile, callback = null) {
+	let current = tile;
+
+	while (current) {
+		const depth = current.__depth;
+		const parent = current.parent;
+
+		if (callback) {
+			callback(current, parent, depth);
+		}
+
+		current = parent;
+	}
+}
 
 const raycastTraverse = (tile, tiles3D, ray, intersects, localRay = null) => {
 	const { activeTiles } = tiles3D;
@@ -932,9 +952,6 @@ class Ellipsoid {
 			.makeRotationFromEuler(_euler)
 			.premultiply(_matrix)
 			.setPosition(0, 0, 0);
-
-
-		console.log(target.elements[0]);
 
 		// Add in the orientation adjustment for objects and cameras so "forward" and "up" are oriented
 		// correctly
@@ -6253,6 +6270,8 @@ class Tiles3D extends Object3D {
 		const rootTile = this.root;
 		if (!rootTile) return;
 
+		this.dispatchEvent(_updateBeforeEvent);
+
 		const { stats } = this;
 		stats.inFrustum = 0;
 		stats.used = 0;
@@ -6264,6 +6283,8 @@ class Tiles3D extends Object3D {
 		this.$cameras.updateInfos(this.worldMatrix);
 
 		schedulingTiles(rootTile, this);
+
+		this.dispatchEvent(_updateAfterEvent);
 	}
 
 	addCamera(camera) {
@@ -6448,9 +6469,11 @@ class Tiles3D extends Object3D {
 					c.frustumCulled = c.frustumCulled && !this._autoDisableRendererCulling;
 				});
 
-				_TileLoadedEvent.scene = scene;
-				_TileLoadedEvent.tile = tile;
-				this.$events.dispatchEvent(_TileLoadedEvent);
+				this.dispatchEvent({
+					type: 'load-model',
+					scene,
+					tile
+				});
 			});
 	}
 
@@ -6469,10 +6492,12 @@ class Tiles3D extends Object3D {
 			visibleTiles.delete(tile);
 		}
 
-		_TileVisibilityChangedEvent.scene = scene;
-		_TileVisibilityChangedEvent.tile = tile;
-		_TileVisibilityChangedEvent.visible = visible;
-		this.$events.dispatchEvent(_TileVisibilityChangedEvent);
+		this.dispatchEvent({
+			type: 'tile-visibility-change',
+			scene,
+			tile,
+			visible
+		});
 	}
 
 	$setTileActive(tile, active) {
@@ -6505,9 +6530,11 @@ class Tiles3D extends Object3D {
 				texture.dispose();
 			}
 
-			_TileDisposedEvent.scene = cached.scene;
-			_TileDisposedEvent.tile = tile;
-			this.$events.dispatchEvent(_TileDisposedEvent);
+			this.dispatchEvent({
+				type: 'dispose-model',
+				scene: cached.scene,
+				tile
+			});
 
 			cached.scene = null;
 			cached.materials = null;
@@ -6520,13 +6547,12 @@ class Tiles3D extends Object3D {
 
 }
 
+const _updateBeforeEvent = { type: 'update-before' };
+const _updateAfterEvent = { type: 'update-after' };
+
 const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
 
 const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
-
-const _TileLoadedEvent = { type: 'TileLoaded', scene: null, tile: null };
-const _TileDisposedEvent = { type: 'TileDisposed', scene: null, tile: null };
-const _TileVisibilityChangedEvent = { type: 'TileVisibilityChanged', scene: null, tile: null, visible: false };
 
 const tempMat = new Matrix4();
 
@@ -6697,6 +6723,620 @@ class CesiumIonAuthPlugin {
 	}
 
 }
+
+class DebugTilesPlugin {
+
+	static get ColorModes() {
+		return ColorModes;
+	}
+
+	constructor(options) {
+		options = {
+			displayParentBounds: false,
+			displayBoxBounds: false,
+			displaySphereBounds: false,
+			displayRegionBounds: false,
+			colorMode: NONE,
+			maxDebugDepth: -1,
+			maxDebugDistance: -1,
+			maxDebugError: -1,
+			customColorCallback: null,
+			...options
+		};
+
+		this.name = 'DEBUG_TILES_PLUGIN';
+		this.tiles = null;
+
+		this._enabled = true;
+
+		this.extremeDebugDepth = -1;
+		this.extremeDebugError = -1;
+		this.boxGroup = null;
+		this.sphereGroup = null;
+		this.regionGroup = null;
+
+		// options
+		this._displayParentBounds = options.displayParentBounds;
+		this.displayBoxBounds = options.displayBoxBounds;
+		this.displaySphereBounds = options.displaySphereBounds;
+		this.displayRegionBounds = options.displayRegionBounds;
+		this.colorMode = options.colorMode;
+		this.maxDebugDepth = options.maxDebugDepth;
+		this.maxDebugDistance = options.maxDebugDistance;
+		this.maxDebugError = options.maxDebugError;
+		this.customColorCallback = options.customColorCallback;
+
+		this.getDebugColor = (value, target) => {
+			target.setRGB(value, value, value);
+		};
+	}
+
+	get enabled() {
+		return this._enabled;
+	}
+
+	set enabled(v) {
+		if (v !== this._enabled) {
+			this._enabled = v;
+
+			if (this._enabled) {
+				if (this.tiles) {
+					this.init(this.tiles);
+				}
+			} else {
+				this.dispose();
+			}
+		}
+	}
+
+	get displayParentBounds() {
+		return this._displayParentBounds;
+	}
+
+	set displayParentBounds(v) {
+		if (this._displayParentBounds !== v) {
+			this._displayParentBounds = v;
+
+			if (!v) {
+				// Reset all ref counts
+				traverseSet(this.tiles.root, null, tile => {
+					tile[PARENT_BOUND_REF_COUNT] = null;
+					this._onTileVisibilityChange(tile, tile.__visible);
+				});
+			} else {
+				// Initialize ref count for existing tiles
+				this.tiles.traverse(tile => {
+					if (tile.__visible) {
+						this._onTileVisibilityChange(tile, true);
+					}
+				});
+			}
+		}
+	}
+
+	// initialize the groups for displaying helpers, register events, and initialize existing tiles
+	init(tiles) {
+		this.tiles = tiles;
+
+		// initialize groups
+		this.boxGroup = new Object3D();
+		this.boxGroup.name = 'DebugTilesPlugin.boxGroup';
+		tiles.add(this.boxGroup);
+		this.boxGroup.updateMatrix();
+
+		this.sphereGroup = new Object3D();
+		this.sphereGroup.name = 'DebugTilesPlugin.sphereGroup';
+		tiles.add(this.sphereGroup);
+		this.sphereGroup.updateMatrix();
+
+		this.regionGroup = new Object3D();
+		this.regionGroup.name = 'DebugTilesPlugin.regionGroup';
+		tiles.add(this.regionGroup);
+		this.regionGroup.updateMatrix();
+
+		// register events
+		this._onLoadTileSetCB = () => {
+			this._initExtremes();
+		};
+
+		this._onLoadModelCB = ({ scene, tile }) => {
+			this._onLoadModel(scene, tile);
+		};
+
+		this._onDisposeModelCB = ({ tile }) => {
+			this._onDisposeModel(tile);
+		};
+
+		this._onUpdateAfterCB = () => {
+			this._onUpdateAfter();
+		};
+
+		this._onTileVisibilityChangeCB = ({ scene, tile, visible }) => {
+			this._onTileVisibilityChange(tile, visible);
+		};
+
+		tiles.addEventListener('load-tile-set', this._onLoadTileSetCB);
+		tiles.addEventListener('load-model', this._onLoadModelCB);
+		tiles.addEventListener('dispose-model', this._onDisposeModelCB);
+		tiles.addEventListener('update-after', this._onUpdateAfterCB);
+		tiles.addEventListener('tile-visibility-change', this._onTileVisibilityChangeCB);
+
+		this._initExtremes();
+
+		// initialize an already-loaded tiles
+		tiles.traverse(tile => {
+			if (tile.cached.scene) {
+				this._onLoadModel(tile.cached.scene, tile);
+			}
+		});
+
+		tiles.visibleTiles.forEach(tile => {
+			this._onTileVisibilityChange(tile, true);
+		});
+	}
+
+	getTileInformationFromActiveObject(object) {
+		// Find which tile this scene is associated with. This is slow and
+		// intended for debug purposes only.
+		let targetTile = null;
+		const activeTiles = this.tiles.activeTiles;
+		activeTiles.forEach(tile => {
+			if (targetTile) {
+				return true;
+			}
+
+			const scene = tile.cached.scene;
+			if (scene) {
+				scene.traverse(c => {
+					if (c === object) {
+						targetTile = tile;
+					}
+				});
+			}
+		});
+
+		if (targetTile) {
+			return {
+				distanceToCamera: targetTile.__distanceFromCamera,
+				geometricError: targetTile.geometricError,
+				screenSpaceError: targetTile.__error,
+				depth: targetTile.__depth,
+				isLeaf: targetTile.__isLeaf
+			};
+		} else {
+			return null;
+		}
+	}
+
+	_initExtremes() {
+		if (!(this.tiles && this.tiles.root)) {
+			return;
+		}
+
+		// initialize the extreme values of the hierarchy
+		let maxDepth = -1;
+		let maxError = -1;
+
+		// Note that we are not using this.tiles.traverse()
+		// as we don't want to pay the cost of preprocessing tiles.
+		traverseSet(this.tiles.root, null, (tile, _, depth) => {
+			maxDepth = Math.max(maxDepth, depth);
+			maxError = Math.max(maxError, tile.geometricError);
+		});
+
+		this.extremeDebugDepth = maxDepth;
+		this.extremeDebugError = maxError;
+	}
+
+	_onUpdateAfter() {
+		const tiles = this.tiles;
+
+		if (!tiles.root) {
+			return;
+		}
+
+		// set box or sphere visibility
+		this.boxGroup.visible = this.displayBoxBounds;
+		this.sphereGroup.visible = this.displaySphereBounds;
+		this.regionGroup.visible = this.displayRegionBounds;
+
+		// get max values to use for materials
+		let maxDepth = -1;
+		if (this.maxDebugDepth === -1) {
+			maxDepth = this.extremeDebugDepth;
+		} else {
+			maxDepth = this.maxDebugDepth;
+		}
+
+		let maxError = -1;
+		if (this.maxDebugError === -1) {
+			maxError = this.extremeDebugError;
+		} else {
+			maxError = this.maxDebugError;
+		}
+
+		let maxDistance = -1;
+		if (this.maxDebugDistance === -1) {
+			tiles.getBoundingSphere(_sphere);
+			maxDistance = _sphere.radius;
+		} else {
+			maxDistance = this.maxDebugDistance;
+		}
+
+		const errorTarget = tiles.errorTarget;
+		const colorMode = this.colorMode;
+		const visibleTiles = tiles.visibleTiles;
+		let sortedTiles;
+		if (colorMode === LOAD_ORDER) {
+			sortedTiles = Array.from(visibleTiles).sort((a, b) => {
+				return a[LOAD_TIME] - b[LOAD_TIME];
+			});
+		}
+
+		// update plugins
+		visibleTiles.forEach(tile => {
+			const scene = tile.cached.scene;
+
+			// create a random color per-tile
+			let h, s, l;
+			if (colorMode === RANDOM_COLOR) {
+				h = Math.random();
+				s = 0.5 + Math.random() * 0.5;
+				l = 0.375 + Math.random() * 0.25;
+			}
+
+			scene.traverse(c => {
+				if (colorMode === RANDOM_NODE_COLOR) {
+					h = Math.random();
+					s = 0.5 + Math.random() * 0.5;
+					l = 0.375 + Math.random() * 0.25;
+				}
+
+				const currMaterial = c.material;
+				if (currMaterial) {
+					// Reset the material if needed
+					const originalMaterial = c[ORIGINAL_MATERIAL];
+
+					if (colorMode === NONE && currMaterial !== originalMaterial) {
+						c.material.dispose();
+						c.material = c[ORIGINAL_MATERIAL];
+					} else if (colorMode !== NONE && currMaterial === originalMaterial) {
+						if (c.material.drawMode === DRAW_MODE.POINTS) {
+							const pointsMaterial = new PointsMaterial();
+							pointsMaterial.size = originalMaterial.size;
+							pointsMaterial.sizeAttenuation = originalMaterial.sizeAttenuation;
+							c.material = pointsMaterial;
+						} else {
+							if (c.material.isInstancedPBRMaterial) {
+								c.material = new InstancedPBRMaterial();
+								c.material.metalness = 0.0;
+								c.material.roughness = 1.0;
+							} else if (c.material.isInstancedBasicMaterial) {
+								c.material = new InstancedBasicMaterial();
+							} else {
+								c.material = new PBRMaterial();
+								c.material.metalness = 0.0;
+								c.material.roughness = 1.0;
+							}
+
+							c.material.shading = SHADING_TYPE.FLAT_SHADING;
+							c.material.envMap = undefined;
+						}
+					}
+
+					if (colorMode !== RANDOM_COLOR) {
+						delete c.material[HAS_RANDOM_COLOR];
+					}
+
+					if (colorMode !== RANDOM_NODE_COLOR) {
+						delete c.material[HAS_RANDOM_NODE_COLOR];
+					}
+
+					switch (colorMode) {
+						case DEPTH: {
+							const val = tile.__depth / maxDepth;
+							this.getDebugColor(val, c.material.diffuse);
+							break;
+						}
+						case RELATIVE_DEPTH: {
+							const val = tile.__depthFromRenderedParent / maxDepth;
+							this.getDebugColor(val, c.material.diffuse);
+							break;
+						}
+						case SCREEN_ERROR: {
+							const val = tile.__error / errorTarget;
+							if (val > 1.0) {
+								c.material.diffuse.setRGB(1.0, 0.0, 0.0);
+							} else {
+								this.getDebugColor(val, c.material.diffuse);
+							}
+							break;
+						}
+						case GEOMETRIC_ERROR: {
+							const val = Math.min(tile.cached.geometricError / maxError, 1);
+							this.getDebugColor(val, c.material.diffuse);
+							break;
+						}
+						case DISTANCE: {
+							// We don't update the distance if the geometric error is 0.0 so
+							// it will always be black.
+							const val = Math.min(tile.__distanceFromCamera / maxDistance, 1);
+							this.getDebugColor(val, c.material.diffuse);
+							break;
+						}
+						case IS_LEAF: {
+							if (!tile.children || tile.children.length === 0) {
+								this.getDebugColor(1.0, c.material.diffuse);
+							} else {
+								this.getDebugColor(0.0, c.material.diffuse);
+							}
+							break;
+						}
+						case RANDOM_NODE_COLOR: {
+							if (!c.material[HAS_RANDOM_NODE_COLOR]) {
+								c.material.diffuse.setHSL(h, s, l);
+								c.material[HAS_RANDOM_NODE_COLOR] = true;
+							}
+							break;
+						}
+						case RANDOM_COLOR: {
+							if (!c.material[HAS_RANDOM_COLOR]) {
+								c.material.diffuse.setHSL(h, s, l);
+								c.material[HAS_RANDOM_COLOR] = true;
+							}
+							break;
+						}
+						case CUSTOM_COLOR: {
+							if (this.customColorCallback) {
+								this.customColorCallback(tile, c);
+							} else {
+								console.warn('DebugTilesPlugin: customColorCallback not defined');
+							}
+							break;
+						}
+						case LOAD_ORDER: {
+							const value = sortedTiles.indexOf(tile);
+							this.getDebugColor(value / (sortedTiles.length - 1), c.material.diffuse);
+							break;
+						}
+					}
+				}
+			});
+		});
+	}
+
+	_onTileVisibilityChange(tile, visible) {
+		if (this.displayParentBounds) {
+			traverseAncestors(tile, current => {
+				if (current[PARENT_BOUND_REF_COUNT] == null) {
+					current[PARENT_BOUND_REF_COUNT] = 0;
+				}
+
+				if (visible) {
+					current[PARENT_BOUND_REF_COUNT]++;
+				} else if (current[PARENT_BOUND_REF_COUNT] > 0) {
+					current[PARENT_BOUND_REF_COUNT]--;
+				}
+
+				const tileVisible = (current === tile && visible) || (this.displayParentBounds && current[PARENT_BOUND_REF_COUNT] > 0);
+
+				this._updateBoundHelper(current, tileVisible);
+			});
+		} else {
+			this._updateBoundHelper(tile, visible);
+		}
+	}
+
+	_createBoundHelper(tile) {
+		const tiles = this.tiles;
+		const cached = tile.cached;
+		const { sphere, obb, region } = cached.boundingVolume;
+		if (obb) {
+			// Create debug bounding box
+			// In some cases the bounding box may have a scale of 0 in one dimension resulting
+			// in the NaNs in an extracted rotation so we disable matrix updates instead.
+			const boxHelperGroup = new Object3D();
+			boxHelperGroup.name = 'DebugTilesPlugin.boxHelperGroup';
+			boxHelperGroup.matrix.copy(obb._originBoxTransform);
+			boxHelperGroup.matrixAutoUpdate = false;
+			boxHelperGroup.matrixNeedsUpdate = false;
+
+			const boxHelper = new Box3Helper(obb._originBox, getIndexedRandomColor(tile.__depth).getHex());
+			boxHelper.raycast = emptyRaycast;
+			boxHelperGroup.add(boxHelper);
+
+			cached.boxHelperGroup = boxHelperGroup;
+
+			if (tiles.visibleTiles.has(tile) && this.displayBoxBounds) {
+				this.boxGroup.add(boxHelperGroup);
+				boxHelperGroup.updateMatrix(true);
+			}
+		}
+
+		if (sphere) {
+			// Create debug bounding sphere
+			const sphereHelper = new SphereHelper(sphere, getIndexedRandomColor(tile.__depth).getHex());
+			sphereHelper.raycast = emptyRaycast;
+			cached.sphereHelper = sphereHelper;
+
+			if (tiles.visibleTiles.has(tile) && this.displaySphereBounds) {
+				this.sphereGroup.add(sphereHelper);
+				sphereHelper.updateMatrix(true);
+			}
+		}
+	}
+
+	_updateHelperMaterial(tile, material) {
+		if (tile.__visible || !this.displayParentBounds) {
+			material.opacity = 1;
+		} else {
+			material.opacity = 0.2;
+		}
+
+		material.transparent = material.opacity < 1;
+	}
+
+	_updateBoundHelper(tile, visible) {
+		const cached = tile.cached;
+
+		if (!cached) {
+			return;
+		}
+
+		const sphereGroup = this.sphereGroup;
+		const boxGroup = this.boxGroup;
+		const regionGroup = this.regionGroup;
+
+		if (visible && (cached.boxHelperGroup == null && cached.sphereHelper == null && cached.regionHelper == null)) {
+			this._createBoundHelper(tile);
+		}
+
+		const boxHelperGroup = cached.boxHelperGroup;
+		const sphereHelper = cached.sphereHelper;
+		const regionHelper = cached.regionHelper;
+
+		if (!visible) {
+			if (boxHelperGroup) {
+				boxGroup.remove(boxHelperGroup);
+			}
+
+			if (sphereHelper) {
+				sphereGroup.remove(sphereHelper);
+			}
+
+			if (regionHelper) {
+				regionGroup.remove(regionHelper);
+			}
+		} else {
+			// TODO: consider updating the volumes based on the bounding regions here in case they've been changed
+			if (boxHelperGroup) {
+				boxGroup.add(boxHelperGroup);
+				boxHelperGroup.updateMatrix(true);
+
+				this._updateHelperMaterial(tile, boxHelperGroup.children[0].material);
+			}
+
+			if (sphereHelper) {
+				sphereGroup.add(sphereHelper);
+				sphereHelper.updateMatrix(true);
+
+				this._updateHelperMaterial(tile, sphereHelper.material);
+			}
+
+			if (regionHelper) {
+				regionGroup.add(regionHelper);
+				regionHelper.updateMatrix(true);
+
+				this._updateHelperMaterial(tile, regionHelper.material);
+			}
+		}
+	}
+
+	_onLoadModel(scene, tile) {
+		tile[LOAD_TIME] = performance.now();
+
+		// Cache the original materials
+		scene.traverse(c => {
+			const material = c.material;
+			if (material) {
+				c[ORIGINAL_MATERIAL] = material;
+			}
+		});
+	}
+
+	_onDisposeModel(tile) {
+		const cached = tile.cached;
+		if (cached.boxHelperGroup) {
+			cached.boxHelperGroup.children[0].geometry.dispose();
+			delete cached.boxHelperGroup;
+		}
+
+		if (cached.sphereHelper) {
+			cached.sphereHelper.geometry.dispose();
+			delete cached.sphereHelper;
+		}
+
+		if (cached.regionHelper) {
+			cached.regionHelper.geometry.dispose();
+			delete cached.regionHelper;
+		}
+	}
+
+	dispose() {
+		const tiles = this.tiles;
+
+		if (tiles) {
+			tiles.removeEventListener('load-tile-set', this._onLoadTileSetCB);
+			tiles.removeEventListener('load-model', this._onLoadModelCB);
+			tiles.removeEventListener('dispose-model', this._onDisposeModelCB);
+			tiles.removeEventListener('update-after', this._onUpdateAfterCB);
+			tiles.removeEventListener('tile-visibility-change', this._onTileVisibilityChangeCB);
+
+			// reset all materials
+			this.colorMode = NONE;
+			this._onUpdateAfter();
+
+			// dispose of all helper objects
+			tiles.traverse(tile => {
+				this._onDisposeModel(tile);
+			});
+		}
+
+		this.boxGroup?.removeFromParent();
+		this.sphereGroup?.removeFromParent();
+		this.regionGroup?.removeFromParent();
+	}
+
+}
+
+const ORIGINAL_MATERIAL = Symbol('ORIGINAL_MATERIAL');
+const HAS_RANDOM_COLOR = Symbol('HAS_RANDOM_COLOR');
+const HAS_RANDOM_NODE_COLOR = Symbol('HAS_RANDOM_NODE_COLOR');
+const LOAD_TIME = Symbol('LOAD_TIME');
+const PARENT_BOUND_REF_COUNT = Symbol('PARENT_BOUND_REF_COUNT');
+
+const _sphere = new Sphere();
+const emptyRaycast = () => {};
+const colors = {};
+
+// Return a consistant random color for an index
+function getIndexedRandomColor(index) {
+	if (!colors[index]) {
+		const h = Math.random();
+		const s = 0.5 + Math.random() * 0.5;
+		const l = 0.375 + Math.random() * 0.25;
+
+		colors[index] = new Color3().setHSL(h, s, l);
+	}
+	return colors[index];
+}
+
+// color modes
+const NONE = 0;
+const SCREEN_ERROR = 1;
+const GEOMETRIC_ERROR = 2;
+const DISTANCE = 3;
+const DEPTH = 4;
+const RELATIVE_DEPTH = 5;
+const IS_LEAF = 6;
+const RANDOM_COLOR = 7;
+const RANDOM_NODE_COLOR = 8;
+const CUSTOM_COLOR = 9;
+const LOAD_ORDER = 10;
+
+const ColorModes = Object.freeze({
+	NONE,
+	SCREEN_ERROR,
+	GEOMETRIC_ERROR,
+	DISTANCE,
+	DEPTH,
+	RELATIVE_DEPTH,
+	IS_LEAF,
+	RANDOM_COLOR,
+	RANDOM_NODE_COLOR,
+	CUSTOM_COLOR,
+	LOAD_ORDER
+});
 
 class ReorientationPlugin {
 
@@ -6980,4 +7620,4 @@ Vector3.prototype.applyEuler = function(euler) {
 
 Vector3.prototype.isVector3 = true;
 
-export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, I3DMLoader, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, ReorientationPlugin, TileGLTFLoader, Tiles3D };
+export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, I3DMLoader, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, ReorientationPlugin, TileGLTFLoader, Tiles3D };

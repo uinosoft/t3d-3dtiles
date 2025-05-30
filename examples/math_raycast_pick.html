@@ -36,19 +36,7 @@
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
 		import { Raycaster } from 't3d/addons/Raycaster.js';
 
-		import { Tiles3D } from 't3d-3dtiles';
-		import {
-			Tiles3DDebugger,
-			NONE,
-			SCREEN_ERROR,
-			GEOMETRIC_ERROR,
-			DISTANCE,
-			DEPTH,
-			RELATIVE_DEPTH,
-			IS_LEAF,
-			RANDOM_COLOR,
-			RANDOM_NODE_COLOR
-		} from './jsm/Tiles3DDebugger.js';
+		import { Tiles3D, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
 
 		import { GUI } from './libs/lil-gui.esm.min.js';
 		import Stats from './libs/stats.module.js';
@@ -89,10 +77,8 @@
 
 		// Create 3D tiles
 
-		const offsetGroup = new t3d.Object3D();
-		scene.add(offsetGroup);
-
 		const tiles3D = new Tiles3D('https://storage.googleapis.com/ogc-3d-tiles/ayutthaya/tiledWithSkirts/tileset.json');
+		scene.add(tiles3D);
 
 		const dracoLoader = new DRACOLoader();
 		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
@@ -101,15 +87,8 @@
 		tiles3D.addCamera(camera);
 		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
-		tiles3D.addEventListener('load-tile-set', ({ tileSet, url }) => {
-			if (url !== tiles3D.rootURL) return;
-			offsetGroup.add(tiles3D);
-			offsetGroup.euler.x = -Math.PI / 2;
-		});
-
-		const tilesDebugger = new Tiles3DDebugger(tiles3D);
-		tilesDebugger.helper.sphereGroup.visible = false;
-		tilesDebugger.helper.boxGroup.visible = false;
+		tiles3D.registerPlugin(new ReorientationPlugin());
+		tiles3D.registerPlugin(new DebugTilesPlugin());
 
 		// Ray casting
 
@@ -208,20 +187,12 @@
 		tileOptions.add(tiles3D, 'errorTarget', 0, 20, 1);
 		tileOptions.close();
 
+		const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+
 		const debugFolder = gui.addFolder('Tiles Debug');
-		debugFolder.add(tilesDebugger.helper.boxGroup, 'visible').name('displayBoxBounds');
-		debugFolder.add(tilesDebugger.helper.sphereGroup, 'visible').name('displaySphereBounds');
-		debugFolder.add(tilesDebugger, 'colorMode', {
-			NONE,
-			SCREEN_ERROR,
-			GEOMETRIC_ERROR,
-			DISTANCE,
-			DEPTH,
-			RELATIVE_DEPTH,
-			IS_LEAF,
-			RANDOM_COLOR,
-			RANDOM_NODE_COLOR
-		});
+		debugFolder.add(debugTilesPlugin, 'displayBoxBounds');
+		debugFolder.add(debugTilesPlugin, 'displaySphereBounds');
+		debugFolder.add(debugTilesPlugin, 'colorMode', DebugTilesPlugin.ColorModes);
 		debugFolder.close();
 
 		const pickFolder = gui.addFolder('Pick');
@@ -243,7 +214,6 @@
 			controller.update();
 
 			tiles3D.update();
-			tilesDebugger.update();
 
 			raycast();
 

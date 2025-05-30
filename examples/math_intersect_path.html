@@ -40,20 +40,8 @@
 		import { Raycaster } from 't3d/addons/Raycaster.js';
 		import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
 
-		import { Tiles3D, OBB } from 't3d-3dtiles';
+		import { Tiles3D, ReorientationPlugin, DebugTilesPlugin, OBB } from 't3d-3dtiles';
 		
-		import {
-			Tiles3DDebugger,
-			NONE,
-			SCREEN_ERROR,
-			GEOMETRIC_ERROR,
-			DISTANCE,
-			DEPTH,
-			RELATIVE_DEPTH,
-			IS_LEAF,
-			RANDOM_COLOR,
-			RANDOM_NODE_COLOR
-		} from './jsm/Tiles3DDebugger.js';
 		import { LineSegment } from './jsm/math/LineSegment.js';
 		import { getIntersectWithPath } from './jsm/math/Intersects.js';
 		import { OBBHelper } from './jsm/helpers/OBBHelper.js';
@@ -98,10 +86,8 @@
 
 		// Create 3D tiles
 
-		const offsetGroup = new t3d.Object3D();
-		scene.add(offsetGroup);
-
 		const tiles3D = new Tiles3D('https://storage.googleapis.com/ogc-3d-tiles/ayutthaya/tiledWithSkirts/tileset.json');
+		scene.add(tiles3D);
 
 		const dracoLoader = new DRACOLoader();
 		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
@@ -110,15 +96,8 @@
 		tiles3D.addCamera(camera);
 		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
-		tiles3D.addEventListener('load-tile-set', ({ tileSet, url }) => {
-			if (url !== tiles3D.rootURL) return;
-			offsetGroup.add(tiles3D);
-			offsetGroup.euler.x = -Math.PI / 2;
-		});
-
-		const tilesDebugger = new Tiles3DDebugger(tiles3D);
-		tilesDebugger.helper.sphereGroup.visible = false;
-		tilesDebugger.helper.boxGroup.visible = false;
+		tiles3D.registerPlugin(new ReorientationPlugin());
+		tiles3D.registerPlugin(new DebugTilesPlugin());
 
 		// Path, Path Helpers and Controls
 
@@ -176,7 +155,7 @@
 			}
 		});
 
-		tiles3D.addEventListener('TileLoaded', ({ scene, tile, visible }) => {
+		tiles3D.addEventListener('load-model', ({ scene, tile }) => {
 			doIntersect();
 		});
 
@@ -237,20 +216,12 @@
 		tileOptions.add(tiles3D, 'errorTarget', 0, 100, 1);
 		tileOptions.close();
 
+		const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+
 		const debugFolder = gui.addFolder('Tiles Debug');
-		debugFolder.add(tilesDebugger.helper.boxGroup, 'visible').name('displayBoxBounds');
-		debugFolder.add(tilesDebugger.helper.sphereGroup, 'visible').name('displaySphereBounds');
-		debugFolder.add(tilesDebugger, 'colorMode', {
-			NONE,
-			SCREEN_ERROR,
-			GEOMETRIC_ERROR,
-			DISTANCE,
-			DEPTH,
-			RELATIVE_DEPTH,
-			IS_LEAF,
-			RANDOM_COLOR,
-			RANDOM_NODE_COLOR
-		});
+		debugFolder.add(debugTilesPlugin, 'displayBoxBounds');
+		debugFolder.add(debugTilesPlugin, 'displaySphereBounds');
+		debugFolder.add(debugTilesPlugin, 'colorMode', DebugTilesPlugin.ColorModes);
 		debugFolder.close();
 
 		const statsContainer = document.getElementById('stats_container');
@@ -270,8 +241,6 @@
 			controller.update();
 
 			transformControls.update();
-
-			tilesDebugger.update();
 
 			const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
 			if (statsContainer.innerHTML !== str) {

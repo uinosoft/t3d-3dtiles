@@ -32,9 +32,6 @@ export class Ellipsoid {
 			.premultiply(_matrix)
 			.setPosition(0, 0, 0);
 
-
-		console.log(target.elements[0]);
-
 		// Add in the orientation adjustment for objects and cameras so "forward" and "up" are oriented
 		// correctly
 		if (frame === CAMERA_FRAME) {

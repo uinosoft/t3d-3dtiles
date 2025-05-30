@@ -219,6 +219,8 @@ export class Tiles3D extends Object3D {
 		const rootTile = this.root;
 		if (!rootTile) return;
 
+		this.dispatchEvent(_updateBeforeEvent);
+
 		const { stats } = this;
 		stats.inFrustum = 0;
 		stats.used = 0;
@@ -230,6 +232,8 @@ export class Tiles3D extends Object3D {
 		this.$cameras.updateInfos(this.worldMatrix);
 
 		schedulingTiles(rootTile, this);
+
+		this.dispatchEvent(_updateAfterEvent);
 	}
 
 	addCamera(camera) {
@@ -414,9 +418,11 @@ export class Tiles3D extends Object3D {
 					c.frustumCulled = c.frustumCulled && !this._autoDisableRendererCulling;
 				});
 
-				_TileLoadedEvent.scene = scene;
-				_TileLoadedEvent.tile = tile;
-				this.$events.dispatchEvent(_TileLoadedEvent);
+				this.dispatchEvent({
+					type: 'load-model',
+					scene,
+					tile
+				});
 			});
 	}
 
@@ -435,10 +441,12 @@ export class Tiles3D extends Object3D {
 			visibleTiles.delete(tile);
 		}
 
-		_TileVisibilityChangedEvent.scene = scene;
-		_TileVisibilityChangedEvent.tile = tile;
-		_TileVisibilityChangedEvent.visible = visible;
-		this.$events.dispatchEvent(_TileVisibilityChangedEvent);
+		this.dispatchEvent({
+			type: 'tile-visibility-change',
+			scene,
+			tile,
+			visible
+		});
 	}
 
 	$setTileActive(tile, active) {
@@ -471,9 +479,11 @@ export class Tiles3D extends Object3D {
 				texture.dispose();
 			}
 
-			_TileDisposedEvent.scene = cached.scene;
-			_TileDisposedEvent.tile = tile;
-			this.$events.dispatchEvent(_TileDisposedEvent);
+			this.dispatchEvent({
+				type: 'dispose-model',
+				scene: cached.scene,
+				tile
+			});
 
 			cached.scene = null;
 			cached.materials = null;
@@ -486,13 +496,12 @@ export class Tiles3D extends Object3D {
 
 }
 
+const _updateBeforeEvent = { type: 'update-before' };
+const _updateAfterEvent = { type: 'update-after' };
+
 const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
 
 const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
-
-const _TileLoadedEvent = { type: 'TileLoaded', scene: null, tile: null };
-const _TileDisposedEvent = { type: 'TileDisposed', scene: null, tile: null };
-const _TileVisibilityChangedEvent = { type: 'TileVisibilityChanged', scene: null, tile: null, visible: false };
 
 const tempMat = new Matrix4();
 

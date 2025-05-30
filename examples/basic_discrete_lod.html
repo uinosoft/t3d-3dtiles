@@ -35,19 +35,7 @@
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
 
-		import { Tiles3D, ReorientationPlugin } from 't3d-3dtiles';
-		import {
-			Tiles3DDebugger,
-			NONE,
-			SCREEN_ERROR,
-			GEOMETRIC_ERROR,
-			DISTANCE,
-			DEPTH,
-			RELATIVE_DEPTH,
-			IS_LEAF,
-			RANDOM_COLOR,
-			RANDOM_NODE_COLOR
-		} from './jsm/Tiles3DDebugger.js';
+		import { Tiles3D, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
 
 		import { GUI } from './libs/lil-gui.esm.min.js';
 
@@ -87,10 +75,13 @@
 
 		// Create 3D tiles
 
-		const tilesetUri = 'https://raw.githubusercontent.com/CesiumGS/3d-tiles-samples/main/1.0/TilesetWithDiscreteLOD/tileset.json';
-		const tiles3D = new Tiles3D(tilesetUri);
-		tiles3D.registerPlugin(new ReorientationPlugin());
+		const tiles3D = new Tiles3D('https://raw.githubusercontent.com/CesiumGS/3d-tiles-samples/main/1.0/TilesetWithDiscreteLOD/tileset.json');
 		scene.add(tiles3D);
+
+		tiles3D.registerPlugin(new ReorientationPlugin());
+		tiles3D.registerPlugin(new DebugTilesPlugin({
+			displayBoxBounds: true
+		}));
 
 		const dracoLoader = new DRACOLoader();
 		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
@@ -98,9 +89,6 @@
 		
 		tiles3D.addCamera(camera);
 		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
-
-		const tilesDebugger = new Tiles3DDebugger(tiles3D);
-		tilesDebugger.helper.sphereGroup.visible = false;
 
 		// GUI
 
@@ -110,21 +98,12 @@
 		tileOptions.add(tiles3D, 'errorTarget', 0, 100, 1);
 		tileOptions.open();
 
+		const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+
 		const debugFolder = gui.addFolder('Tiles Debug');
-		debugFolder.add(tilesDebugger.helper.boxGroup, 'visible').name('displayBoxBounds');
-		debugFolder.add(tilesDebugger.helper.sphereGroup, 'visible').name('displaySphereBounds');
-		debugFolder.add(tilesDebugger, 'colorMode', {
-			NONE,
-			SCREEN_ERROR,
-			GEOMETRIC_ERROR,
-			DISTANCE,
-			DEPTH,
-			RELATIVE_DEPTH,
-			IS_LEAF,
-			RANDOM_COLOR,
-			RANDOM_NODE_COLOR
-		});
-		debugFolder.open();
+		debugFolder.add(debugTilesPlugin, 'displayBoxBounds');
+		debugFolder.add(debugTilesPlugin, 'displaySphereBounds');
+		debugFolder.add(debugTilesPlugin, 'colorMode', DebugTilesPlugin.ColorModes);
 
 		const statsContainer = document.getElementById('stats_container');
 
@@ -136,7 +115,6 @@
 			controller.update();
 
 			tiles3D.update();
-			tilesDebugger.update();
 
 			const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
 			if (statsContainer.innerHTML !== str) {

@@ -12,6 +12,7 @@ export * from './loaders/I3DMLoader.js';
 export * from './loaders/PNTSLoader.js';
 
 export { CesiumIonAuthPlugin } from './plugins/CesiumIonAuthPlugin.js';
+export { DebugTilesPlugin } from './plugins/DebugTilesPlugin.js';
 export { ReorientationPlugin } from './plugins/ReorientationPlugin.js';
 
 export { LoadParser as DebugLoadParser } from './loaders/parsers/LoadParser.js';
