@@ -17,9 +17,11 @@ export { ReorientationPlugin } from './plugins/ReorientationPlugin.js';
 
 export { LoadParser as DebugLoadParser } from './loaders/parsers/LoadParser.js';
 
-// Exporting the Matrix4 prototype methods for compatibility
+// Exporting some prototype methods for Matrix4, Vector3, and Object3D classes
 
-import { Matrix4 } from 't3d';
+import { Vector3, Quaternion, Matrix4, Object3D } from 't3d';
+
+const _quaternion = new Quaternion();
 
 Matrix4.prototype.makeBasis = function(xAxis, yAxis, zAxis) {
 	this.set(
@@ -160,13 +162,18 @@ Matrix4.prototype.invert = function() {
 	return this.getInverse(this);
 };
 
-// Exporting the Vector3 prototype method for compatibility
-
-import { Vector3, Quaternion } from 't3d';
-const _quaternion = new Quaternion();
-
 Vector3.prototype.applyEuler = function(euler) {
 	return this.applyQuaternion(_quaternion.setFromEuler(euler));
 };
 
 Vector3.prototype.isVector3 = true;
+
+Object3D.prototype.removeFromParent = function() {
+	const parent = this.parent;
+
+	if (parent !== null) {
+		parent.remove(this);
+	}
+
+	return this;
+};

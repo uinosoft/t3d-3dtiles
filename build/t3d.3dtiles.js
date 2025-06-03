@@ -5529,6 +5529,10 @@
 			stats.failed = 0;
 		}
 		dispose() {
+			// dispose of all the plugins
+			this.plugins.forEach(plugin => {
+				this.unregisterPlugin(plugin);
+			});
 			const lruCache = this.$tilesLoader.lruCache;
 			this.traverse(tile => {
 				lruCache.remove(tile);
@@ -6426,7 +6430,6 @@
 						const cart = {};
 						ellipsoid.getPositionToCartographic(sphere.center, cart);
 						this.transformLatLonHeightToOrigin(cart.lat, cart.lon, cart.height);
-						console.log(cart.lat, cart.lon, cart.height);
 					} else {
 						// lastly fall back to orienting the up direction to +Y
 						tiles.euler.set(0, 0, 0);
@@ -6504,6 +6507,7 @@
 		}
 	}
 
+	const _quaternion = new t3d.Quaternion();
 	t3d.Matrix4.prototype.makeBasis = function (xAxis, yAxis, zAxis) {
 		this.set(xAxis.x, yAxis.x, zAxis.x, 0, xAxis.y, yAxis.y, zAxis.y, 0, xAxis.z, yAxis.z, zAxis.z, 0, 0, 0, 0, 1);
 		return this;
@@ -6633,11 +6637,17 @@
 	t3d.Matrix4.prototype.invert = function () {
 		return this.getInverse(this);
 	};
-	const _quaternion = new t3d.Quaternion();
 	t3d.Vector3.prototype.applyEuler = function (euler) {
 		return this.applyQuaternion(_quaternion.setFromEuler(euler));
 	};
 	t3d.Vector3.prototype.isVector3 = true;
+	t3d.Object3D.prototype.removeFromParent = function () {
+		const parent = this.parent;
+		if (parent !== null) {
+			parent.remove(this);
+		}
+		return this;
+	};
 
 	exports.B3DMLoader = B3DMLoader;
 	exports.CMPTLoader = CMPTLoader;

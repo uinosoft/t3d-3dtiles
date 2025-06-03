@@ -42,7 +42,6 @@ export class ReorientationPlugin {
 					const cart = {};
 					ellipsoid.getPositionToCartographic(sphere.center, cart);
 					this.transformLatLonHeightToOrigin(cart.lat, cart.lon, cart.height);
-					console.log(cart.lat, cart.lon, cart.height);
 				} else {
 					// lastly fall back to orienting the up direction to +Y
 					tiles.euler.set(0, 0, 0);

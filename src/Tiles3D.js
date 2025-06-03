@@ -333,6 +333,11 @@ export class Tiles3D extends Object3D {
 	}
 
 	dispose() {
+		// dispose of all the plugins
+		this.plugins.forEach(plugin => {
+			this.unregisterPlugin(plugin);
+		});
+
 		const lruCache = this.$tilesLoader.lruCache;
 		this.traverse(tile => {
 			lruCache.remove(tile);

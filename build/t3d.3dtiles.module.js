@@ -6384,6 +6384,11 @@ class Tiles3D extends Object3D {
 	}
 
 	dispose() {
+		// dispose of all the plugins
+		this.plugins.forEach(plugin => {
+			this.unregisterPlugin(plugin);
+		});
+
 		const lruCache = this.$tilesLoader.lruCache;
 		this.traverse(tile => {
 			lruCache.remove(tile);
@@ -7379,7 +7384,6 @@ class ReorientationPlugin {
 					const cart = {};
 					ellipsoid.getPositionToCartographic(sphere.center, cart);
 					this.transformLatLonHeightToOrigin(cart.lat, cart.lon, cart.height);
-					console.log(cart.lat, cart.lon, cart.height);
 				} else {
 					// lastly fall back to orienting the up direction to +Y
 					tiles.euler.set(0, 0, 0);
@@ -7473,6 +7477,8 @@ class LoadParser {
 	}
 
 }
+
+const _quaternion = new Quaternion();
 
 Matrix4.prototype.makeBasis = function(xAxis, yAxis, zAxis) {
 	this.set(
@@ -7612,12 +7618,21 @@ Matrix4.prototype.makeRotationFromEuler = function(euler) {
 Matrix4.prototype.invert = function() {
 	return this.getInverse(this);
 };
-const _quaternion = new Quaternion();
 
 Vector3.prototype.applyEuler = function(euler) {
 	return this.applyQuaternion(_quaternion.setFromEuler(euler));
 };
 
 Vector3.prototype.isVector3 = true;
+
+Object3D.prototype.removeFromParent = function() {
+	const parent = this.parent;
+
+	if (parent !== null) {
+		parent.remove(this);
+	}
+
+	return this;
+};
 
 export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, I3DMLoader, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, ReorientationPlugin, TileGLTFLoader, Tiles3D };
