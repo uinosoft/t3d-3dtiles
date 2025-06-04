@@ -234,7 +234,7 @@ const toggleTiles = (tile, tiles3D) => {
 			}
 
 			if (tile.__wasSetVisible !== setVisible) {
-				tiles3D.$setTileVisible(tile, setVisible);
+				tiles3D.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, setVisible));
 			}
 		}
 		tile.__wasSetActive = setActive;

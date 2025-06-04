@@ -11,6 +11,7 @@ export * from './loaders/TileGLTFLoader.js';
 export * from './loaders/I3DMLoader.js';
 export * from './loaders/PNTSLoader.js';
 
+export { TilesFadePlugin } from './plugins/fade/TilesFadePlugin.js';
 export { CesiumIonAuthPlugin } from './plugins/CesiumIonAuthPlugin.js';
 export { DebugTilesPlugin } from './plugins/DebugTilesPlugin.js';
 export { ReorientationPlugin } from './plugins/ReorientationPlugin.js';
@@ -19,7 +20,7 @@ export { LoadParser as DebugLoadParser } from './loaders/parsers/LoadParser.js';
 
 // Exporting some prototype methods for Matrix4, Vector3, and Object3D classes
 
-import { Vector3, Quaternion, Matrix4, Object3D } from 't3d';
+import { Vector3, Quaternion, Matrix4, Object3D, MathUtils } from 't3d';
 
 const _quaternion = new Quaternion();
 
@@ -167,6 +168,14 @@ Vector3.prototype.applyEuler = function(euler) {
 };
 
 Vector3.prototype.isVector3 = true;
+
+Quaternion.prototype.angleTo = function(q) {
+	return 2 * Math.acos(Math.abs(MathUtils.clamp(this.dot(q), -1, 1)));
+};
+
+Quaternion.prototype.identity = function() {
+	return this.set(0, 0, 0, 1);
+};
 
 Object3D.prototype.removeFromParent = function() {
 	const parent = this.parent;

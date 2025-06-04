@@ -1,5 +1,5 @@
 // t3d-3dtiles
-import { Matrix4, Ray, Vector3, Matrix3, Frustum, Vector2, Box3, Plane, Spherical, Euler, Sphere, Loader, Vector4, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Buffer, Attribute, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Bone, Object3D, Camera, SkinnedMesh, Mesh, Skeleton, KeyframeClip, QuaternionLinearInterpolant, LinearInterpolant, QuaternionCubicSplineInterpolant, CubicSplineInterpolant, StepInterpolant, VectorKeyframeTrack, NumberKeyframeTrack, QuaternionKeyframeTrack, DirectionalLight, PointLight, SpotLight, PBR2Material, FileLoader, ImageLoader, DefaultLoadingManager, ShaderLib, MATERIAL_TYPE, Quaternion, Color3, EventDispatcher, LoadingManager, DRAW_MODE } from 't3d';
+import { Matrix4, Ray, Vector3, Matrix3, Frustum, Vector2, Box3, Plane, Spherical, Euler, Sphere, Loader, Vector4, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Buffer, Attribute, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Bone, Object3D, SkinnedMesh, Mesh, Camera, Skeleton, KeyframeClip, VectorKeyframeTrack, NumberKeyframeTrack, QuaternionKeyframeTrack, QuaternionLinearInterpolant, LinearInterpolant, QuaternionCubicSplineInterpolant, CubicSplineInterpolant, StepInterpolant, DirectionalLight, PointLight, SpotLight, PBR2Material, DefaultLoadingManager, FileLoader, ImageLoader, ShaderLib, MATERIAL_TYPE, Quaternion, Color3, LoadingManager, EventDispatcher, MathUtils, DRAW_MODE } from 't3d';
 import { Box3Helper } from 't3d/addons/objects/Box3Helper.js';
 import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
 
@@ -1082,7 +1082,7 @@ class Ellipsoid {
 				y2 * yMultiplier3 * invRadiusSqY +
 				z2 * zMultiplier3 * invRadiusSqZ;
 
-			const derivative = -2.0 * denominator;
+			const derivative = -2 * denominator;
 			correction = func / derivative;
 		} while (Math.abs(func) > EPSILON12);
 
@@ -1918,7 +1918,7 @@ class TilesLoader {
 				tile.__loadingState = RequestState$1.LOADED;
 
 				if (tile.__wasSetVisible) {
-					tiles3D.$setTileVisible(tile, true);
+					tiles3D.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, true));
 				}
 
 				if (tile.__wasSetActive) {
@@ -2580,7 +2580,6 @@ const ATTRIBUTES = {
 };
 
 const ALPHA_MODES = {
-	OPAQUE: 'OPAQUE',
 	MASK: 'MASK',
 	BLEND: 'BLEND'
 };
@@ -2631,7 +2630,6 @@ const WEBGL_DRAW_MODES = {
 	LINES: 1,
 	LINE_LOOP: 2,
 	LINE_STRIP: 3,
-	TRIANGLES: 4,
 	TRIANGLE_STRIP: 5,
 	TRIANGLE_FAN: 6
 };
@@ -5910,7 +5908,7 @@ const toggleTiles = (tile, tiles3D) => {
 			}
 
 			if (tile.__wasSetVisible !== setVisible) {
-				tiles3D.$setTileVisible(tile, setVisible);
+				tiles3D.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, setVisible));
 			}
 		}
 		tile.__wasSetActive = setActive;
@@ -6053,8 +6051,7 @@ const _recursivelyLoadTiles = (tile, depthFromRenderedParent, tiles3D) => {
 // https://en.wikipedia.org/wiki/World_Geodetic_System
 // https://en.wikipedia.org/wiki/Flattening
 const WGS84_RADIUS = 6378137;
-const WGS84_FLATTENING = 1 / 298.257223563;
-const WGS84_HEIGHT = -(WGS84_FLATTENING * WGS84_RADIUS - WGS84_RADIUS);
+const WGS84_HEIGHT = 6356752.314245179;
 
 const WGS84_ELLIPSOID = new Ellipsoid(new Vector3(WGS84_RADIUS, WGS84_RADIUS, WGS84_HEIGHT));
 WGS84_ELLIPSOID.name = 'WGS84 Earth';
@@ -6266,6 +6263,10 @@ class Tiles3D extends Object3D {
 		this.$events.dispatchEvent(event);
 	}
 
+	markTileUsed(tile) {
+		this.$tilesLoader.lruCache.markUsed(tile);
+	}
+
 	update() {
 		const rootTile = this.root;
 		if (!rootTile) return;
@@ -6288,11 +6289,19 @@ class Tiles3D extends Object3D {
 	}
 
 	addCamera(camera) {
-		return this.$cameras.add(camera);
+		const success = this.$cameras.add(camera);
+		if (success) {
+			this.dispatchEvent({ type: 'add-camera', camera });
+		}
+		return success;
 	}
 
 	removeCamera(camera) {
-		return this.$cameras.remove(camera);
+		const success = this.$cameras.remove(camera);
+		if (success) {
+			this.dispatchEvent({ type: 'delete-camera', camera });
+		}
+		return success;
 	}
 
 	resize(width, height) {
@@ -6360,6 +6369,15 @@ class Tiles3D extends Object3D {
 		} else {
 			return false;
 		}
+	}
+
+	forEachLoadedModel(callback) {
+		this.traverse(tile => {
+			const scene = tile.cached && tile.cached.scene;
+			if (scene) {
+				callback(scene, tile);
+			}
+		}, null);
 	}
 
 	traverse(beforecb, aftercb) {
@@ -6482,7 +6500,7 @@ class Tiles3D extends Object3D {
 			});
 	}
 
-	$setTileVisible(tile, visible) {
+	setTileVisible(tile, visible) {
 		const scene = tile.cached.scene;
 		if (!scene) {
 			return;
@@ -6573,6 +6591,609 @@ const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
 
 	return true;
 };
+
+class FadeManager {
+
+	constructor() {
+		this.duration = 250;
+		this.fadeCount = 0;
+		this._lastTick = -1;
+		this._fadeState = new Map();
+		this.onFadeComplete = null;
+		this.onFadeStart = null;
+		this.onFadeSetComplete = null;
+		this.onFadeSetStart = null;
+	}
+
+	// delete the object from the fade, reset the material data
+	deleteObject(object) {
+		if (!object) {
+			return;
+		}
+
+		this.completeFade(object);
+	}
+
+	// Ensure we're storing a fade timer for the provided object
+	// Returns whether a new state had to be added
+	guaranteeState(object) {
+		const fadeState = this._fadeState;
+		if (fadeState.has(object)) {
+			return false;
+		}
+
+		const state = {
+			fadeInTarget: 0,
+			fadeOutTarget: 0,
+			fadeIn: 0,
+			fadeOut: 0
+		};
+
+		fadeState.set(object, state);
+
+		return true;
+	}
+
+	// Force the fade to complete in the direction it is already trending
+	completeFade(object) {
+		const fadeState = this._fadeState;
+		if (!fadeState.has(object)) {
+			return;
+		}
+
+		const visible = fadeState.get(object).fadeOutTarget === 0;
+
+		fadeState.delete(object);
+
+		// fire events
+		this.fadeCount--;
+
+		if (this.onFadeComplete) {
+			this.onFadeComplete(object, visible);
+		}
+
+		if (this.fadeCount === 0 && this.onFadeSetComplete) {
+			this.onFadeSetComplete();
+		}
+	}
+
+	completeAllFades() {
+		this._fadeState.forEach((value, key) => {
+			this.completeFade(key);
+		});
+	}
+
+	forEachObject(cb) {
+		this._fadeState.forEach((info, object) => {
+			cb(object, info);
+		});
+	}
+
+	// Fade the object in
+	fadeIn(object) {
+		const noState = this.guaranteeState(object);
+		const state = this._fadeState.get(object);
+		state.fadeInTarget = 1;
+		state.fadeOutTarget = 0;
+		state.fadeOut = 0;
+
+		// Fire events
+		if (noState) {
+			this.fadeCount++;
+			if (this.fadeCount === 1 && this.onFadeSetStart) {
+				this.onFadeSetStart();
+			}
+
+			if (this.onFadeStart) {
+				this.onFadeStart(object);
+			}
+		}
+	}
+
+	// Fade the object out
+	fadeOut(object) {
+		const noState = this.guaranteeState(object);
+		const state = this._fadeState.get(object);
+		state.fadeOutTarget = 1;
+
+		// Fire events and initialize state
+		if (noState) {
+			state.fadeInTarget = 1;
+			state.fadeIn = 1;
+
+			this.fadeCount++;
+			if (this.fadeCount === 1 && this.onFadeSetStart) {
+				this.onFadeSetStart();
+			}
+
+			if (this.onFadeStart) {
+				this.onFadeStart(object);
+			}
+		}
+	}
+
+	isFading(object) {
+		return this._fadeState.has(object);
+	}
+
+	isFadingOut(object) {
+		const state = this._fadeState.get(object);
+		return state && state.fadeOutTarget === 1;
+	}
+
+	// Tick the fade timer for each actively fading object
+	update() {
+		// clamp delta in case duration is really small or 0
+		const time = window.performance.now();
+		if (this._lastTick === -1) {
+			this._lastTick = time;
+		}
+
+		const delta = MathUtils.clamp((time - this._lastTick) / this.duration, 0, 1);
+		this._lastTick = time;
+
+		const fadeState = this._fadeState;
+		fadeState.forEach((state, object) => {
+			// tick the fade values
+			const {
+				fadeOutTarget,
+				fadeInTarget
+			} = state;
+
+			let {
+				fadeOut,
+				fadeIn
+			} = state;
+
+			const fadeInSign = Math.sign(fadeInTarget - fadeIn);
+			fadeIn = MathUtils.clamp(fadeIn + fadeInSign * delta, 0, 1);
+
+			const fadeOutSign = Math.sign(fadeOutTarget - fadeOut);
+			fadeOut = MathUtils.clamp(fadeOut + fadeOutSign * delta, 0, 1);
+
+			state.fadeIn = fadeIn;
+			state.fadeOut = fadeOut;
+
+			// Check if the fade in and fade out animations are complete
+			const fadeOutComplete = fadeOut === 1 || fadeOut === 0;
+			const fadeInComplete = fadeIn === 1 || fadeIn === 0;
+
+			// If they are or the fade out animation is further along than the
+			// fade in animation then mark the fade as completed for this tile
+			if ((fadeOutComplete && fadeInComplete) || fadeOut >= fadeIn) {
+				this.completeFade(object);
+			}
+		});
+	}
+
+}
+
+// Adjusts the provided material to support fading in and out using a bayer pattern.
+function wrapFadeMaterial(material) {
+	material.shaderName = `${material.shaderName || material.type}_fade`;
+
+	material.defines.FEATURE_FADE = 0;
+
+	material.uniforms.fadeIn = 0;
+	material.uniforms.fadeOut = 0;
+
+	const fragmentShader = material.fragmentShader ||
+		(material.type === MATERIAL_TYPE.BASIC ?
+			ShaderLib.basic_frag : ShaderLib.pbr_frag);
+
+	material.type = MATERIAL_TYPE.SHADER;
+
+	material.vertexShader = material.type === MATERIAL_TYPE.BASIC ?
+		ShaderLib.basic_vert : ShaderLib.pbr_vert;
+	material.fragmentShader = fragmentShader
+		.replace(/void main\(/, value => /* glsl */`
+			#if FEATURE_FADE
+
+			// adapted from https://www.shadertoy.com/view/Mlt3z8
+			float bayerDither2x2(vec2 v) {
+				return mod(3.0 * v.y + 2.0 * v.x, 4.0);
+			}
+
+			float bayerDither4x4(vec2 v) {
+				vec2 P1 = mod(v, 2.0);
+				vec2 P2 = floor(0.5 * mod(v, 4.0));
+				return 4.0 * bayerDither2x2(P1) + bayerDither2x2(P2);
+			}
+
+			uniform float fadeIn;
+			uniform float fadeOut;
+
+			#endif
+
+			${value}
+		`)
+		.replace(/#include <end_frag>/, value => /* glsl */`
+			${value}
+
+			#if FEATURE_FADE
+
+			float bayerValue = bayerDither4x4(floor(mod(gl_FragCoord.xy, 4.0)));
+			float bayerBins = 16.0;
+			float dither = (0.5 + bayerValue) / bayerBins;
+			if (dither >= fadeIn) {
+				discard;
+			}
+
+			if (dither < fadeOut) {
+				discard;
+			}
+
+			#endif
+		`);
+
+	return material.uniforms;
+}
+
+// Class for managing and updating extended fade parameters
+class FadeMaterialManager {
+
+	constructor() {
+		this._fadeParams = new WeakMap();
+		this.fading = 0;
+	}
+
+	// Set the fade parameters for the given scene
+	setFade(scene, fadeIn, fadeOut) {
+		if (!scene) {
+			return;
+		}
+
+		// traverse the scene and update the fade parameters of all materials
+		const fadeParams = this._fadeParams;
+		scene.traverse(child => {
+			const material = child.material;
+			if (material) {
+				const params = fadeParams.get(material);
+				params.fadeIn = fadeIn;
+				params.fadeOut = fadeOut;
+
+				const fadeInComplete = fadeIn === 0 || fadeIn === 1;
+				const fadeOutComplete = fadeOut === 0 || fadeOut === 1;
+				const value = Number(!fadeInComplete || !fadeOutComplete);
+				if (material.defines.FEATURE_FADE !== value) {
+					this.fading += value === 1 ? 1 : -1;
+					material.defines.FEATURE_FADE = value;
+					material.needsUpdate = true;
+				}
+			}
+		});
+	}
+
+	// initialize materials in the object
+	prepareScene(scene) {
+		scene.traverse(child => {
+			if (child.material) {
+				this.prepareMaterial(child.material);
+			}
+		});
+	}
+
+	// delete the object from the fade, reset the material data
+	deleteScene(scene) {
+		if (!scene) {
+			return;
+		}
+
+		// revert the materials
+		const fadeParams = this._fadeParams;
+		scene.traverse(child => {
+			const material = child.material;
+			if (material) {
+				fadeParams.delete(material);
+				material.defines.FEATURE_FADE = false;
+				material.needsUpdate = true;
+			}
+		});
+	}
+
+	// initialize the material
+	prepareMaterial(material) {
+		const fadeParams = this._fadeParams;
+		if (fadeParams.has(material)) {
+			return;
+		}
+
+		fadeParams.set(material, wrapFadeMaterial(material));
+	}
+
+}
+
+class TilesFadePlugin {
+
+	get fadeDuration() {
+		return this._fadeManager.duration;
+	}
+
+	set fadeDuration(value) {
+		this._fadeManager.duration = Number(value);
+	}
+
+	get fadingTiles() {
+		return this._fadeManager.fadeCount;
+	}
+
+	constructor(options) {
+		options = {
+			maximumFadeOutTiles: 50,
+			fadeRootTiles: false,
+			fadeDuration: 250,
+			...options
+		};
+
+		this.name = 'FADE_TILES_PLUGIN';
+		this.priority = -2;
+
+		this.tiles = null;
+		this.batchedMesh = null;
+		this._fadeManager = new FadeManager();
+		this._fadeMaterialManager = new FadeMaterialManager();
+		this._prevCameraTransforms = null;
+		this._fadingOutCount = 0;
+
+		this.maximumFadeOutTiles = options.maximumFadeOutTiles;
+		this.fadeRootTiles = options.fadeRootTiles;
+		this.fadeDuration = options.fadeDuration;
+	}
+
+	init(tiles) {
+		// event callback initialization
+		this._onLoadModel = ({ scene }) => {
+			// initialize all the scene materials to fade
+			this._fadeMaterialManager.prepareScene(scene);
+		};
+		this._onDisposeModel = ({ tile, scene }) => {
+			// delete the fade info from the managers on disposal of model
+			this._fadeManager.deleteObject(tile);
+			this._fadeMaterialManager.deleteScene(scene);
+		};
+		this._onAddCamera = ({ camera }) => {
+			// track the camera transform
+			this._prevCameraTransforms.set(camera, new Matrix4());
+		};
+		this._onDeleteCamera = ({ camera }) => {
+			// remove the camera transform
+			this._prevCameraTransforms.delete(camera);
+		};
+		this._onTileVisibilityChange = ({ tile, visible }) => {
+			// this function gets fired _after_ all set visible callbacks including the batched meshes
+
+			// revert the scene and fade to the initial state when toggling
+			const scene = tile.cached.scene;
+			if (scene) {
+				scene.visible = true;
+			}
+		};
+		this._onUpdateBefore = () => {
+			onUpdateBefore.call(this);
+		};
+		this._onUpdateAfter = () => {
+			onUpdateAfter.call(this);
+		};
+
+		tiles.addEventListener('load-model', this._onLoadModel);
+		tiles.addEventListener('dispose-model', this._onDisposeModel);
+		tiles.addEventListener('add-camera', this._onAddCamera);
+		tiles.addEventListener('delete-camera', this._onDeleteCamera);
+		tiles.addEventListener('update-before', this._onUpdateBefore);
+		tiles.addEventListener('update-after', this._onUpdateAfter);
+		tiles.addEventListener('tile-visibility-change', this._onTileVisibilityChange);
+
+		// initialize fade manager
+		const fadeManager = this._fadeManager;
+		fadeManager.onFadeSetStart = () => {
+			tiles.dispatchEvent({ type: 'fade-start' });
+			tiles.dispatchEvent({ type: 'needs-render' });
+		};
+
+		fadeManager.onFadeSetComplete = () => {
+			tiles.dispatchEvent({ type: 'fade-end' });
+			tiles.dispatchEvent({ type: 'needs-render' });
+		};
+
+		fadeManager.onFadeComplete = (tile, visible) => {
+			// mark the fade as finished and reset the fade parameters
+			this._fadeMaterialManager.setFade(tile.cached.scene, 0, 0);
+
+			if (!visible) {
+				// now that the tile is hidden we can run the built-in setTileVisible function for the tile
+				tiles.invokeOnePlugin(plugin => plugin !== this && plugin.setTileVisible && plugin.setTileVisible(tile, false));
+				this._fadingOutCount--;
+			}
+		};
+
+		// initialize the state based on what's already present
+		const prevCameraTransforms = new Map();
+		tiles.$cameras._cameras.forEach(camera => {
+			prevCameraTransforms.set(camera, new Matrix4());
+		});
+
+		tiles.forEachLoadedModel((scene, tile) => {
+			this._onLoadModel({ scene });
+		});
+
+		this.tiles = tiles;
+		this._fadeManager = fadeManager;
+		this._prevCameraTransforms = prevCameraTransforms;
+	}
+
+	// callback for fading to prevent tiles from being removed until the fade effect has completed
+	setTileVisible(tile, visible) {
+		const fadeManager = this._fadeManager;
+
+		// track the fade state
+		const wasFading = fadeManager.isFading(tile);
+		if (fadeManager.isFadingOut(tile)) {
+			this._fadingOutCount--;
+		}
+
+		// trigger any necessary fades
+		if (!visible) {
+			this._fadingOutCount++;
+			fadeManager.fadeOut(tile);
+		} else {
+			// if this is a root renderable tile and this is the first time rendering in
+			// then pop it in
+			const isRootRenderableTile = tile.__depthFromRenderedParent === 1;
+			if (isRootRenderableTile) {
+				if (tile[HAS_POPPED_IN] || this.fadeRootTiles) {
+					this._fadeManager.fadeIn(tile);
+				}
+
+				tile[HAS_POPPED_IN] = true;
+			} else {
+				this._fadeManager.fadeIn(tile);
+			}
+		}
+
+		// if a tile was already fading then it's already marked as visible and in the scene
+		if (wasFading) {
+			return true;
+		}
+
+		// cancel the visibility change trigger because we're fading and will call this after
+		// fade completes.
+		const isFading = this._fadeManager.isFading(tile);
+		if (!visible && isFading) {
+			return true;
+		}
+
+		return false;
+	}
+
+	dispose() {
+		const tiles = this.tiles;
+
+		this._fadeManager.completeAllFades();
+
+		if (this.batchedMesh !== null) {
+			this._onBatchedMeshDispose();
+		}
+
+		tiles.removeEventListener('load-model', this._onLoadModel);
+		tiles.removeEventListener('dispose-model', this._onDisposeModel);
+		tiles.removeEventListener('add-camera', this._onAddCamera);
+		tiles.removeEventListener('delete-camera', this._onDeleteCamera);
+		tiles.removeEventListener('update-before', this._onUpdateBefore);
+		tiles.removeEventListener('update-after', this._onUpdateAfter);
+		tiles.removeEventListener('tile-visibility-change', this._onTileVisibilityChange);
+		tiles.forEachLoadedModel((scene, tile) => {
+			this._fadeManager.deleteObject(tile);
+			if (scene) {
+				scene.visible = true; // TODO
+			}
+		});
+	}
+
+}
+
+const HAS_POPPED_IN = Symbol('HAS_POPPED_IN');
+const _fromPos = new Vector3();
+const _toPos = new Vector3();
+const _fromQuat = new Quaternion();
+const _toQuat = new Quaternion();
+const _scale = new Vector3();
+
+function onUpdateBefore() {
+	const fadeManager = this._fadeManager;
+	const tiles = this.tiles;
+
+	// store the tiles renderer state before the tiles update so we can check
+	// whether fading started or stopped completely
+	this._fadingBefore = fadeManager.fadeCount;
+	this._displayActiveTiles = tiles.displayActiveTiles;
+
+	// we need to display all active tiles in this case so we don't fade tiles in
+	// when moving from off screen
+	tiles.displayActiveTiles = true;
+}
+
+function onUpdateAfter() {
+	const fadeManager = this._fadeManager;
+	const fadeMaterialManager = this._fadeMaterialManager;
+	const displayActiveTiles = this._displayActiveTiles;
+	const fadingBefore = this._fadingBefore;
+	const prevCameraTransforms = this._prevCameraTransforms;
+	const { tiles, maximumFadeOutTiles } = this;
+	const cameras = tiles.$cameras._cameras;
+
+	// reset the active tiles flag
+	tiles.displayActiveTiles = displayActiveTiles;
+
+	// update fade step
+	fadeManager.update();
+
+	// fire an event
+	const fadingAfter = fadeManager.fadeCount;
+	if (fadingBefore !== 0 && fadingAfter !== 0) {
+		tiles.dispatchEvent({ type: 'fade-change' });
+		tiles.dispatchEvent({ type: 'needs-render' });
+	}
+
+	// update the visibility of tiles based on visibility since we must use
+	// the active tiles for rendering fade
+	if (!displayActiveTiles) {
+		tiles.visibleTiles.forEach(t => {
+			// if a tile is fading out then it may not be traversed and thus will not have
+			// the frustum flag set correctly.
+			const scene = t.cached.scene;
+			if (scene) {
+				scene.visible = t.__inFrustum;
+			}
+		});
+	}
+
+	if (maximumFadeOutTiles < this._fadingOutCount) {
+		// determine whether all the rendering cameras are moving
+		// quickly so we can adjust how tiles fade accordingly
+		let isMovingFast = true;
+		cameras.forEach(camera => {
+			if (!prevCameraTransforms.has(camera)) {
+				return;
+			}
+
+			const currMatrix = camera.worldMatrix;
+			const prevMatrix = prevCameraTransforms.get(camera);
+
+			currMatrix.decompose(_toPos, _toQuat, _scale);
+			prevMatrix.decompose(_fromPos, _fromQuat, _scale);
+
+			const angleTo = _toQuat.angleTo(_fromQuat);
+			const positionTo = _toPos.distanceTo(_fromPos);
+
+			// if rotation is moving > 0.25 radians per frame or position is moving > 0.1 units
+			// then we are considering the camera to be moving too fast to notice a faster / abrupt fade
+			isMovingFast = isMovingFast && (angleTo > 0.25 || positionTo > 0.1);
+		});
+
+		if (isMovingFast) {
+			fadeManager.completeAllFades();
+		}
+	}
+
+	// track the camera movement so we can use it for next frame
+	cameras.forEach(camera => {
+		prevCameraTransforms.get(camera).copy(camera.worldMatrix);
+	});
+
+	// update the fade state for each tile
+	fadeManager.forEachObject((tile, { fadeIn, fadeOut }) => {
+		// prevent faded tiles from being unloaded
+		const scene = tile.cached.scene;
+		const isFadingOut = fadeManager.isFadingOut(tile);
+		tiles.markTileUsed(tile);
+		if (scene) {
+			fadeMaterialManager.setFade(scene, fadeIn, fadeOut);
+			if (isFadingOut) {
+				scene.visible = true;
+			}
+		}
+	});
+}
 
 class CesiumIonAuthPlugin {
 
@@ -7625,6 +8246,14 @@ Vector3.prototype.applyEuler = function(euler) {
 
 Vector3.prototype.isVector3 = true;
 
+Quaternion.prototype.angleTo = function(q) {
+	return 2 * Math.acos(Math.abs(MathUtils.clamp(this.dot(q), -1, 1)));
+};
+
+Quaternion.prototype.identity = function() {
+	return this.set(0, 0, 0, 1);
+};
+
 Object3D.prototype.removeFromParent = function() {
 	const parent = this.parent;
 
@@ -7635,4 +8264,4 @@ Object3D.prototype.removeFromParent = function() {
 	return this;
 };
 
-export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, I3DMLoader, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, ReorientationPlugin, TileGLTFLoader, Tiles3D };
+export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, I3DMLoader, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, ReorientationPlugin, TileGLTFLoader, Tiles3D, TilesFadePlugin };

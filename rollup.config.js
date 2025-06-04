@@ -1,5 +1,6 @@
 import { babel } from '@rollup/plugin-babel';
 import terser from '@rollup/plugin-terser';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
 
 const babelrc = {
 	presets: [
@@ -40,6 +41,7 @@ export default [
 	{
 		input: 'src/main.js',
 		plugins: [
+			nodeResolve(),
 			babel({
 				babelHelpers: 'bundled',
 				compact: false,
@@ -64,6 +66,7 @@ export default [
 	{
 		input: 'src/main.js',
 		plugins: [
+			nodeResolve(),
 			babel({
 				babelHelpers: 'bundled',
 				babelrc: false,
@@ -89,7 +92,7 @@ export default [
 		plugins: [
 			header()
 		],
-		external: ['t3d'],
+		external: [/^t3d(\/.*)?$/],
 		output: [
 			{
 				format: 'esm',

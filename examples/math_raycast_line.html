@@ -37,7 +37,7 @@
 		import { TransformControls } from 't3d/addons/controls/TransformControls.js';
 		import { Raycaster } from 't3d/addons/Raycaster.js';
 
-		import { Tiles3D, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
+		import { Tiles3D, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin } from 't3d-3dtiles';
 
 		import { GUI } from './libs/lil-gui.esm.min.js';
 		import Stats from './libs/stats.module.js';
@@ -90,6 +90,7 @@
 
 		tiles3D.registerPlugin(new ReorientationPlugin());
 		tiles3D.registerPlugin(new DebugTilesPlugin());
+		tiles3D.registerPlugin(new TilesFadePlugin());
 
 		// Ray casting
 
@@ -269,7 +270,6 @@
 		const debugFolder = gui.addFolder('Tiles Debug');
 		debugFolder.add(debugTilesPlugin, 'displayBoxBounds');
 		debugFolder.add(debugTilesPlugin, 'displaySphereBounds');
-		debugFolder.add(debugTilesPlugin, 'colorMode', DebugTilesPlugin.ColorModes);
 		debugFolder.close();
 
 		const statsContainer = document.getElementById('stats_container');

@@ -215,6 +215,10 @@ export class Tiles3D extends Object3D {
 		this.$events.dispatchEvent(event);
 	}
 
+	markTileUsed(tile) {
+		this.$tilesLoader.lruCache.markUsed(tile);
+	}
+
 	update() {
 		const rootTile = this.root;
 		if (!rootTile) return;
@@ -237,11 +241,19 @@ export class Tiles3D extends Object3D {
 	}
 
 	addCamera(camera) {
-		return this.$cameras.add(camera);
+		const success = this.$cameras.add(camera);
+		if (success) {
+			this.dispatchEvent({ type: 'add-camera', camera });
+		}
+		return success;
 	}
 
 	removeCamera(camera) {
-		return this.$cameras.remove(camera);
+		const success = this.$cameras.remove(camera);
+		if (success) {
+			this.dispatchEvent({ type: 'delete-camera', camera });
+		}
+		return success;
 	}
 
 	resize(width, height) {
@@ -309,6 +321,15 @@ export class Tiles3D extends Object3D {
 		} else {
 			return false;
 		}
+	}
+
+	forEachLoadedModel(callback) {
+		this.traverse(tile => {
+			const scene = tile.cached && tile.cached.scene;
+			if (scene) {
+				callback(scene, tile);
+			}
+		}, null);
 	}
 
 	traverse(beforecb, aftercb) {
@@ -431,7 +452,7 @@ export class Tiles3D extends Object3D {
 			});
 	}
 
-	$setTileVisible(tile, visible) {
+	setTileVisible(tile, visible) {
 		const scene = tile.cached.scene;
 		if (!scene) {
 			return;

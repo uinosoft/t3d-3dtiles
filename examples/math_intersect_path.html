@@ -40,7 +40,7 @@
 		import { Raycaster } from 't3d/addons/Raycaster.js';
 		import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
 
-		import { Tiles3D, ReorientationPlugin, DebugTilesPlugin, OBB } from 't3d-3dtiles';
+		import { Tiles3D, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin, OBB } from 't3d-3dtiles';
 		
 		import { LineSegment } from './jsm/math/LineSegment.js';
 		import { getIntersectWithPath } from './jsm/math/Intersects.js';
@@ -98,6 +98,7 @@
 
 		tiles3D.registerPlugin(new ReorientationPlugin());
 		tiles3D.registerPlugin(new DebugTilesPlugin());
+		tiles3D.registerPlugin(new TilesFadePlugin());
 
 		// Path, Path Helpers and Controls
 
@@ -221,7 +222,6 @@
 		const debugFolder = gui.addFolder('Tiles Debug');
 		debugFolder.add(debugTilesPlugin, 'displayBoxBounds');
 		debugFolder.add(debugTilesPlugin, 'displaySphereBounds');
-		debugFolder.add(debugTilesPlugin, 'colorMode', DebugTilesPlugin.ColorModes);
 		debugFolder.close();
 
 		const statsContainer = document.getElementById('stats_container');

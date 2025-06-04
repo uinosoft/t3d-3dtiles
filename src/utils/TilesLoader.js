@@ -211,7 +211,7 @@ export class TilesLoader {
 				tile.__loadingState = RequestState.LOADED;
 
 				if (tile.__wasSetVisible) {
-					tiles3D.$setTileVisible(tile, true);
+					tiles3D.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, true));
 				}
 
 				if (tile.__wasSetActive) {
