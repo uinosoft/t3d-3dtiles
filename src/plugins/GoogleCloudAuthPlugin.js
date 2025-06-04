@@ -59,12 +59,13 @@ export class GoogleCloudAuthPlugin {
 		};
 
 		this._visibilityChangeCallback = ({ tile, visible }) => {
-			const copyright = tile.cached.metadata.asset.copyright || '';
-			if (visible) {
-				this._attributionsManager.addAttributions(copyright);
-			} else {
-				this._attributionsManager.removeAttributions(copyright);
-			}
+			// TODO
+			// const copyright = tile.cached.metadata.asset.copyright || '';
+			// if (visible) {
+			// 	this._attributionsManager.addAttributions(copyright);
+			// } else {
+			// 	this._attributionsManager.removeAttributions(copyright);
+			// }
 		};
 
 		tiles.addEventListener('load-tile-set', this._onLoadCallback);

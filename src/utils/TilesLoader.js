@@ -274,8 +274,7 @@ const preprocessTile = (tile, parentTile, tileSetDir) => {
 
 		if (tile.content.uri) {
 			// tile content uri has to be interpreted relative to the tileset.json
-			// tile.content.uri = new URL( tile.content.uri, tileSetDir + '/' ).toString();
-			tile.content.uri = `${tileSetDir}/${tile.content.uri}`;
+			tile.content.uri = new URL(tile.content.uri, tileSetDir + '/').toString();
 		}
 
 		// NOTE: fix for some cases where tile provide the bounding volume

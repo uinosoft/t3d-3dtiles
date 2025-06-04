@@ -1657,8 +1657,7 @@
 			}
 			if (tile.content.uri) {
 				// tile content uri has to be interpreted relative to the tileset.json
-				// tile.content.uri = new URL( tile.content.uri, tileSetDir + '/' ).toString();
-				tile.content.uri = `${tileSetDir}/${tile.content.uri}`;
+				tile.content.uri = new URL(tile.content.uri, tileSetDir + '/').toString();
 			}
 
 			// NOTE: fix for some cases where tile provide the bounding volume
@@ -6378,12 +6377,13 @@
 				tile,
 				visible
 			}) => {
-				const copyright = tile.cached.metadata.asset.copyright || '';
-				if (visible) {
-					this._attributionsManager.addAttributions(copyright);
-				} else {
-					this._attributionsManager.removeAttributions(copyright);
-				}
+				// TODO
+				// const copyright = tile.cached.metadata.asset.copyright || '';
+				// if (visible) {
+				// 	this._attributionsManager.addAttributions(copyright);
+				// } else {
+				// 	this._attributionsManager.removeAttributions(copyright);
+				// }
 			};
 			tiles.addEventListener('load-tile-set', this._onLoadCallback);
 			tiles.addEventListener('tile-visibility-change', this._visibilityChangeCallback);
