@@ -2,7 +2,8 @@
 	"basic": [
 		"basic_house",
 		"basic_discrete_lod",
-		"basic_ion"
+		"basic_ion",
+		"basic_globe"
 	],
 	"math": [
 		"math_raycast_pick",
