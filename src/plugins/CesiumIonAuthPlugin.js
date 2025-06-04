@@ -1,3 +1,5 @@
+import { GoogleCloudAuthPlugin } from './GoogleCloudAuthPlugin.js';
+
 export class CesiumIonAuthPlugin {
 
 	constructor({ apiToken, assetId = null, autoRefreshToken = false, useRecommendedSettings = true }) {
@@ -101,7 +103,15 @@ export class CesiumIonAuthPlugin {
 
 					const tiles = this.tiles;
 					if ('externalType' in json) {
-						// TODO GoogleCloudAuthPlugin
+						const url = new URL(json.options.url);
+						tiles.rootURL = json.options.url;
+
+						// if the tile set is "external" then assume it's a google API tile set
+						tiles.registerPlugin(new GoogleCloudAuthPlugin({
+							apiToken: url.searchParams.get('key'),
+							autoRefreshToken: this.autoRefreshToken,
+							useRecommendedSettings: this.useRecommendedSettings
+						}));
 					} else {
 						// GLTF
 						// CZML
