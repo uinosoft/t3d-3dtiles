@@ -1,4 +1,4 @@
-import { Euler, Matrix4, Sphere, Spherical, Vector3, Ray } from 't3d';
+import { Euler, Matrix4, Sphere, Spherical, Vector3, Ray, MathUtils } from 't3d';
 import { swapToGeoFrame, latitudeToSphericalPhi } from './GeoUtils.js';
 
 export class Ellipsoid {
@@ -9,13 +9,13 @@ export class Ellipsoid {
 	}
 
 	intersectRay(ray, target) {
-		_matrix.makeScale(...this.radius).invert();
+		_matrix.makeScale(...this.radius.toArray([])).invert();
 		_sphere.center.set(0, 0, 0);
 		_sphere.radius = 1;
 
 		_ray.copy(ray).applyMatrix4(_matrix);
 		if (_ray.intersectSphere(_sphere, target)) {
-			_matrix.makeScale(...this.radius);
+			_matrix.makeScale(...this.radius.toArray([]));
 			target.applyMatrix4(_matrix);
 			return target;
 		} else {
@@ -185,6 +185,35 @@ export class Ellipsoid {
 			pos.y * yMultiplier,
 			pos.z * zMultiplier
 		);
+	}
+
+	calculateHorizonDistance(latitude, elevation) {
+		// from https://aty.sdsu.edu/explain/atmos_refr/horizon.html
+		// OG = sqrt ( 2 R h + h2 ) .
+		const effectiveRadius = this.calculateEffectiveRadius(latitude);
+		return Math.sqrt(2 * effectiveRadius * elevation + elevation ** 2);
+	}
+
+	calculateEffectiveRadius(latitude) {
+		// This radius represents the distance from the center of the ellipsoid to the surface along the normal at the given latitude.
+		// from https://en.wikipedia.org/wiki/Earth_radius#Prime_vertical
+		// N = a / sqrt(1 - e^2 * sin^2(phi))
+		const semiMajorAxis = this.radius.x;
+		const semiMinorAxis = this.radius.z;
+		const eSquared = 1 - (semiMinorAxis ** 2 / semiMajorAxis ** 2);
+		const phi = latitude * MathUtils.DEG2RAD;
+
+		const sinPhiSquared = Math.sin(phi) ** 2;
+		const N = semiMajorAxis / Math.sqrt(1 - eSquared * sinPhiSquared);
+		return N;
+	}
+
+	getPositionElevation(pos) {
+		// logic from "getPositionToCartographic"
+		this.getPositionToSurfacePoint(pos, _vec);
+
+		const heightDelta = _vec2.subVectors(pos, _vec);
+		return Math.sign(heightDelta.dot(pos)) * heightDelta.getLength();
 	}
 
 	copy(source) {

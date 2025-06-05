@@ -36,12 +36,11 @@
 
 	<script type="module">
 		import * as t3d from 't3d';
-		import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
 		import { KTX2Loader } from 't3d/addons/loaders/KTX2Loader.js';
 
-		import { Tiles3D, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin } from 't3d-3dtiles';
+		import { Tiles3D, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin, GlobeControls } from 't3d-3dtiles';
 		import ionAccessToken from './ionAccessToken.js';
 
 		import { GUI } from './libs/lil-gui.esm.min.js';
@@ -78,9 +77,7 @@
 		camera.setPerspective(45 / 180 * Math.PI, width / height, 10, 100000000);
 		scene.add(camera);
 
-		const controller = new OrbitControls(camera, canvas);
-		controller.enablePan = true;
-		controller.minDistance = 6400000;
+		let controller;
 
 		// Create 3D tiles
 
@@ -118,6 +115,9 @@
 			tiles3D.addCamera(camera);
 			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
+			controller = new GlobeControls(scene, camera, canvas, tiles3D);
+			controller.pivotMesh.material.uniforms.resolution = [width, height];
+
 			const gui = new GUI();
 
 			const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
@@ -136,9 +136,8 @@
 		function loop(count) {
 			requestAnimationFrame(loop);
 
-			controller.update();
-
-			camera.updateMatrix();
+			controller && controller.update();
+		
 			scene.anchorMatrix.copy(camera.worldMatrix);
 
 			if (tiles3D) {
@@ -164,6 +163,7 @@
 
 			if (tiles3D) {
 				tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+				controller.pivotMesh.material.uniforms.resolution = [width, height];
 			}
 
 			canvas.style.width = width + 'px';

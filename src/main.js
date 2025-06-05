@@ -11,6 +11,7 @@ export * from './loaders/TileGLTFLoader.js';
 export * from './loaders/I3DMLoader.js';
 export * from './loaders/PNTSLoader.js';
 
+export { GlobeControls } from './controls/GlobeControls.js';
 export { EnvironmentControls } from './controls/EnvironmentControls.js';
 
 export { TilesFadePlugin } from './plugins/fade/TilesFadePlugin.js';
@@ -22,10 +23,21 @@ export { LoadParser as DebugLoadParser } from './loaders/parsers/LoadParser.js';
 
 // Exporting some prototype methods for Matrix4, Vector3, and Object3D classes
 
-import { Vector3, Quaternion, Matrix4, Object3D, Ray, MathUtils } from 't3d';
+import { Vector3, Quaternion, Matrix4, Object3D, Ray, MathUtils, Camera } from 't3d';
 
 const _quaternion = new Quaternion();
 const _vector = new Vector3();
+
+if (!Matrix4.prototype.makeScale) {
+	Matrix4.prototype.makeScale = function(x, y, z) {
+		return this.set(
+			x, 0, 0, 0,
+			0, y, 0, 0,
+			0, 0, z, 0,
+			0, 0, 0, 1
+		);
+	};
+}
 
 Matrix4.prototype.makeBasis = function(xAxis, yAxis, zAxis) {
 	this.set(
@@ -196,6 +208,14 @@ Quaternion.prototype.identity = function() {
 	return this.set(0, 0, 0, 1);
 };
 
+if (!Quaternion.prototype.slerp) {
+	Quaternion.prototype.slerp = function(q, t) {
+		this.slerpQuaternions(this, q, t);
+		return this;
+	};
+}
+
+
 Object3D.prototype.removeFromParent = function() {
 	const parent = this.parent;
 
@@ -226,4 +246,56 @@ Ray.prototype.recast = function(t) {
 
 MathUtils.mapLinear = function(x, a1, a2, b1, b2) {
 	return b1 + (x - a1) * (b2 - b1) / (a2 - a1);
+};
+
+MathUtils.DEG2RAD = Math.PI / 180;
+
+MathUtils.lerp = function(x, y, t) {
+	return x + (y - x) * t;
+};
+
+let oldMethod;
+
+oldMethod = Camera.prototype.setOrtho;
+Camera.prototype.setOrtho = function(left, right, bottom, top, near, far) {
+	this.left = left;
+	this.right = right;
+	this.bottom = bottom;
+	this.top = top;
+	this.near = near;
+	this.far = far;
+
+	this.zoom = 1;
+
+	this.isPerspectiveCamera = false;
+	this.isOrthographicCamera = true;
+
+	oldMethod.call(this, left, right, bottom, top, near, far);
+};
+
+oldMethod = Camera.prototype.setPerspective;
+Camera.prototype.setPerspective = function(fov, aspect, near, far) {
+	this.fov = fov;
+	this.aspect = aspect;
+	this.near = near;
+	this.far = far;
+
+	this.isPerspectiveCamera = true;
+	this.isOrthographicCamera = false;
+
+	oldMethod.call(this, fov, aspect, near, far);
+};
+
+Camera.prototype.updateProjectionMatrix = function() {
+	if (this.isOrthographicCamera) {
+		this.setOrtho(
+			this.left, this.right, this.bottom, this.top, this.near, this.far
+		);
+	} else if (this.isPerspectiveCamera) {
+		this.setPerspective(
+			this.fov, this.aspect, this.near, this.far
+		);
+	}
+
+	return this;
 };
