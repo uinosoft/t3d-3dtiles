@@ -1,399 +1,7 @@
 // t3d-3dtiles
-import { Matrix4, Ray, Vector3, Matrix3, Frustum, Vector2, Box3, Plane, Spherical, Euler, Sphere, Loader, Vector4, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Buffer, Attribute, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Bone, Object3D, SkinnedMesh, Mesh, Camera, Skeleton, KeyframeClip, VectorKeyframeTrack, NumberKeyframeTrack, QuaternionKeyframeTrack, QuaternionLinearInterpolant, LinearInterpolant, QuaternionCubicSplineInterpolant, CubicSplineInterpolant, StepInterpolant, DirectionalLight, PointLight, SpotLight, PBR2Material, DefaultLoadingManager, FileLoader, ImageLoader, ShaderLib, MATERIAL_TYPE, Quaternion, Color3, LoadingManager, EventDispatcher, MathUtils, DRAW_MODE } from 't3d';
+import { Vector3, Matrix3, Box3, Ray, Plane, Matrix4, Spherical, Euler, Vector2, Sphere, Frustum, Loader, Vector4, TEXTURE_FILTER, TEXTURE_WRAP, Texture2D, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Buffer, Attribute, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Bone, Object3D, SkinnedMesh, Mesh, Camera, Skeleton, KeyframeClip, VectorKeyframeTrack, NumberKeyframeTrack, QuaternionKeyframeTrack, QuaternionLinearInterpolant, LinearInterpolant, QuaternionCubicSplineInterpolant, CubicSplineInterpolant, StepInterpolant, DirectionalLight, PointLight, SpotLight, PBR2Material, DefaultLoadingManager, FileLoader, ImageLoader, ShaderLib, MATERIAL_TYPE, Quaternion, Color3, LoadingManager, EventDispatcher, MathUtils, DRAW_MODE } from 't3d';
 import { Box3Helper } from 't3d/addons/objects/Box3Helper.js';
 import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
-
-/**
- * Returns the file extension of the path component of a URL
- * @param {string} url
- * @returns {string} null if no extension found
- */
-const getUrlExtension = url => {
-	let parsedUrl;
-	try {
-		parsedUrl = new URL(url, 'http://fakehost.com/');
-	} catch (_) {
-		// Ignore invalid URLs
-		return null;
-	}
-
-	const filename = parsedUrl.pathname.split('/').pop();
-	const dotIndex = filename.lastIndexOf('.');
-	if (dotIndex === -1 || dotIndex === filename.length - 1) {
-		// Has no extension or has trailing . character
-		return null;
-	}
-
-	const extension = filename.substring(dotIndex + 1);
-	return extension;
-};
-
-const traverseSet = (tile, beforeCb = null, afterCb = null, parent = null, depth = 0) => {
-	if (beforeCb && beforeCb(tile, parent, depth)) {
-		if (afterCb) {
-			afterCb(tile, parent, depth);
-		}
-
-		return;
-	}
-
-	const children = tile.children;
-	for (let i = 0, l = children.length; i < l; i++) {
-		traverseSet(children[i], beforeCb, afterCb, tile, depth + 1);
-	}
-
-	if (afterCb) {
-		afterCb(tile, parent, depth);
-	}
-};
-
-/**
- * Traverses the ancestry of the tile up to the root tile.
- */
-function traverseAncestors(tile, callback = null) {
-	let current = tile;
-
-	while (current) {
-		const depth = current.__depth;
-		const parent = current.parent;
-
-		if (callback) {
-			callback(current, parent, depth);
-		}
-
-		current = parent;
-	}
-}
-
-const raycastTraverse = (tile, tiles3D, ray, intersects, localRay = null) => {
-	const { activeTiles } = tiles3D;
-	const boundingVolume = tile.cached.boundingVolume;
-
-	// reuse the ray when traversing the tree
-	if (localRay === null) {
-		localRay = _ray_1$1;
-		_mat4_1$1.copy(tiles3D.worldMatrix).inverse();
-		localRay.copy(ray).applyMatrix4(_mat4_1$1);
-	}
-
-	if (!tile.__used || !boundingVolume.intersectsRay(localRay)) {
-		return;
-	}
-
-	if (activeTiles.has(tile)) {
-		_intersectTileScene(tile, ray, intersects);
-	}
-
-	const children = tile.children;
-	for (let i = 0, l = children.length; i < l; i++) {
-		raycastTraverse(children[i], tiles3D, ray, intersects, localRay);
-	}
-};
-
-// Returns the closest hit when traversing the tree
-const raycastTraverseFirstHit = (tile, tiles3D, ray, localRay = null) => {
-	const { activeTiles } = tiles3D;
-
-	// reuse the ray when traversing the tree
-	if (localRay === null) {
-		localRay = _ray_1$1;
-		_mat4_1$1.copy(tiles3D.worldMatrix).inverse();
-		localRay.copy(ray).applyMatrix4(_mat4_1$1);
-	}
-
-	// get a set of intersections so we intersect the nearest one first
-	const array = [];
-	const children = tile.children;
-	for (let i = 0, l = children.length; i < l; i++) {
-		const child = children[i];
-
-		if (!child.__used) {
-			continue;
-		}
-
-		const boundingVolume = child.cached.boundingVolume;
-
-		if (boundingVolume.intersectRay(localRay, _vec3_1$5)) {
-			_vec3_1$5.applyMatrix4(tiles3D.worldMatrix);
-			array.push({
-				distance: _vec3_1$5.distanceToSquared(ray.origin),
-				tile: child
-			});
-		}
-	}
-
-	// sort them by ascending distance
-	array.sort(distanceSort);
-
-	let bestHit = null;
-	let bestHitDistSq = Infinity;
-
-	// If the root is active make sure we've checked it
-	if (activeTiles.has(tile)) {
-		_intersectTileScene(tile, ray, _hitArray);
-
-		if (_hitArray.length > 0) {
-			if (_hitArray.length > 1) {
-				_hitArray.sort(distanceSort);
-			}
-
-			const hit = _hitArray[0];
-			_hitArray.length = 0;
-
-			bestHit = hit;
-			bestHitDistSq = hit.distance * hit.distance;
-		}
-	}
-
-	// traverse until we find the best hit and early out if a tile bounds
-	// couldn't possible include a best hit
-	for (let i = 0, l = array.length; i < l; i++) {
-		const data = array[i];
-		const distanceSquared = data.distance;
-		const tile = data.tile;
-
-		if (distanceSquared > bestHitDistSq) {
-			break;
-		}
-
-		const hit = raycastTraverseFirstHit(tile, tiles3D, ray, localRay);
-
-		if (hit) {
-			const hitDistSq = hit.distance * hit.distance;
-			if (hitDistSq < bestHitDistSq) {
-				bestHit = hit;
-				bestHitDistSq = hitDistSq;
-			}
-		}
-	}
-
-	return bestHit;
-};
-
-const distanceSort = (a, b) => {
-	return a.distance - b.distance;
-};
-
-const _intersectTileScene = (tile, ray, intersects) => {
-	const scene = tile.cached.scene;
-
-	const lengthBefore = intersects.length;
-
-	scene.traverse(c => {
-		// We set the default raycast function to empty so t3d.js doesn't automatically cast against it
-		Object.getPrototypeOf(c).raycast.call(c, ray, intersects);
-	});
-
-	const lengthAfter = intersects.length;
-
-	// add the tile to intersects
-	if (lengthAfter > lengthBefore) {
-		for (let i = lengthBefore; i < lengthAfter; i++) {
-			intersects[i].tile = tile;
-		}
-	}
-};
-
-const _mat4_1$1 = new Matrix4();
-const _ray_1$1 = new Ray();
-const _vec3_1$5 = new Vector3();
-
-const _hitArray = [];
-
-/**
- * State of the request.
- *
- * @enum {Number}
- */
-const RequestState = {
-	UNLOADED: 0,
-
-	LOADING: 1,
-
-	PARSING: 2,
-
-	LOADED: 3,
-
-	FAILED: 4
-};
-var RequestState$1 = Object.freeze(RequestState);
-
-class FastFrustum extends Frustum {
-
-	constructor() {
-		super();
-
-		this.points = new Array(8).fill().map(() => new Vector3());
-	}
-
-	updateCache() {
-		const { planes, points } = this;
-		const planeIntersections = [
-			[planes[0], planes[3], planes[4]], // Near top left
-			[planes[1], planes[3], planes[4]], // Near top right
-			[planes[0], planes[2], planes[4]], // Near bottom left
-			[planes[1], planes[2], planes[4]], // Near bottom right
-			[planes[0], planes[3], planes[5]], // Far top left
-			[planes[1], planes[3], planes[5]], // Far top right
-			[planes[0], planes[2], planes[5]], // Far bottom left
-			[planes[1], planes[2], planes[5]] // Far bottom right
-		];
-
-		planeIntersections.forEach((planes, index) => {
-			findIntersectionPoint(planes[0], planes[1], planes[2], points[index]);
-		});
-	}
-
-}
-
-const _mat3_1$1 = new Matrix3();
-
-// Solve a system of equations to find the point where the three planes intersect
-function findIntersectionPoint(plane1, plane2, plane3, target) {
-	// Create the matrix A using the normals of the planes as rows
-	const A = _mat3_1$1.set(
-		plane1.normal.x, plane1.normal.y, plane1.normal.z,
-		plane2.normal.x, plane2.normal.y, plane2.normal.z,
-		plane3.normal.x, plane3.normal.y, plane3.normal.z
-	);
-
-	// Create the vector B using the constants of the planes
-	target.set(-plane1.constant, -plane2.constant, -plane3.constant);
-
-	// Solve for X by applying the inverse matrix to B
-	target.applyMatrix3(A.inverse());
-
-	return target;
-}
-
-class CameraList {
-
-	constructor() {
-		this._cameras = [];
-		this._resolution = new Vector2();
-		this._infos = [];
-	}
-
-	add(camera) {
-		const cameras = this._cameras;
-
-		if (cameras.indexOf(camera) === -1) {
-			cameras.push(camera);
-			return true;
-		}
-
-		return false;
-	}
-
-	remove(camera) {
-		const cameras = this._cameras;
-		const index = cameras.indexOf(camera);
-
-		if (index !== -1) {
-			cameras.splice(index, 1);
-			return true;
-		}
-
-		return false;
-	}
-
-	setResolution(width, height) {
-		this._resolution.set(width, height);
-	}
-
-	updateInfos(originMatrix) {
-		const cameras = this._cameras;
-		const cameraCount = cameras.length;
-		const infos = this._infos;
-		const resolution = this._resolution;
-
-		if (cameraCount === 0) {
-			console.warn('CameraList.updateInfos(): No camera added.');
-			return;
-		}
-
-		// automatically scale the array of infos to match the cameras
-
-		while (infos.length > cameras.length) {
-			infos.pop();
-		}
-
-		while (infos.length < cameras.length) {
-			infos.push({
-				frustum: new FastFrustum(), // in origin space
-				isOrthographic: false,
-				sseDenominator: -1, // used if isOrthographic is false
-				position: new Vector3(), // in origin space
-				invScale: -1,
-				pixelSize: 0 // used if isOrthographic is true
-			});
-		}
-
-		// get inverse scale of origin matrix
-
-		_mat4_1.copy(originMatrix).inverse();
-
-		const invScaleX = _vec3_1$4.setFromMatrixColumn(_mat4_1, 0).getLength();
-		const invScaleY = _vec3_1$4.setFromMatrixColumn(_mat4_1, 1).getLength();
-		const invScaleZ = _vec3_1$4.setFromMatrixColumn(_mat4_1, 2).getLength();
-
-		if (Math.abs(Math.max(invScaleX - invScaleY, invScaleX - invScaleZ)) > 1e-6) {
-			console.warn('CameraList.updateInfos(): Non uniform scale used for tile which may cause issues when calculating screen space error.');
-		}
-
-		const invScale = invScaleX;
-		const invOriginMatrix = _mat4_1;
-
-		// update the camera infos
-
-		for (let i = 0, l = infos.length; i < l; i++) {
-			const camera = cameras[i];
-			const info = infos[i];
-
-			const cameraResolutionX = resolution.x * (camera.rect.z - camera.rect.x);
-			const cameraResolutionY = resolution.y * (camera.rect.w - camera.rect.y);
-
-			if (cameraResolutionX === 0 || cameraResolutionY === 0) {
-				console.warn('CameraList.updateInfos(): Resolution for camera error calculation is not set.');
-			}
-
-			// Read the calculated projection matrix directly to support custom Camera implementations
-			const projection = camera.projectionMatrix.elements;
-
-			// The last element of the projection matrix is 1 for orthographic, 0 for perspective
-			info.isOrthographic = projection[15] === 1;
-
-			if (info.isOrthographic) {
-				// the view width and height are used to populate matrix elements 0 and 5.
-				const w = 2 / projection[0];
-				const h = 2 / projection[5];
-				info.pixelSize = Math.max(h / cameraResolutionY, w / cameraResolutionX);
-			} else {
-				// the vertical FOV is used to populate matrix element 5.
-				info.sseDenominator = (2 / projection[5]) / cameraResolutionY;
-			}
-
-			info.invScale = invScale;
-
-			// get frustum in origin space
-			_mat4_2.copy(originMatrix).premultiply(camera.projectionViewMatrix);
-			info.frustum.setFromMatrix(_mat4_2);
-			info.frustum.updateCache();
-
-			// get camera position in origin space
-			info.position.setFromMatrixPosition(camera.worldMatrix).applyMatrix4(invOriginMatrix);
-		}
-	}
-
-	getInfos() {
-		return this._infos;
-	}
-
-}
-
-const _mat4_1 = new Matrix4();
-const _mat4_2 = new Matrix4();
-const _vec3_1$4 = new Vector3();
 
 /**
  * An oriented bounding box.
@@ -419,38 +27,38 @@ class OBB {
      * @return {OBB} A reference to this OBB.
      */
 	setFromCenterAndAxes(center, axisX, axisY, axisZ) {
-		_vec3_1$3.copy(axisX);
+		_vec3_1$5.copy(axisX);
 		_vec3_2$1.copy(axisY);
 		_vec3_3$1.copy(axisZ);
 
-		const scaleX = _vec3_1$3.getLength();
+		const scaleX = _vec3_1$5.getLength();
 		const scaleY = _vec3_2$1.getLength();
 		const scaleZ = _vec3_3$1.getLength();
 
-		_vec3_1$3.normalize();
+		_vec3_1$5.normalize();
 		_vec3_2$1.normalize();
 		_vec3_3$1.normalize();
 
 		// handle the case where the box has a dimension of 0 in one axis
 		if (scaleX === 0) {
-			_vec3_1$3.crossVectors(_vec3_2$1, _vec3_3$1);
+			_vec3_1$5.crossVectors(_vec3_2$1, _vec3_3$1);
 		}
 
 		if (scaleY === 0) {
-			_vec3_2$1.crossVectors(_vec3_1$3, _vec3_3$1);
+			_vec3_2$1.crossVectors(_vec3_1$5, _vec3_3$1);
 		}
 
 		if (scaleZ === 0) {
-			_vec3_3$1.crossVectors(_vec3_1$3, _vec3_2$1);
+			_vec3_3$1.crossVectors(_vec3_1$5, _vec3_2$1);
 		}
 
 		this.rotation.set(
-			_vec3_1$3.x, _vec3_2$1.x, _vec3_3$1.x,
-			_vec3_1$3.y, _vec3_2$1.y, _vec3_3$1.y,
-			_vec3_1$3.z, _vec3_2$1.z, _vec3_3$1.z
+			_vec3_1$5.x, _vec3_2$1.x, _vec3_3$1.x,
+			_vec3_1$5.y, _vec3_2$1.y, _vec3_3$1.y,
+			_vec3_1$5.z, _vec3_2$1.z, _vec3_3$1.z
 		);
 
-		const halfSize = _vec3_1$3.set(scaleX, scaleY, scaleZ);
+		const halfSize = _vec3_1$5.set(scaleX, scaleY, scaleZ);
 		this.box.min.copy(center).sub(halfSize);
 		this.box.max.copy(center).add(halfSize);
 
@@ -465,34 +73,34 @@ class OBB {
 	applyMatrix4(matrix) {
 		const e = matrix.elements;
 
-		let sx = _vec3_1$3.set(e[0], e[1], e[2]).getLength();
-		const sy = _vec3_1$3.set(e[4], e[5], e[6]).getLength();
-		const sz = _vec3_1$3.set(e[8], e[9], e[10]).getLength();
+		let sx = _vec3_1$5.set(e[0], e[1], e[2]).getLength();
+		const sy = _vec3_1$5.set(e[4], e[5], e[6]).getLength();
+		const sz = _vec3_1$5.set(e[8], e[9], e[10]).getLength();
 
 		const det = matrix.determinant();
 		if (det < 0) sx = -sx;
 
-		_mat3_1.setFromMatrix4(matrix);
+		_mat3_1$1.setFromMatrix4(matrix);
 
 		const invSX = 1 / sx;
 		const invSY = 1 / sy;
 		const invSZ = 1 / sz;
 
-		_mat3_1.elements[0] *= invSX;
-		_mat3_1.elements[1] *= invSX;
-		_mat3_1.elements[2] *= invSX;
+		_mat3_1$1.elements[0] *= invSX;
+		_mat3_1$1.elements[1] *= invSX;
+		_mat3_1$1.elements[2] *= invSX;
 
-		_mat3_1.elements[3] *= invSY;
-		_mat3_1.elements[4] *= invSY;
-		_mat3_1.elements[5] *= invSY;
+		_mat3_1$1.elements[3] *= invSY;
+		_mat3_1$1.elements[4] *= invSY;
+		_mat3_1$1.elements[5] *= invSY;
 
-		_mat3_1.elements[6] *= invSZ;
-		_mat3_1.elements[7] *= invSZ;
-		_mat3_1.elements[8] *= invSZ;
+		_mat3_1$1.elements[6] *= invSZ;
+		_mat3_1$1.elements[7] *= invSZ;
+		_mat3_1$1.elements[8] *= invSZ;
 
-		this.rotation.multiply(_mat3_1);
+		this.rotation.multiply(_mat3_1$1);
 
-		const center = this.box.getCenter(_vec3_1$3);
+		const center = this.box.getCenter(_vec3_1$5);
 		const halfSize = this.box.getSize(_vec3_2$1).multiplyScalar(0.5);
 
 		halfSize.x *= sx;
@@ -514,7 +122,7 @@ class OBB {
      * @return {Vector3[]} The array of points.
      */
 	getPoints(points) {
-		const center = this.box.getCenter(_vec3_1$3);
+		const center = this.box.getCenter(_vec3_1$5);
 		const min = _vec3_2$1.subVectors(this.box.min, center);
 		const max = _vec3_3$1.subVectors(this.box.max, center);
 
@@ -544,25 +152,25 @@ class OBB {
      * @return {Plane[]} The array of planes.
      */
 	getPlanes(planes) {
-		const center = this.box.getCenter(_vec3_1$3);
+		const center = this.box.getCenter(_vec3_1$5);
 		const worldMin = _vec3_2$1.subVectors(this.box.min, center).applyMatrix3(this.rotation).add(center);
 		const worldMax = _vec3_3$1.subVectors(this.box.max, center).applyMatrix3(this.rotation).add(center);
 
-		_vec3_1$3.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
-		planes[0].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
-		planes[1].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
+		_vec3_1$5.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
+		planes[0].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMin);
+		planes[1].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMax);
 		planes[1].normal.negate();
 		planes[1].constant *= -1;
 
-		_vec3_1$3.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
-		planes[2].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
-		planes[3].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
+		_vec3_1$5.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
+		planes[2].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMin);
+		planes[3].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMax);
 		planes[3].normal.negate();
 		planes[3].constant *= -1;
 
-		_vec3_1$3.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
-		planes[4].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
-		planes[5].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
+		_vec3_1$5.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
+		planes[4].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMin);
+		planes[5].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMax);
 		planes[5].normal.negate();
 		planes[5].constant *= -1;
 
@@ -572,7 +180,7 @@ class OBB {
 	containsPoint(point) {
 		const obbStruct = getOBBStruct(this, a);
 
-		const v = _vec3_1$3.subVectors(point, obbStruct.c);
+		const v = _vec3_1$5.subVectors(point, obbStruct.c);
 
 		// project _vec3_4 onto each axis and check if these points lie inside the OBB
 
@@ -588,7 +196,7 @@ class OBB {
 	clampPoint(point, result) {
 		const obbStruct = getOBBStruct(this, a);
 
-		const v = _vec3_1$3.subVectors(point, obbStruct.c);
+		const v = _vec3_1$5.subVectors(point, obbStruct.c);
 
 		// start at the center position of the OBB
 
@@ -631,7 +239,7 @@ class OBB {
 
 		// compute translation vector
 
-		const v1 = _vec3_1$3.subVectors(b.c, a.c);
+		const v1 = _vec3_1$5.subVectors(b.c, a.c);
 
 		// bring translation into a's coordinate frame
 
@@ -734,7 +342,7 @@ class OBB {
      * @param {Matrix4} transform - The transformation matrix.
      */
 	toBoundingBoxWithTransform(box3, transform) {
-		const center = this.box.getCenter(_vec3_1$3);
+		const center = this.box.getCenter(_vec3_1$5);
 
 		box3.min.copy(this.box.min).sub(center);
 		box3.max.copy(this.box.max).sub(center);
@@ -753,10 +361,10 @@ class OBB {
 
 const closestPoint = new Vector3();
 
-const _vec3_1$3 = new Vector3();
+const _vec3_1$5 = new Vector3();
 const _vec3_2$1 = new Vector3();
 const _vec3_3$1 = new Vector3();
-const _mat3_1 = new Matrix3();
+const _mat3_1$1 = new Matrix3();
 
 const R = [[], [], []];
 const AbsR = [[], [], []];
@@ -817,19 +425,19 @@ class TileOBB extends OBB {
 	}
 
 	containsPoint(point) {
-		_vec3_1$2.copy(point).applyMatrix4(this._originBoxTransformInverse);
-		return this.box.containsPoint(_vec3_1$2);
+		_vec3_1$4.copy(point).applyMatrix4(this._originBoxTransformInverse);
+		return this.box.containsPoint(_vec3_1$4);
 	}
 
 	intersectsRay(ray) {
-		_ray_1.copy(ray).applyMatrix4(this._originBoxTransformInverse);
-		return _ray_1.intersectsBox(this._originBox);
+		_ray_1$1.copy(ray).applyMatrix4(this._originBoxTransformInverse);
+		return _ray_1$1.intersectsBox(this._originBox);
 	}
 
 	intersectRay(ray, target) {
-		_ray_1.copy(ray).applyMatrix4(this._originBoxTransformInverse);
+		_ray_1$1.copy(ray).applyMatrix4(this._originBoxTransformInverse);
 
-		if (_ray_1.intersectBox(this._originBox, target)) {
+		if (_ray_1$1.intersectBox(this._originBox, target)) {
 			return target.applyMatrix4(this._originBoxTransform);
 		}
 
@@ -873,8 +481,8 @@ class TileOBB extends OBB {
 	distanceToPoint(point) {
 		// originBoxTransformInverse has no scale,
 		// so we don't need to scale the distance
-		_vec3_1$2.copy(point).applyMatrix4(this._originBoxTransformInverse);
-		return this._originBox.distanceToPoint(_vec3_1$2);
+		_vec3_1$4.copy(point).applyMatrix4(this._originBoxTransformInverse);
+		return this._originBox.distanceToPoint(_vec3_1$4);
 	}
 
 	getBoundingSphere(target) {
@@ -887,8 +495,8 @@ class TileOBB extends OBB {
 
 }
 
-const _ray_1 = new Ray();
-const _vec3_1$2 = new Vector3();
+const _ray_1$1 = new Ray();
+const _vec3_1$4 = new Vector3();
 
 // Cesium / 3D tiles Spheroid:
 // - Up is Z at 90 degrees latitude
@@ -1295,7 +903,7 @@ class TileBoundingVolume {
 
 		obb.setFromCenterAndAxes(
 			_vec3_4.set(data[0], data[1], data[2]),
-			_vec3_1$1.set(data[3], data[4], data[5]),
+			_vec3_1$3.set(data[3], data[4], data[5]),
 			_vec3_2.set(data[6], data[7], data[8]),
 			_vec3_3.set(data[9], data[10], data[11])
 		).applyMatrix4(transform);
@@ -1314,9 +922,9 @@ class TileBoundingVolume {
 		this.sphere = sphere;
 	}
 
-	setRegionData(west, south, east, north, minHeight, maxHeight) {
+	setRegionData(ellipsoid, west, south, east, north, minHeight, maxHeight) {
 		const region = new EllipsoidRegion(
-			WGS84_RADIUS$1.clone(),
+			ellipsoid.radius.clone(),
 			new Vector2(south, north),
 			new Vector2(west, east),
 			new Vector2(minHeight, maxHeight)
@@ -1358,14 +966,14 @@ class TileBoundingVolume {
 		let obbDistSq = -Infinity;
 
 		if (sphere) {
-			if (ray.intersectSphere(sphere, _vec3_1$1)) {
-				sphereDistSq = sphere.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$1);
+			if (ray.intersectSphere(sphere, _vec3_1$3)) {
+				sphereDistSq = sphere.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$3);
 			}
 		}
 
 		if (obb) {
-			if (obb.intersectRay(ray, _vec3_1$1)) {
-				obbDistSq = obb.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$1);
+			if (obb.intersectRay(ray, _vec3_1$3)) {
+				obbDistSq = obb.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$3);
 			}
 		}
 
@@ -1444,12 +1052,402 @@ class TileBoundingVolume {
 
 }
 
-const WGS84_RADIUS$1 = new Vector3(6378137, 6378137, 6356752.3142451793);
-
-const _vec3_1$1 = new Vector3();
+const _vec3_1$3 = new Vector3();
 const _vec3_2 = new Vector3();
 const _vec3_3 = new Vector3();
 const _vec3_4 = new Vector3();
+
+/**
+ * Returns the file extension of the path component of a URL
+ * @param {string} url
+ * @returns {string} null if no extension found
+ */
+const getUrlExtension = url => {
+	let parsedUrl;
+	try {
+		parsedUrl = new URL(url, 'http://fakehost.com/');
+	} catch (_) {
+		// Ignore invalid URLs
+		return null;
+	}
+
+	const filename = parsedUrl.pathname.split('/').pop();
+	const dotIndex = filename.lastIndexOf('.');
+	if (dotIndex === -1 || dotIndex === filename.length - 1) {
+		// Has no extension or has trailing . character
+		return null;
+	}
+
+	const extension = filename.substring(dotIndex + 1);
+	return extension;
+};
+
+const traverseSet = (tile, beforeCb = null, afterCb = null, parent = null, depth = 0) => {
+	if (beforeCb && beforeCb(tile, parent, depth)) {
+		if (afterCb) {
+			afterCb(tile, parent, depth);
+		}
+
+		return;
+	}
+
+	const children = tile.children;
+	for (let i = 0, l = children.length; i < l; i++) {
+		traverseSet(children[i], beforeCb, afterCb, tile, depth + 1);
+	}
+
+	if (afterCb) {
+		afterCb(tile, parent, depth);
+	}
+};
+
+/**
+ * Traverses the ancestry of the tile up to the root tile.
+ */
+function traverseAncestors(tile, callback = null) {
+	let current = tile;
+
+	while (current) {
+		const depth = current.__depth;
+		const parent = current.parent;
+
+		if (callback) {
+			callback(current, parent, depth);
+		}
+
+		current = parent;
+	}
+}
+
+const raycastTraverse = (tile, tiles3D, ray, intersects, localRay = null) => {
+	const { activeTiles } = tiles3D;
+	const boundingVolume = tile.cached.boundingVolume;
+
+	// reuse the ray when traversing the tree
+	if (localRay === null) {
+		localRay = _ray_1;
+		_mat4_1$1.copy(tiles3D.worldMatrix).inverse();
+		localRay.copy(ray).applyMatrix4(_mat4_1$1);
+	}
+
+	if (!tile.__used || !boundingVolume.intersectsRay(localRay)) {
+		return;
+	}
+
+	if (activeTiles.has(tile)) {
+		_intersectTileScene(tile, ray, intersects);
+	}
+
+	const children = tile.children;
+	for (let i = 0, l = children.length; i < l; i++) {
+		raycastTraverse(children[i], tiles3D, ray, intersects, localRay);
+	}
+};
+
+// Returns the closest hit when traversing the tree
+const raycastTraverseFirstHit = (tile, tiles3D, ray, localRay = null) => {
+	const { activeTiles } = tiles3D;
+
+	// reuse the ray when traversing the tree
+	if (localRay === null) {
+		localRay = _ray_1;
+		_mat4_1$1.copy(tiles3D.worldMatrix).inverse();
+		localRay.copy(ray).applyMatrix4(_mat4_1$1);
+	}
+
+	// get a set of intersections so we intersect the nearest one first
+	const array = [];
+	const children = tile.children;
+	for (let i = 0, l = children.length; i < l; i++) {
+		const child = children[i];
+
+		if (!child.__used) {
+			continue;
+		}
+
+		const boundingVolume = child.cached.boundingVolume;
+
+		if (boundingVolume.intersectRay(localRay, _vec3_1$2)) {
+			_vec3_1$2.applyMatrix4(tiles3D.worldMatrix);
+			array.push({
+				distance: _vec3_1$2.distanceToSquared(ray.origin),
+				tile: child
+			});
+		}
+	}
+
+	// sort them by ascending distance
+	array.sort(distanceSort);
+
+	let bestHit = null;
+	let bestHitDistSq = Infinity;
+
+	// If the root is active make sure we've checked it
+	if (activeTiles.has(tile)) {
+		_intersectTileScene(tile, ray, _hitArray);
+
+		if (_hitArray.length > 0) {
+			if (_hitArray.length > 1) {
+				_hitArray.sort(distanceSort);
+			}
+
+			const hit = _hitArray[0];
+			_hitArray.length = 0;
+
+			bestHit = hit;
+			bestHitDistSq = hit.distance * hit.distance;
+		}
+	}
+
+	// traverse until we find the best hit and early out if a tile bounds
+	// couldn't possible include a best hit
+	for (let i = 0, l = array.length; i < l; i++) {
+		const data = array[i];
+		const distanceSquared = data.distance;
+		const tile = data.tile;
+
+		if (distanceSquared > bestHitDistSq) {
+			break;
+		}
+
+		const hit = raycastTraverseFirstHit(tile, tiles3D, ray, localRay);
+
+		if (hit) {
+			const hitDistSq = hit.distance * hit.distance;
+			if (hitDistSq < bestHitDistSq) {
+				bestHit = hit;
+				bestHitDistSq = hitDistSq;
+			}
+		}
+	}
+
+	return bestHit;
+};
+
+const distanceSort = (a, b) => {
+	return a.distance - b.distance;
+};
+
+const _intersectTileScene = (tile, ray, intersects) => {
+	const scene = tile.cached.scene;
+
+	const lengthBefore = intersects.length;
+
+	scene.traverse(c => {
+		// We set the default raycast function to empty so t3d.js doesn't automatically cast against it
+		Object.getPrototypeOf(c).raycast.call(c, ray, intersects);
+	});
+
+	const lengthAfter = intersects.length;
+
+	// add the tile to intersects
+	if (lengthAfter > lengthBefore) {
+		for (let i = lengthBefore; i < lengthAfter; i++) {
+			intersects[i].tile = tile;
+		}
+	}
+};
+
+const _mat4_1$1 = new Matrix4();
+const _ray_1 = new Ray();
+const _vec3_1$2 = new Vector3();
+
+const _hitArray = [];
+
+/**
+ * State of the request.
+ *
+ * @enum {Number}
+ */
+const RequestState = {
+	UNLOADED: 0,
+
+	LOADING: 1,
+
+	PARSING: 2,
+
+	LOADED: 3,
+
+	FAILED: 4
+};
+var RequestState$1 = Object.freeze(RequestState);
+
+class FastFrustum extends Frustum {
+
+	constructor() {
+		super();
+
+		this.points = new Array(8).fill().map(() => new Vector3());
+	}
+
+	updateCache() {
+		const { planes, points } = this;
+		const planeIntersections = [
+			[planes[0], planes[3], planes[4]], // Near top left
+			[planes[1], planes[3], planes[4]], // Near top right
+			[planes[0], planes[2], planes[4]], // Near bottom left
+			[planes[1], planes[2], planes[4]], // Near bottom right
+			[planes[0], planes[3], planes[5]], // Far top left
+			[planes[1], planes[3], planes[5]], // Far top right
+			[planes[0], planes[2], planes[5]], // Far bottom left
+			[planes[1], planes[2], planes[5]] // Far bottom right
+		];
+
+		planeIntersections.forEach((planes, index) => {
+			findIntersectionPoint(planes[0], planes[1], planes[2], points[index]);
+		});
+	}
+
+}
+
+const _mat3_1 = new Matrix3();
+
+// Solve a system of equations to find the point where the three planes intersect
+function findIntersectionPoint(plane1, plane2, plane3, target) {
+	// Create the matrix A using the normals of the planes as rows
+	const A = _mat3_1.set(
+		plane1.normal.x, plane1.normal.y, plane1.normal.z,
+		plane2.normal.x, plane2.normal.y, plane2.normal.z,
+		plane3.normal.x, plane3.normal.y, plane3.normal.z
+	);
+
+	// Create the vector B using the constants of the planes
+	target.set(-plane1.constant, -plane2.constant, -plane3.constant);
+
+	// Solve for X by applying the inverse matrix to B
+	target.applyMatrix3(A.inverse());
+
+	return target;
+}
+
+class CameraList {
+
+	constructor() {
+		this._cameras = [];
+		this._resolution = new Vector2();
+		this._infos = [];
+	}
+
+	add(camera) {
+		const cameras = this._cameras;
+
+		if (cameras.indexOf(camera) === -1) {
+			cameras.push(camera);
+			return true;
+		}
+
+		return false;
+	}
+
+	remove(camera) {
+		const cameras = this._cameras;
+		const index = cameras.indexOf(camera);
+
+		if (index !== -1) {
+			cameras.splice(index, 1);
+			return true;
+		}
+
+		return false;
+	}
+
+	setResolution(width, height) {
+		this._resolution.set(width, height);
+	}
+
+	updateInfos(originMatrix) {
+		const cameras = this._cameras;
+		const cameraCount = cameras.length;
+		const infos = this._infos;
+		const resolution = this._resolution;
+
+		if (cameraCount === 0) {
+			console.warn('CameraList.updateInfos(): No camera added.');
+			return;
+		}
+
+		// automatically scale the array of infos to match the cameras
+
+		while (infos.length > cameras.length) {
+			infos.pop();
+		}
+
+		while (infos.length < cameras.length) {
+			infos.push({
+				frustum: new FastFrustum(), // in origin space
+				isOrthographic: false,
+				sseDenominator: -1, // used if isOrthographic is false
+				position: new Vector3(), // in origin space
+				invScale: -1,
+				pixelSize: 0 // used if isOrthographic is true
+			});
+		}
+
+		// get inverse scale of origin matrix
+
+		_mat4_1.copy(originMatrix).inverse();
+
+		const invScaleX = _vec3_1$1.setFromMatrixColumn(_mat4_1, 0).getLength();
+		const invScaleY = _vec3_1$1.setFromMatrixColumn(_mat4_1, 1).getLength();
+		const invScaleZ = _vec3_1$1.setFromMatrixColumn(_mat4_1, 2).getLength();
+
+		if (Math.abs(Math.max(invScaleX - invScaleY, invScaleX - invScaleZ)) > 1e-6) {
+			console.warn('CameraList.updateInfos(): Non uniform scale used for tile which may cause issues when calculating screen space error.');
+		}
+
+		const invScale = invScaleX;
+		const invOriginMatrix = _mat4_1;
+
+		// update the camera infos
+
+		for (let i = 0, l = infos.length; i < l; i++) {
+			const camera = cameras[i];
+			const info = infos[i];
+
+			const cameraResolutionX = resolution.x * (camera.rect.z - camera.rect.x);
+			const cameraResolutionY = resolution.y * (camera.rect.w - camera.rect.y);
+
+			if (cameraResolutionX === 0 || cameraResolutionY === 0) {
+				console.warn('CameraList.updateInfos(): Resolution for camera error calculation is not set.');
+			}
+
+			// Read the calculated projection matrix directly to support custom Camera implementations
+			const projection = camera.projectionMatrix.elements;
+
+			// The last element of the projection matrix is 1 for orthographic, 0 for perspective
+			info.isOrthographic = projection[15] === 1;
+
+			if (info.isOrthographic) {
+				// the view width and height are used to populate matrix elements 0 and 5.
+				const w = 2 / projection[0];
+				const h = 2 / projection[5];
+				info.pixelSize = Math.max(h / cameraResolutionY, w / cameraResolutionX);
+			} else {
+				// the vertical FOV is used to populate matrix element 5.
+				info.sseDenominator = (2 / projection[5]) / cameraResolutionY;
+			}
+
+			info.invScale = invScale;
+
+			// get frustum in origin space
+			_mat4_2.copy(originMatrix).premultiply(camera.projectionViewMatrix);
+			info.frustum.setFromMatrix(_mat4_2);
+			info.frustum.updateCache();
+
+			// get camera position in origin space
+			info.position.setFromMatrixPosition(camera.worldMatrix).applyMatrix4(invOriginMatrix);
+		}
+	}
+
+	getInfos() {
+		return this._infos;
+	}
+
+}
+
+const _mat4_1 = new Matrix4();
+const _mat4_2 = new Matrix4();
+const _vec3_1$1 = new Vector3();
 
 class LRUCache {
 
@@ -1720,32 +1718,6 @@ class TilesLoader {
 		this.parseQueue = new PriorityQueue({ maxJobs: 1, priorityCallback });
 	}
 
-	preprocessTileSet(json, url, parent = null) {
-		const version = json.asset.version;
-		const [major, minor] = version.split('.').map(v => parseInt(v));
-		console.assert(
-			major <= 1,
-			'TilesLoader: asset.version is expected to be a 1.x or a compatible version.'
-		);
-
-		if (major === 1 && minor > 0) {
-			console.warn('TilesLoader: tiles versions at 1.1 or higher have limited support. Some new extensions and features may not be supported.');
-		}
-
-		// remove the last file path path-segment from the URL including the trailing slash
-		let basePath = url.replace(/\/[^/]*$/, '');
-		basePath = new URL(basePath, window.location.href).toString();
-
-		// this.preprocessNode(json.root, basePath, parent);
-		traverseSet(
-			json.root,
-			(node, parent) => preprocessTile(node, parent, basePath),
-			null,
-			parent,
-			parent ? parent.__depth : 0
-		);
-	}
-
 	requestTileContents(tile, tiles3D) {
 		// If the tile is already being loaded then don't
 		// start it again.
@@ -1844,7 +1816,7 @@ class TilesLoader {
 					throw new Error(`TilesLoader: Failed to load tileset "${uri}" with status ${res.status} : ${res.statusText}`);
 				}
 			}).then(json => {
-				this.preprocessTileSet(json, uri, tile);
+				tiles3D.preprocessTileSet(json, uri, tile);
 				return json;
 			}).then(json => {
 				// if it has been unloaded then the tile has been disposed
@@ -1965,135 +1937,6 @@ const priorityCallback = (a, b) => {
 
 	return 0;
 };
-
-const preprocessTile = (tile, parentTile, tileSetDir) => {
-	if (tile.contents) {
-		// TODO: multiple contents (1.1) are not supported yet
-		tile.content = tile.contents[0];
-	}
-
-	if (tile.content) {
-		// Fix old file formats
-		if (!('uri' in tile.content) && 'url' in tile.content) {
-			tile.content.uri = tile.content.url;
-			delete tile.content.url;
-		}
-
-		if (tile.content.uri) {
-			// tile content uri has to be interpreted relative to the tileset.json
-			tile.content.uri = new URL(tile.content.uri, tileSetDir + '/').toString();
-		}
-
-		// NOTE: fix for some cases where tile provide the bounding volume
-		// but volumes are not present.
-		if (
-			tile.content.boundingVolume &&
-			!(
-				'box' in tile.content.boundingVolume ||
-				'sphere' in tile.content.boundingVolume ||
-				'region' in tile.content.boundingVolume
-			)
-		) {
-			delete tile.content.boundingVolume;
-		}
-	}
-
-	tile.parent = parentTile;
-	tile.children = tile.children || [];
-
-	const uri = tile.content && tile.content.uri;
-	if (uri) {
-		// "content" should only indicate loadable meshes, not external tile sets
-		const extension = getUrlExtension(tile.content.uri);
-		const isExternalTileSet = Boolean(extension && extension.toLowerCase() === 'json');
-		tile.__externalTileSet = isExternalTileSet;
-		tile.__contentEmpty = isExternalTileSet;
-	} else {
-		tile.__externalTileSet = false;
-		tile.__contentEmpty = true;
-	}
-
-	// Expected to be set during calculateError()
-	tile.__distanceFromCamera = Infinity;
-	tile.__error = Infinity;
-
-	tile.__inFrustum = false;
-	tile.__isLeaf = false;
-
-	tile.__usedLastFrame = false;
-	tile.__used = false;
-
-	tile.__wasSetVisible = false;
-	tile.__visible = false;
-	tile.__childrenWereVisible = false;
-	tile.__allChildrenLoaded = false;
-
-	tile.__wasSetActive = false;
-	tile.__active = false;
-
-	tile.__loadingState = RequestState$1.UNLOADED;
-	tile.__loadIndex = 0;
-
-	tile.__loadAbort = null;
-
-	tile.__depthFromRenderedParent = -1;
-	if (parentTile === null) {
-		tile.__depth = 0;
-		tile.refine = tile.refine || 'REPLACE';
-	} else {
-		tile.__depth = parentTile.__depth + 1;
-		tile.refine = tile.refine || parentTile.refine;
-	}
-
-	//
-
-	const transform = new Matrix4();
-	if (tile.transform) {
-		transform.fromArray(tile.transform);
-	}
-	if (parentTile) {
-		transform.premultiply(parentTile.cached.transform);
-	}
-	const transformInverse = (new Matrix4()).copy(transform).inverse();
-
-	const transformScale = _vec3_1.setFromMatrixScale(transform);
-	const uniformScale = Math.max(transformScale.x, transformScale.y, transformScale.z);
-	let geometricError = tile.geometricError * uniformScale;
-
-	const boundingVolume = new TileBoundingVolume();
-	if ('box' in tile.boundingVolume) {
-		boundingVolume.setOBBData(tile.boundingVolume.box, transform);
-	}
-	if ('sphere' in tile.boundingVolume) {
-		boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
-	}
-	if ('region' in tile.boundingVolume) {
-		boundingVolume.setRegionData(...tile.boundingVolume.region);
-		geometricError = tile.geometricError;
-	}
-
-	tile.cached = {
-		loadIndex: 0,
-		transform,
-		transformInverse,
-
-		geometricError, // geometric error applied tile transform scale
-
-		boundingVolume,
-
-		active: false,
-		inFrustum: [],
-
-		scene: null,
-		geometry: null,
-		material: null,
-
-		featureTable: null,
-		batchTable: null
-	};
-};
-
-const _vec3_1 = new Vector3();
 
 class ImageBitmapLoader extends Loader {
 
@@ -6114,6 +5957,31 @@ class Tiles3D extends Object3D {
 		this.$events = new EventDispatcher();
 	}
 
+	preprocessTileSet(json, url, parent = null) {
+		const version = json.asset.version;
+		const [major, minor] = version.split('.').map(v => parseInt(v));
+		console.assert(
+			major <= 1,
+			'TilesLoader: asset.version is expected to be a 1.x or a compatible version.'
+		);
+
+		if (major === 1 && minor > 0) {
+			console.warn('TilesLoader: tiles versions at 1.1 or higher have limited support. Some new extensions and features may not be supported.');
+		}
+
+		// remove the last file path path-segment from the URL including the trailing slash
+		let basePath = url.replace(/\/[^/]*$/, '');
+		basePath = new URL(basePath, window.location.href).toString();
+
+		traverseSet(
+			json.root,
+			(node, parent) => preprocessTile(this.ellipsoid, node, parent, basePath),
+			null,
+			parent,
+			parent ? parent.__depth : 0
+		);
+	}
+
 	loadRootTileSet() {
 		// transform the url
 		let processedUrl = this.rootURL;
@@ -6130,7 +5998,23 @@ class Tiles3D extends Object3D {
 				}
 			})
 			.then(root => {
-				this.$tilesLoader.preprocessTileSet(root, processedUrl);
+				const { extensions = {} } = root;
+
+				// update the ellipsoid based on the extension
+				if ('3DTILES_ellipsoid' in extensions) {
+					const ext = extensions['3DTILES_ellipsoid'];
+					const { ellipsoid } = this;
+					ellipsoid.name = ext.body;
+					if (ext.radii) {
+						ellipsoid.radius.set(...ext.radii);
+					} else {
+						ellipsoid.radius.set(1, 1, 1);
+					}
+					console.log(extensions);
+				}
+
+				this.preprocessTileSet(root, processedUrl);
+
 				return root;
 			});
 
@@ -6589,6 +6473,135 @@ const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
 	}
 
 	return true;
+};
+
+const _vec3_1 = new Vector3();
+
+const preprocessTile = (ellipsoid, tile, parentTile, tileSetDir) => {
+	if (tile.contents) {
+		// TODO: multiple contents (1.1) are not supported yet
+		tile.content = tile.contents[0];
+	}
+
+	if (tile.content) {
+		// Fix old file formats
+		if (!('uri' in tile.content) && 'url' in tile.content) {
+			tile.content.uri = tile.content.url;
+			delete tile.content.url;
+		}
+
+		if (tile.content.uri) {
+			// tile content uri has to be interpreted relative to the tileset.json
+			tile.content.uri = new URL(tile.content.uri, tileSetDir + '/').toString();
+		}
+
+		// NOTE: fix for some cases where tile provide the bounding volume
+		// but volumes are not present.
+		if (
+			tile.content.boundingVolume &&
+			!(
+				'box' in tile.content.boundingVolume ||
+				'sphere' in tile.content.boundingVolume ||
+				'region' in tile.content.boundingVolume
+			)
+		) {
+			delete tile.content.boundingVolume;
+		}
+	}
+
+	tile.parent = parentTile;
+	tile.children = tile.children || [];
+
+	const uri = tile.content && tile.content.uri;
+	if (uri) {
+		// "content" should only indicate loadable meshes, not external tile sets
+		const extension = getUrlExtension(tile.content.uri);
+		const isExternalTileSet = Boolean(extension && extension.toLowerCase() === 'json');
+		tile.__externalTileSet = isExternalTileSet;
+		tile.__contentEmpty = isExternalTileSet;
+	} else {
+		tile.__externalTileSet = false;
+		tile.__contentEmpty = true;
+	}
+
+	// Expected to be set during calculateError()
+	tile.__distanceFromCamera = Infinity;
+	tile.__error = Infinity;
+
+	tile.__inFrustum = false;
+	tile.__isLeaf = false;
+
+	tile.__usedLastFrame = false;
+	tile.__used = false;
+
+	tile.__wasSetVisible = false;
+	tile.__visible = false;
+	tile.__childrenWereVisible = false;
+	tile.__allChildrenLoaded = false;
+
+	tile.__wasSetActive = false;
+	tile.__active = false;
+
+	tile.__loadingState = RequestState$1.UNLOADED;
+	tile.__loadIndex = 0;
+
+	tile.__loadAbort = null;
+
+	tile.__depthFromRenderedParent = -1;
+	if (parentTile === null) {
+		tile.__depth = 0;
+		tile.refine = tile.refine || 'REPLACE';
+	} else {
+		tile.__depth = parentTile.__depth + 1;
+		tile.refine = tile.refine || parentTile.refine;
+	}
+
+	//
+
+	const transform = new Matrix4();
+	if (tile.transform) {
+		transform.fromArray(tile.transform);
+	}
+	if (parentTile) {
+		transform.premultiply(parentTile.cached.transform);
+	}
+	const transformInverse = (new Matrix4()).copy(transform).inverse();
+
+	const transformScale = _vec3_1.setFromMatrixScale(transform);
+	const uniformScale = Math.max(transformScale.x, transformScale.y, transformScale.z);
+	let geometricError = tile.geometricError * uniformScale;
+
+	const boundingVolume = new TileBoundingVolume();
+	if ('box' in tile.boundingVolume) {
+		boundingVolume.setOBBData(tile.boundingVolume.box, transform);
+	}
+	if ('sphere' in tile.boundingVolume) {
+		boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
+	}
+	if ('region' in tile.boundingVolume) {
+		boundingVolume.setRegionData(ellipsoid, ...tile.boundingVolume.region);
+		geometricError = tile.geometricError;
+	}
+
+	tile.cached = {
+		loadIndex: 0,
+		transform,
+		transformInverse,
+
+		geometricError, // geometric error applied tile transform scale
+
+		boundingVolume,
+
+		active: false,
+		inFrustum: [],
+
+		scene: null,
+		geometry: null,
+		material: null,
+
+		featureTable: null,
+		batchTable: null
+	};
 };
 
 class FadeManager {

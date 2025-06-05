@@ -74,18 +74,19 @@
 
 		const camera = new t3d.Camera();
 		camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
-		camera.position.set(0, 0, 20000000);
-		camera.setPerspective(45 / 180 * Math.PI, width / height, 10, 100000000);
+		camera.position.set(0, 0, 6737400);
+		camera.setPerspective(45 / 180 * Math.PI, width / height, 10, 10000000);
 		scene.add(camera);
 
 		const controller = new OrbitControls(camera, canvas);
 		controller.enablePan = true;
-		controller.minDistance = 6400000;
+		controller.minDistance = 1800000;
+		controller.maxDistance = 9000000;
 
 		// Create 3D tiles
 
 		const ionParams = {
-			ionAssetId: '2275207', // Google Photorealistic 3D Tiles
+			ionAssetId: '2684829', // Google Photorealistic 3D Tiles
 			ionAccessToken
 		};
 

@@ -34,9 +34,9 @@ export class TileBoundingVolume {
 		this.sphere = sphere;
 	}
 
-	setRegionData(west, south, east, north, minHeight, maxHeight) {
+	setRegionData(ellipsoid, west, south, east, north, minHeight, maxHeight) {
 		const region = new EllipsoidRegion(
-			WGS84_RADIUS.clone(),
+			ellipsoid.radius.clone(),
 			new Vector2(south, north),
 			new Vector2(west, east),
 			new Vector2(minHeight, maxHeight)
@@ -163,8 +163,6 @@ export class TileBoundingVolume {
 	}
 
 }
-
-const WGS84_RADIUS = new Vector3(6378137, 6378137, 6356752.3142451793);
 
 const _vec3_1 = new Vector3();
 const _vec3_2 = new Vector3();

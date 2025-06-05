@@ -3,7 +3,8 @@
 		"basic_house",
 		"basic_discrete_lod",
 		"basic_ion",
-		"basic_globe"
+		"basic_globe",
+		"basic_globe_moon"
 	],
 	"math": [
 		"math_raycast_pick",

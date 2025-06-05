@@ -1,5 +1,6 @@
-import { EventDispatcher, LoadingManager, Matrix4, Object3D } from 't3d';
-import { traverseSet } from './utils/Utils.js';
+import { EventDispatcher, LoadingManager, Matrix4, Vector3, Object3D } from 't3d';
+import { TileBoundingVolume } from './math/TileBoundingVolume.js';
+import { traverseSet, getUrlExtension } from './utils/Utils.js';
 import { raycastTraverse, raycastTraverseFirstHit, distanceSort } from './utils/IntersectionUtils.js';
 import RequestState from './utils/RequestState.js';
 import { CameraList } from './utils/CameraList.js';
@@ -67,6 +68,31 @@ export class Tiles3D extends Object3D {
 		this.$events = new EventDispatcher();
 	}
 
+	preprocessTileSet(json, url, parent = null) {
+		const version = json.asset.version;
+		const [major, minor] = version.split('.').map(v => parseInt(v));
+		console.assert(
+			major <= 1,
+			'TilesLoader: asset.version is expected to be a 1.x or a compatible version.'
+		);
+
+		if (major === 1 && minor > 0) {
+			console.warn('TilesLoader: tiles versions at 1.1 or higher have limited support. Some new extensions and features may not be supported.');
+		}
+
+		// remove the last file path path-segment from the URL including the trailing slash
+		let basePath = url.replace(/\/[^/]*$/, '');
+		basePath = new URL(basePath, window.location.href).toString();
+
+		traverseSet(
+			json.root,
+			(node, parent) => preprocessTile(this.ellipsoid, node, parent, basePath),
+			null,
+			parent,
+			parent ? parent.__depth : 0
+		);
+	}
+
 	loadRootTileSet() {
 		// transform the url
 		let processedUrl = this.rootURL;
@@ -83,7 +109,23 @@ export class Tiles3D extends Object3D {
 				}
 			})
 			.then(root => {
-				this.$tilesLoader.preprocessTileSet(root, processedUrl);
+				const { extensions = {} } = root;
+
+				// update the ellipsoid based on the extension
+				if ('3DTILES_ellipsoid' in extensions) {
+					const ext = extensions['3DTILES_ellipsoid'];
+					const { ellipsoid } = this;
+					ellipsoid.name = ext.body;
+					if (ext.radii) {
+						ellipsoid.radius.set(...ext.radii);
+					} else {
+						ellipsoid.radius.set(1, 1, 1);
+					}
+					console.log(extensions);
+				}
+
+				this.preprocessTileSet(root, processedUrl);
+
 				return root;
 			});
 
@@ -542,4 +584,133 @@ const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
 	}
 
 	return true;
+};
+
+const _vec3_1 = new Vector3();
+
+const preprocessTile = (ellipsoid, tile, parentTile, tileSetDir) => {
+	if (tile.contents) {
+		// TODO: multiple contents (1.1) are not supported yet
+		tile.content = tile.contents[0];
+	}
+
+	if (tile.content) {
+		// Fix old file formats
+		if (!('uri' in tile.content) && 'url' in tile.content) {
+			tile.content.uri = tile.content.url;
+			delete tile.content.url;
+		}
+
+		if (tile.content.uri) {
+			// tile content uri has to be interpreted relative to the tileset.json
+			tile.content.uri = new URL(tile.content.uri, tileSetDir + '/').toString();
+		}
+
+		// NOTE: fix for some cases where tile provide the bounding volume
+		// but volumes are not present.
+		if (
+			tile.content.boundingVolume &&
+			!(
+				'box' in tile.content.boundingVolume ||
+				'sphere' in tile.content.boundingVolume ||
+				'region' in tile.content.boundingVolume
+			)
+		) {
+			delete tile.content.boundingVolume;
+		}
+	}
+
+	tile.parent = parentTile;
+	tile.children = tile.children || [];
+
+	const uri = tile.content && tile.content.uri;
+	if (uri) {
+		// "content" should only indicate loadable meshes, not external tile sets
+		const extension = getUrlExtension(tile.content.uri);
+		const isExternalTileSet = Boolean(extension && extension.toLowerCase() === 'json');
+		tile.__externalTileSet = isExternalTileSet;
+		tile.__contentEmpty = isExternalTileSet;
+	} else {
+		tile.__externalTileSet = false;
+		tile.__contentEmpty = true;
+	}
+
+	// Expected to be set during calculateError()
+	tile.__distanceFromCamera = Infinity;
+	tile.__error = Infinity;
+
+	tile.__inFrustum = false;
+	tile.__isLeaf = false;
+
+	tile.__usedLastFrame = false;
+	tile.__used = false;
+
+	tile.__wasSetVisible = false;
+	tile.__visible = false;
+	tile.__childrenWereVisible = false;
+	tile.__allChildrenLoaded = false;
+
+	tile.__wasSetActive = false;
+	tile.__active = false;
+
+	tile.__loadingState = RequestState.UNLOADED;
+	tile.__loadIndex = 0;
+
+	tile.__loadAbort = null;
+
+	tile.__depthFromRenderedParent = -1;
+	if (parentTile === null) {
+		tile.__depth = 0;
+		tile.refine = tile.refine || 'REPLACE';
+	} else {
+		tile.__depth = parentTile.__depth + 1;
+		tile.refine = tile.refine || parentTile.refine;
+	}
+
+	//
+
+	const transform = new Matrix4();
+	if (tile.transform) {
+		transform.fromArray(tile.transform);
+	}
+	if (parentTile) {
+		transform.premultiply(parentTile.cached.transform);
+	}
+	const transformInverse = (new Matrix4()).copy(transform).inverse();
+
+	const transformScale = _vec3_1.setFromMatrixScale(transform);
+	const uniformScale = Math.max(transformScale.x, transformScale.y, transformScale.z);
+	let geometricError = tile.geometricError * uniformScale;
+
+	const boundingVolume = new TileBoundingVolume();
+	if ('box' in tile.boundingVolume) {
+		boundingVolume.setOBBData(tile.boundingVolume.box, transform);
+	}
+	if ('sphere' in tile.boundingVolume) {
+		boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
+	}
+	if ('region' in tile.boundingVolume) {
+		boundingVolume.setRegionData(ellipsoid, ...tile.boundingVolume.region);
+		geometricError = tile.geometricError;
+	}
+
+	tile.cached = {
+		loadIndex: 0,
+		transform,
+		transformInverse,
+
+		geometricError, // geometric error applied tile transform scale
+
+		boundingVolume,
+
+		active: false,
+		inFrustum: [],
+
+		scene: null,
+		geometry: null,
+		material: null,
+
+		featureTable: null,
+		batchTable: null
+	};
 };

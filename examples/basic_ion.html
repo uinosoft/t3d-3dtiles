@@ -42,6 +42,7 @@
 		import { KTX2Loader } from 't3d/addons/loaders/KTX2Loader.js';
 
 		import { Tiles3D, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
+		import ionAccessToken from './ionAccessToken.js';
 
 		import { GUI } from './libs/lil-gui.esm.min.js';
 		import * as KTXParse from './libs/ktx-parse.module.js';
@@ -84,9 +85,7 @@
 		// Create 3D tiles
 
 		// Other available assets:
-		// 2644092 - Sydney - region bounding, texture basisu
-		// 354759 - Boston
-		const ionParams = { ionAssetId: '40866', ionAccessToken: 'put-your-api-key-here' };
+		const ionParams = { ionAssetId: '354759', ionAccessToken };
 
 		const gui = new GUI();
 
@@ -151,6 +150,8 @@
 				debugFolder = null;
 			}
 		}
+
+		fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
 
 		//
 
