@@ -1,4 +1,4 @@
-import { Euler, Matrix4, Spherical, Vector3 } from 't3d';
+import { Euler, Matrix4, Sphere, Spherical, Vector3, Ray } from 't3d';
 import { swapToGeoFrame, latitudeToSphericalPhi } from './GeoUtils.js';
 
 export class Ellipsoid {
@@ -6,6 +6,21 @@ export class Ellipsoid {
 	constructor(radius = new Vector3(1, 1, 1)) {
 		this.name = '';
 		this.radius = radius;
+	}
+
+	intersectRay(ray, target) {
+		_matrix.makeScale(...this.radius).invert();
+		_sphere.center.set(0, 0, 0);
+		_sphere.radius = 1;
+
+		_ray.copy(ray).applyMatrix4(_matrix);
+		if (_ray.intersectSphere(_sphere, target)) {
+			_matrix.makeScale(...this.radius);
+			target.applyMatrix4(_matrix);
+			return target;
+		} else {
+			return null;
+		}
 	}
 
 	// returns a frame with Z indicating altitude
@@ -189,12 +204,15 @@ const _vec = new Vector3();
 const _vec2 = new Vector3();
 const _matrix = new Matrix4();
 const _matrix2 = new Matrix4();
+const _sphere = new Sphere();
 const _euler = new Euler();
 
 const _vecX = new Vector3();
 const _vecY = new Vector3();
 const _vecZ = new Vector3();
 const _pos = new Vector3();
+
+const _ray = new Ray();
 
 const EPSILON12 = 1e-12;
 const CENTER_EPS = 0.1;

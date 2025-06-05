@@ -11,6 +11,8 @@ export * from './loaders/TileGLTFLoader.js';
 export * from './loaders/I3DMLoader.js';
 export * from './loaders/PNTSLoader.js';
 
+export { EnvironmentControls } from './controls/EnvironmentControls.js';
+
 export { TilesFadePlugin } from './plugins/fade/TilesFadePlugin.js';
 export { CesiumIonAuthPlugin } from './plugins/CesiumIonAuthPlugin.js';
 export { DebugTilesPlugin } from './plugins/DebugTilesPlugin.js';
@@ -20,9 +22,10 @@ export { LoadParser as DebugLoadParser } from './loaders/parsers/LoadParser.js';
 
 // Exporting some prototype methods for Matrix4, Vector3, and Object3D classes
 
-import { Vector3, Quaternion, Matrix4, Object3D, MathUtils } from 't3d';
+import { Vector3, Quaternion, Matrix4, Object3D, Ray, MathUtils } from 't3d';
 
 const _quaternion = new Quaternion();
+const _vector = new Vector3();
 
 Matrix4.prototype.makeBasis = function(xAxis, yAxis, zAxis) {
 	this.set(
@@ -167,6 +170,22 @@ Vector3.prototype.applyEuler = function(euler) {
 	return this.applyQuaternion(_quaternion.setFromEuler(euler));
 };
 
+Vector3.prototype.applyAxisAngle = function(axis, angle) {
+	return this.applyQuaternion(_quaternion.setFromAxisAngle(axis, angle));
+};
+
+Vector3.prototype.angleTo = function(v) {
+	const denominator = Math.sqrt(this.getLengthSquared() * v.getLengthSquared());
+
+	if (denominator === 0) return Math.PI / 2;
+
+	const theta = this.dot(v) / denominator;
+
+	// clamp, to handle numerical problems
+
+	return Math.acos(MathUtils.clamp(theta, -1, 1));
+};
+
 Vector3.prototype.isVector3 = true;
 
 Quaternion.prototype.angleTo = function(q) {
@@ -185,4 +204,26 @@ Object3D.prototype.removeFromParent = function() {
 	}
 
 	return this;
+};
+
+Ray.prototype.closestPointToPoint = function(point, target) {
+	target.subVectors(point, this.origin);
+
+	const directionDistance = target.dot(this.direction);
+
+	if (directionDistance < 0) {
+		return target.copy(this.origin);
+	}
+
+	return target.copy(this.origin).addScaledVector(this.direction, directionDistance);
+};
+
+Ray.prototype.recast = function(t) {
+	this.origin.copy(this.at(t, _vector));
+
+	return this;
+};
+
+MathUtils.mapLinear = function(x, a1, a2, b1, b2) {
+	return b1 + (x - a1) * (b2 - b1) / (a2 - a1);
 };

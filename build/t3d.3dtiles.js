@@ -458,6 +458,19 @@
 			this.name = '';
 			this.radius = radius;
 		}
+		intersectRay(ray, target) {
+			_matrix$1.makeScale(...this.radius).invert();
+			_sphere$1.center.set(0, 0, 0);
+			_sphere$1.radius = 1;
+			_ray$1.copy(ray).applyMatrix4(_matrix$1);
+			if (_ray$1.intersectSphere(_sphere$1, target)) {
+				_matrix$1.makeScale(...this.radius);
+				target.applyMatrix4(_matrix$1);
+				return target;
+			} else {
+				return null;
+			}
+		}
 
 		// returns a frame with Z indicating altitude
 		// Y pointing north
@@ -473,9 +486,9 @@
 			vecNorth.crossVectors(vecUp, vecEast).normalize(); // north
 		}
 		getRotationMatrixFromAzElRoll(lat, lon, az, el, roll, target, frame = ENU_FRAME) {
-			this.getEastNorthUpFrame(lat, lon, _matrix);
+			this.getEastNorthUpFrame(lat, lon, _matrix$1);
 			_euler.set(el, roll, -az, 'ZXY');
-			target.makeRotationFromEuler(_euler).premultiply(_matrix).setPosition(0, 0, 0);
+			target.makeRotationFromEuler(_euler).premultiply(_matrix$1).setPosition(0, 0, 0);
 
 			// Add in the orientation adjustment for objects and cameras so "forward" and "up" are oriented
 			// correctly
@@ -495,20 +508,20 @@
 			// https://github.com/CesiumGS/cesium/blob/665ec32e813d5d6fe906ec3e87187f6c38ed5e49/packages/engine/Source/Core/Ellipsoid.js#L396
 			this.getCartographicToNormal(lat, lon, _norm);
 			const radius = this.radius;
-			_vec.copy(_norm);
-			_vec.x *= radius.x ** 2;
-			_vec.y *= radius.y ** 2;
-			_vec.z *= radius.z ** 2;
-			const gamma = Math.sqrt(_norm.dot(_vec));
-			_vec.multiplyScalar(1 / gamma);
-			return target.copy(_vec).addScaledVector(_norm, height);
+			_vec$2.copy(_norm);
+			_vec$2.x *= radius.x ** 2;
+			_vec$2.y *= radius.y ** 2;
+			_vec$2.z *= radius.z ** 2;
+			const gamma = Math.sqrt(_norm.dot(_vec$2));
+			_vec$2.multiplyScalar(1 / gamma);
+			return target.copy(_vec$2).addScaledVector(_norm, height);
 		}
 		getPositionToCartographic(pos, target) {
 			// From Cesium function Ellipsoid.cartesianToCartographic
 			// https://github.com/CesiumGS/cesium/blob/665ec32e813d5d6fe906ec3e87187f6c38ed5e49/packages/engine/Source/Core/Ellipsoid.js#L463
-			this.getPositionToSurfacePoint(pos, _vec);
+			this.getPositionToSurfacePoint(pos, _vec$2);
 			this.getPositionToNormal(pos, _norm);
-			const heightDelta = _vec2.subVectors(pos, _vec);
+			const heightDelta = _vec2$1.subVectors(pos, _vec$2);
 			target.lon = Math.atan2(_norm.y, _norm.x);
 			target.lat = Math.asin(_norm.z);
 			target.height = Math.sign(heightDelta.dot(pos)) * heightDelta.getLength();
@@ -547,14 +560,14 @@
 			const ratio = Math.sqrt(1.0 / squaredNorm);
 
 			// As an initial approximation, assume that the radial intersection is the projection point.
-			const intersection = _vec.copy(pos).multiplyScalar(ratio);
+			const intersection = _vec$2.copy(pos).multiplyScalar(ratio);
 			if (squaredNorm < CENTER_EPS) {
 				return !isFinite(ratio) ? null : target.copy(intersection);
 			}
 
 			// Use the gradient at the intersection point in place of the true unit normal.
 			// The difference in magnitude will be absorbed in the multiplier.
-			const gradient = _vec2.set(intersection.x * invRadiusSqX * 2.0, intersection.y * invRadiusSqY * 2.0, intersection.z * invRadiusSqZ * 2.0);
+			const gradient = _vec2$1.set(intersection.x * invRadiusSqX * 2.0, intersection.y * invRadiusSqY * 2.0, intersection.z * invRadiusSqZ * 2.0);
 
 			// Compute the initial guess at the normal vector multiplier, lambda.
 			let lambda = (1.0 - ratio) * pos.getLength() / (0.5 * gradient.getLength());
@@ -594,15 +607,17 @@
 	}
 	const _spherical = new t3d.Spherical();
 	const _norm = new t3d.Vector3();
-	const _vec = new t3d.Vector3();
-	const _vec2 = new t3d.Vector3();
-	const _matrix = new t3d.Matrix4();
+	const _vec$2 = new t3d.Vector3();
+	const _vec2$1 = new t3d.Vector3();
+	const _matrix$1 = new t3d.Matrix4();
 	const _matrix2 = new t3d.Matrix4();
+	const _sphere$1 = new t3d.Sphere();
 	const _euler = new t3d.Euler();
 	const _vecX = new t3d.Vector3();
 	const _vecY = new t3d.Vector3();
 	const _vecZ = new t3d.Vector3();
 	const _pos = new t3d.Vector3();
+	const _ray$1 = new t3d.Ray();
 	const EPSILON12 = 1e-12;
 	const CENTER_EPS = 0.1;
 	const ENU_FRAME = 0;
@@ -5728,6 +5743,1412 @@
 		};
 	};
 
+	class Raycaster {
+		/**
+		 * This creates a new raycaster object.
+		 * @param {t3d.Vector3} origin — The origin vector where the ray casts from.
+		 * @param {t3d.Vector3} direction — The direction vector that gives direction to the ray. Should be normalized.
+		 */
+		constructor(origin, direction) {
+			/**
+			 * The Ray used for the raycasting.
+			 * @type {t3d.Ray}
+			 */
+			this.ray = new t3d.Ray(origin, direction);
+		}
+
+		/**
+				* Updates the ray with a new origin and direction.
+				* @param {t3d.Vector3} origin — The origin vector where the ray casts from.
+				* @param {t3d.Vector3} direction — The normalized direction vector that gives direction to the ray.
+				*/
+		set(origin, direction) {
+			this.ray.set(origin, direction);
+		}
+
+		/**
+				* Updates the ray with a new origin and direction.
+				* @param {t3d.Vector2} coords — 2D coordinates of the mouse, in normalized device coordinates (NDC)---X and Y components should be between -1 and 1.
+				* @param {t3d.Camera} camera — camera from which the ray should originate.
+				*/
+		setFromCamera(coords, camera) {
+			if (camera.projectionMatrix.elements[11] === -1) {
+				// perspective
+				this.ray.origin.setFromMatrixPosition(camera.worldMatrix);
+				this.ray.direction.set(coords.x, coords.y, 0.5).unproject(camera).sub(this.ray.origin).normalize();
+			} else {
+				// orthographic
+				// set origin in plane of camera
+				// projectionMatrix.elements[14] = (near + far) / (near - far)
+				this.ray.origin.set(coords.x, coords.y, camera.projectionMatrix.elements[14]).unproject(camera);
+				this.ray.direction.set(0, 0, -1).transformDirection(camera.worldMatrix);
+			}
+		}
+
+		/**
+				* Checks all intersection between the ray and the object with or without the descendants. Intersections are returned sorted by distance, closest first. An array of intersections is returned:
+				* [ { distance, point, face, faceIndex, object }, ... ]
+				* @param {t3d.Object3D} object — The object to check for intersection with the ray.
+				* @param {Boolean} [recursive=] — If true, it also checks all descendants. Otherwise it only checks intersecton with the object.
+				* @return {Object[]} An array of intersections
+				*/
+		intersectObject(object, recursive) {
+			const intersects = [];
+			intersectObject(object, this, intersects, recursive);
+			intersects.sort(ascSort);
+			return intersects;
+		}
+
+		/**
+				* Checks all intersection between the ray and the objects with or without the descendants. Intersections are returned sorted by distance, closest first. An array of intersections is returned:
+				* [ { distance, point, face, faceIndex, object }, ... ]
+				* @param {t3d.Object3D[]} objects — The objects to check for intersection with the ray.
+				* @param {Boolean} [recursive=] — If true, it also checks all descendants. Otherwise it only checks intersecton with the object.
+				* @return {Object[]} An array of intersections
+				*/
+		intersectObjects(objects, recursive) {
+			const intersects = [];
+			if (Array.isArray(objects) === false) {
+				console.warn('Raycaster.intersectObjects: objects is not an Array.');
+				return intersects;
+			}
+			for (let i = 0, l = objects.length; i < l; i++) {
+				intersectObject(objects[i], this, intersects, recursive);
+			}
+			intersects.sort(ascSort);
+			return intersects;
+		}
+	}
+	function ascSort(a, b) {
+		return a.distance - b.distance;
+	}
+	function intersectObject(object, raycaster, intersects, recursive) {
+		object.raycast(raycaster.ray, intersects);
+		if (recursive === true) {
+			const children = object.children;
+			for (let i = 0, l = children.length; i < l; i++) {
+				intersectObject(children[i], raycaster, intersects, true);
+			}
+		}
+	}
+
+	class PivotPointMesh extends t3d.Mesh {
+		constructor() {
+			super(new t3d.PlaneGeometry(0, 0), new PivotMaterial());
+			this.renderOrder = Infinity;
+		}
+	}
+	class PivotMaterial extends t3d.ShaderMaterial {
+		constructor() {
+			super(pivotShader);
+			this.depthWrite = false;
+			this.depthTest = false;
+			this.transparent = true;
+		}
+	}
+	const pivotShader = {
+		name: 'PivotPoint',
+		uniforms: {
+			resolution: [512, 512],
+			size: 15,
+			thickness: 2,
+			opacity: 1
+		},
+		vertexShader: /* glsl */`
+		attribute vec3 a_Position; 
+		attribute vec2 a_Uv;
+
+		uniform mat4 u_ProjectionView;
+		uniform mat4 u_Model;
+
+		uniform float pixelRatio;
+		uniform float size;
+		uniform float thickness;
+		uniform vec2 resolution;
+
+		varying vec2 v_Uv;
+
+		void main() {
+			v_Uv = a_Uv;
+
+			float aspect = resolution.x / resolution.y;
+			vec2 offset = a_Uv * 2.0 - vec2(1.0);
+			offset.y *= aspect;
+
+			vec4 screenPoint = u_ProjectionView * u_Model * vec4(a_Position, 1.0);
+			screenPoint.xy += offset * (size + thickness) * screenPoint.w / resolution.x;
+
+			gl_Position = screenPoint;
+		}
+	`,
+		fragmentShader: /* glsl */`
+		uniform float size;
+		uniform float thickness;
+		uniform float opacity;
+
+		varying vec2 v_Uv;
+
+		void main() {
+			float ht = 0.5 * thickness;
+			float planeDim = size + thickness;
+			float offset = (planeDim - ht - 2.0) / planeDim;
+			float texelThickness = ht / planeDim;
+
+			vec2 vec = v_Uv * 2.0 - vec2(1.0);
+			float dist = abs(length(vec) - offset);
+			float fw = fwidth(dist) * 0.5;
+			float a = smoothstep(texelThickness - fw, texelThickness + fw, dist);
+
+			gl_FragColor = vec4(1, 1, 1, opacity * (1.0 - a));
+		}
+	`
+	};
+
+	const _vec$1 = new t3d.Vector2();
+	const _vec2 = new t3d.Vector2();
+	class PointerTracker {
+		constructor() {
+			this.domElement = null;
+			this.buttons = 0;
+			this.pointerType = null;
+			this.pointerOrder = [];
+			this.previousPositions = {};
+			this.pointerPositions = {};
+			this.startPositions = {};
+			this.pointerSetThisFrame = {};
+			this.hoverPosition = new t3d.Vector2();
+			this.hoverSet = false;
+		}
+		reset() {
+			this.buttons = 0;
+			this.pointerType = null;
+			this.pointerOrder = [];
+			this.previousPositions = {};
+			this.pointerPositions = {};
+			this.startPositions = {};
+			this.pointerSetThisFrame = {};
+			this.hoverPosition = new t3d.Vector2();
+			this.hoverSet = false;
+		}
+
+		// The pointers can be set multiple times per frame so track whether the pointer has
+		// been set this frame or not so we don't overwrite the previous position and lose information
+		// about pointer movement
+		updateFrame() {
+			const {
+				previousPositions,
+				pointerPositions
+			} = this;
+			for (const id in pointerPositions) {
+				previousPositions[id].copy(pointerPositions[id]);
+			}
+		}
+		setHoverEvent(e) {
+			if (e.pointerType === 'mouse' || e.type === 'wheel') {
+				this.getAdjustedPointer(e, this.hoverPosition);
+				this.hoverSet = true;
+			}
+		}
+		getLatestPoint(target) {
+			if (this.pointerType !== null) {
+				this.getCenterPoint(target);
+				return target;
+			} else if (this.hoverSet) {
+				target.copy(this.hoverPosition);
+				return target;
+			} else {
+				return null;
+			}
+		}
+
+		// get the pointer position in the coordinate system of the target element
+		getAdjustedPointer(e, target) {
+			const domRef = this.domElement ? this.domElement : e.target;
+			const rect = domRef.getBoundingClientRect();
+			const x = e.clientX - rect.left;
+			const y = e.clientY - rect.top;
+			target.set(x, y);
+		}
+		addPointer(e) {
+			const id = e.pointerId;
+			const position = new t3d.Vector2();
+			this.getAdjustedPointer(e, position);
+			this.pointerOrder.push(id);
+			this.pointerPositions[id] = position;
+			this.previousPositions[id] = position.clone();
+			this.startPositions[id] = position.clone();
+			if (this.getPointerCount() === 1) {
+				this.pointerType = e.pointerType;
+				this.buttons = e.buttons;
+			}
+		}
+		updatePointer(e) {
+			const id = e.pointerId;
+			if (!(id in this.pointerPositions)) {
+				return false;
+			}
+			this.getAdjustedPointer(e, this.pointerPositions[id]);
+			return true;
+		}
+		deletePointer(e) {
+			const id = e.pointerId;
+			const pointerOrder = this.pointerOrder;
+			pointerOrder.splice(pointerOrder.indexOf(id), 1);
+			delete this.pointerPositions[id];
+			delete this.previousPositions[id];
+			delete this.startPositions[id];
+			if (this.getPointerCount() === 0) {
+				this.buttons = 0;
+				this.pointerType = null;
+			}
+		}
+		getPointerCount() {
+			return this.pointerOrder.length;
+		}
+		getCenterPoint(target, pointerPositions = this.pointerPositions) {
+			const pointerOrder = this.pointerOrder;
+			if (this.getPointerCount() === 1 || this.getPointerType() === 'mouse') {
+				const id = pointerOrder[0];
+				target.copy(pointerPositions[id]);
+				return target;
+			} else if (this.getPointerCount() === 2) {
+				const id0 = this.pointerOrder[0];
+				const id1 = this.pointerOrder[1];
+				const p0 = pointerPositions[id0];
+				const p1 = pointerPositions[id1];
+				target.addVectors(p0, p1).multiplyScalar(0.5);
+				return target;
+			}
+			return null;
+		}
+		getPreviousCenterPoint(target) {
+			return this.getCenterPoint(target, this.previousPositions);
+		}
+		getStartCenterPoint(target) {
+			return this.getCenterPoint(target, this.startPositions);
+		}
+		getMoveDistance() {
+			this.getCenterPoint(_vec$1);
+			this.getPreviousCenterPoint(_vec2);
+			return _vec$1.sub(_vec2).getLength();
+		}
+		getTouchPointerDistance(pointerPositions = this.pointerPositions) {
+			if (this.getPointerCount() <= 1 || this.getPointerType() === 'mouse') {
+				return 0;
+			}
+			const {
+				pointerOrder
+			} = this;
+			const id0 = pointerOrder[0];
+			const id1 = pointerOrder[1];
+			const p0 = pointerPositions[id0];
+			const p1 = pointerPositions[id1];
+			return p0.distanceTo(p1);
+		}
+		getPreviousTouchPointerDistance() {
+			return this.getTouchPointerDistance(this.previousPositions);
+		}
+		getStartTouchPointerDistance() {
+			return this.getTouchPointerDistance(this.startPositions);
+		}
+		getPointerType() {
+			return this.pointerType;
+		}
+		isPointerTouch() {
+			return this.getPointerType() === 'touch';
+		}
+		getPointerButtons() {
+			return this.buttons;
+		}
+		isLeftClicked() {
+			return Boolean(this.buttons & 1);
+		}
+		isRightClicked() {
+			return Boolean(this.buttons & 2);
+		}
+	}
+
+	const _matrix = new t3d.Matrix4();
+	new t3d.Ray();
+	new t3d.Vector3();
+
+	// helper function for constructing a matrix for rotating around a point
+	function makeRotateAroundPoint(point, quat, target) {
+		target.makeTranslation(-point.x, -point.y, -point.z);
+		_matrix.makeRotationFromQuaternion(quat);
+		target.premultiply(_matrix);
+		_matrix.makeTranslation(point.x, point.y, point.z);
+		target.premultiply(_matrix);
+		return target;
+	}
+
+	// get the three.js pointer coords from an event
+	function mouseToCoords(clientX, clientY, element, target) {
+		target.x = (clientX - element.offsetLeft) / element.clientWidth * 2 - 1;
+		target.y = -((clientY - element.offsetTop) / element.clientHeight) * 2 + 1;
+		if (target.isVector3) {
+			target.z = 0;
+		}
+	}
+
+	// custom version of set raycaster from camera that relies on the underlying matrices
+	// so the ray origin is position at the camera near clip.
+	function setRaycasterFromCamera(raycaster, coords, camera) {
+		const ray = raycaster instanceof t3d.Ray ? raycaster : raycaster.ray;
+		const {
+			origin,
+			direction
+		} = ray;
+
+		// get the origin and direction of the frustum ray
+		origin.set(coords.x, coords.y, -1).unproject(camera);
+		direction.set(coords.x, coords.y, 1).unproject(camera).sub(origin);
+
+		// normalize the ray direction
+		direction.normalize();
+	}
+
+	const NONE$1 = 0;
+	const DRAG = 1;
+	const ROTATE = 2;
+	const ZOOM = 3;
+	const WAITING = 4;
+	const DRAG_PLANE_THRESHOLD = 0.05;
+	const DRAG_UP_THRESHOLD = 0.025;
+	const _rotMatrix = /* @__PURE__ */new t3d.Matrix4();
+	const _delta = /* @__PURE__ */new t3d.Vector3();
+	const _vec = /* @__PURE__ */new t3d.Vector3();
+	const _forward = /* @__PURE__ */new t3d.Vector3();
+	const _right = /* @__PURE__ */new t3d.Vector3();
+	const _rotationAxis = /* @__PURE__ */new t3d.Vector3();
+	const _quaternion$1 = /* @__PURE__ */new t3d.Quaternion();
+	const _plane = /* @__PURE__ */new t3d.Plane();
+	const _localUp = /* @__PURE__ */new t3d.Vector3();
+	const _mouseBefore = /* @__PURE__ */new t3d.Vector3();
+	const _mouseAfter = /* @__PURE__ */new t3d.Vector3();
+	const _identityQuat = /* @__PURE__ */new t3d.Quaternion();
+	const _ray = /* @__PURE__ */new t3d.Ray();
+	const _zoomPointPointer = /* @__PURE__ */new t3d.Vector2();
+	const _pointer = /* @__PURE__ */new t3d.Vector2();
+	const _prevPointer = /* @__PURE__ */new t3d.Vector2();
+	const _deltaPointer = /* @__PURE__ */new t3d.Vector2();
+	const _centerPoint = /* @__PURE__ */new t3d.Vector2();
+	const _startCenterPoint = /* @__PURE__ */new t3d.Vector2();
+	const _changeEvent = {
+		type: 'change'
+	};
+	const _startEvent = {
+		type: 'start'
+	};
+	const _endEvent = {
+		type: 'end'
+	};
+	class EnvironmentControls extends t3d.EventDispatcher {
+		get enabled() {
+			return this._enabled;
+		}
+		set enabled(v) {
+			if (v !== this.enabled) {
+				this._enabled = v;
+				this.resetState();
+				this.pointerTracker.reset();
+				if (!this.enabled) {
+					this.dragInertia.set(0, 0, 0);
+					this.rotationInertia.set(0, 0);
+				}
+			}
+		}
+		constructor(scene = null, camera = null, domElement = null, tilesRenderer = null) {
+			super();
+			this.isEnvironmentControls = true;
+			this.domElement = null;
+			this.camera = null;
+			this.scene = null;
+			this.tilesRenderer = null;
+
+			// settings
+			this._enabled = true;
+			this.cameraRadius = 5;
+			this.rotationSpeed = 1;
+			this.minAltitude = 0;
+			this.maxAltitude = 0.45 * Math.PI;
+			this.minDistance = 10;
+			this.maxDistance = Infinity;
+			this.minZoom = 0;
+			this.maxZoom = Infinity;
+			this.zoomSpeed = 1;
+			this.adjustHeight = true;
+			this.enableDamping = false;
+			this.dampingFactor = 0.15;
+			this.fallbackPlane = new t3d.Plane(new t3d.Vector3(0, 1, 0), 0);
+			this.useFallbackPlane = true;
+
+			// settings for GlobeControls
+			this.reorientOnDrag = true;
+			this.scaleZoomOrientationAtEdges = false;
+
+			// internal state
+			this.state = NONE$1;
+			this.pointerTracker = new PointerTracker();
+			this.needsUpdate = false;
+			this.actionHeightOffset = 0;
+			this.pivotPoint = new t3d.Vector3();
+
+			// used for zoom
+			this.zoomDirectionSet = false;
+			this.zoomPointSet = false;
+			this.zoomDirection = new t3d.Vector3();
+			this.zoomPoint = new t3d.Vector3();
+			this.zoomDelta = 0;
+
+			// fields used for inertia
+			this.rotationInertiaPivot = new t3d.Vector3();
+			this.rotationInertia = new t3d.Vector2();
+			this.dragInertia = new t3d.Vector3();
+			this.inertiaTargetDistance = Infinity; // track the distance from the camera that we want to use to calculate the inertia end threshold
+			this.inertiaStableFrames = 0; // the number of frames that the camera has not moved while the user is interacting
+
+			// circular pivot mesh
+			this.pivotMesh = new PivotPointMesh();
+			this.pivotMesh.raycast = () => {};
+			this.pivotMesh.scale.setScalar(0.25);
+
+			// raycaster
+			this.raycaster = new Raycaster();
+			this.up = new t3d.Vector3(0, 1, 0);
+			this._detachCallback = null;
+			this._upInitialized = false;
+			this._lastUsedState = NONE$1;
+			this._zoomPointWasSet = false;
+
+			// always update the zoom target point in case the tiles are changing
+			this._tilesOnChangeCallback = () => this.zoomPointSet = false;
+
+			// init
+			if (domElement) this.attach(domElement);
+			if (camera) this.setCamera(camera);
+			if (scene) this.setScene(scene);
+			if (tilesRenderer) this.setTilesRenderer(tilesRenderer);
+		}
+		setScene(scene) {
+			this.scene = scene;
+		}
+		setCamera(camera) {
+			this.camera = camera;
+			this._upInitialized = false;
+			this.zoomDirectionSet = false;
+			this.zoomPointSet = false;
+			this.needsUpdate = true;
+			this.raycaster.camera = camera;
+			this.resetState();
+		}
+		setTilesRenderer(tilesRenderer) {
+			// TODO: what if a scene has multiple tile sets?
+			if (this.tilesRenderer) {
+				this.tilesRenderer.removeEventListener('tile-visibility-change', this._tilesOnChangeCallback);
+			}
+			this.tilesRenderer = tilesRenderer;
+			if (this.tilesRenderer !== null) {
+				this.tilesRenderer.addEventListener('tile-visibility-change', this._tilesOnChangeCallback);
+				if (this.scene === null) {
+					this.setScene(this.tilesRenderer);
+				}
+			}
+		}
+		attach(domElement) {
+			if (this.domElement) {
+				throw new Error('EnvironmentControls: Controls already attached to element');
+			}
+
+			// set the touch action to none so the browser does not
+			// drag the page to refresh or scroll
+			this.domElement = domElement;
+			this.pointerTracker.domElement = domElement;
+			domElement.style.touchAction = 'none';
+			const contextMenuCallback = e => {
+				// exit early if the controls are disabled
+				if (!this.enabled) {
+					return;
+				}
+				e.preventDefault();
+			};
+			const pointerdownCallback = e => {
+				// exit early if the controls are disabled
+				if (!this.enabled) {
+					return;
+				}
+				e.preventDefault();
+				const {
+					camera,
+					raycaster,
+					domElement,
+					up,
+					pivotMesh,
+					pointerTracker,
+					scene,
+					pivotPoint,
+					enabled
+				} = this;
+
+				// init the pointer
+				pointerTracker.addPointer(e);
+				this.needsUpdate = true;
+
+				// handle cases where we need to capture the pointer or
+				// reset state when we have too many pointers
+				if (pointerTracker.isPointerTouch()) {
+					pivotMesh.visible = false;
+					if (pointerTracker.getPointerCount() === 0) {
+						domElement.setPointerCapture(e.pointerId);
+					} else if (pointerTracker.getPointerCount() > 2) {
+						this.resetState();
+						return;
+					}
+				}
+
+				// the "pointer" for zooming and rotating should be based on the center point
+				pointerTracker.getCenterPoint(_pointer);
+				mouseToCoords(_pointer.x, _pointer.y, domElement, _pointer);
+				setRaycasterFromCamera(raycaster, _pointer, camera);
+
+				// prevent the drag distance from getting too severe by limiting the drag point
+				// to a reasonable angle and reasonable distance with the drag plane
+				const dot = Math.abs(raycaster.ray.direction.dot(up));
+				if (dot < DRAG_PLANE_THRESHOLD || dot < DRAG_UP_THRESHOLD) {
+					return;
+				}
+
+				// find the hit point
+				const hit = this._raycast(raycaster);
+				if (hit) {
+					// if two fingers, right click, or shift click are being used then we trigger
+					// a rotation action to begin
+					if (pointerTracker.getPointerCount() === 2 || pointerTracker.isRightClicked() || pointerTracker.isLeftClicked() && e.shiftKey) {
+						this.setState(pointerTracker.isPointerTouch() ? WAITING : ROTATE);
+						pivotPoint.copy(hit.point);
+						pivotMesh.position.copy(hit.point);
+						pivotMesh.visible = pointerTracker.isPointerTouch() ? false : enabled;
+						pivotMesh.updateMatrix();
+						scene.add(pivotMesh);
+					} else if (pointerTracker.isLeftClicked()) {
+						// if the clicked point is coming from below the plane then don't perform the drag
+						this.setState(DRAG);
+						pivotPoint.copy(hit.point);
+						pivotMesh.position.copy(hit.point);
+						pivotMesh.updateMatrix();
+						scene.add(pivotMesh);
+					}
+				}
+			};
+			let _pointerMoveQueued = false;
+			const pointermoveCallback = e => {
+				// exit early if the controls are disabled
+				if (!this.enabled) {
+					return;
+				}
+				e.preventDefault();
+				const {
+					pivotMesh,
+					enabled
+				} = this;
+
+				// whenever the pointer moves we need to re-derive the zoom direction and point
+				this.zoomDirectionSet = false;
+				this.zoomPointSet = false;
+				if (this.state !== NONE$1) {
+					this.needsUpdate = true;
+				}
+				const {
+					pointerTracker
+				} = this;
+				pointerTracker.setHoverEvent(e);
+				if (!pointerTracker.updatePointer(e)) {
+					return;
+				}
+				if (pointerTracker.isPointerTouch() && pointerTracker.getPointerCount() === 2) {
+					// We queue this event to ensure that all pointers have been updated
+					if (!_pointerMoveQueued) {
+						_pointerMoveQueued = true;
+						queueMicrotask(() => {
+							_pointerMoveQueued = false;
+
+							// adjust the pointer position to be the center point
+							pointerTracker.getCenterPoint(_centerPoint);
+
+							// detect zoom transition
+							const startDist = pointerTracker.getStartTouchPointerDistance();
+							const pointerDist = pointerTracker.getTouchPointerDistance();
+							const separateDelta = pointerDist - startDist;
+							if (this.state === NONE$1 || this.state === WAITING) {
+								// check which direction was moved in first - if the pointers are pinching then
+								// it's a zoom. But if they move in parallel it's a rotation
+								pointerTracker.getCenterPoint(_centerPoint);
+								pointerTracker.getStartCenterPoint(_startCenterPoint);
+
+								// adjust the drag requirement by the dpr
+								const dragThreshold = 2.0 * window.devicePixelRatio;
+								const parallelDelta = _centerPoint.distanceTo(_startCenterPoint);
+								if (Math.abs(separateDelta) > dragThreshold || parallelDelta > dragThreshold) {
+									if (Math.abs(separateDelta) > parallelDelta) {
+										this.setState(ZOOM);
+										this.zoomDirectionSet = false;
+									} else {
+										this.setState(ROTATE);
+									}
+								}
+							}
+							if (this.state === ZOOM) {
+								const previousDist = pointerTracker.getPreviousTouchPointerDistance();
+								this.zoomDelta += pointerDist - previousDist;
+								pivotMesh.visible = false;
+							} else if (this.state === ROTATE) {
+								pivotMesh.visible = enabled;
+							}
+						});
+					}
+				}
+
+				// TODO: we have the potential to fire change multiple times per frame - should we debounce?
+				this.dispatchEvent(_changeEvent);
+			};
+			const pointerupCallback = e => {
+				// exit early if the controls are disabled
+				if (!this.enabled) {
+					return;
+				}
+				const {
+					pointerTracker
+				} = this;
+				pointerTracker.deletePointer(e);
+				if (pointerTracker.getPointerType() === 'touch' && pointerTracker.getPointerCount() === 0) {
+					domElement.releasePointerCapture(e.pointerId);
+				}
+				this.resetState();
+				this.needsUpdate = true;
+			};
+			const wheelCallback = e => {
+				// exit early if the controls are disabled
+				if (!this.enabled) {
+					return;
+				}
+				e.preventDefault();
+				const {
+					pointerTracker
+				} = this;
+				pointerTracker.setHoverEvent(e);
+				pointerTracker.updatePointer(e);
+
+				// TODO: do we need events here?
+				this.dispatchEvent(_startEvent);
+				let delta;
+				switch (e.deltaMode) {
+					case 2:
+						// Pages
+						delta = e.deltaY * 800;
+						break;
+					case 1:
+						// Lines
+						delta = e.deltaY * 40;
+						break;
+					case 0:
+						// Pixels
+						delta = e.deltaY;
+						break;
+				}
+
+				// use LOG to scale the scroll delta and hopefully normalize them across platforms
+				const deltaSign = Math.sign(delta);
+				const normalizedDelta = Math.abs(delta);
+				this.zoomDelta -= 0.25 * deltaSign * normalizedDelta;
+				this.needsUpdate = true;
+				this._lastUsedState = ZOOM;
+				this.dispatchEvent(_endEvent);
+			};
+			const pointerenterCallback = e => {
+				// exit early if the controls are disabled
+				if (!this.enabled) {
+					return;
+				}
+				const {
+					pointerTracker
+				} = this;
+				if (e.buttons !== pointerTracker.getPointerButtons()) {
+					pointerTracker.deletePointer(e);
+					this.resetState();
+				}
+			};
+			domElement.addEventListener('contextmenu', contextMenuCallback);
+			domElement.addEventListener('pointerdown', pointerdownCallback);
+			domElement.addEventListener('pointermove', pointermoveCallback);
+			domElement.addEventListener('pointerup', pointerupCallback);
+			domElement.addEventListener('wheel', wheelCallback, {
+				passive: false
+			});
+			domElement.addEventListener('pointerenter', pointerenterCallback);
+			this._detachCallback = () => {
+				domElement.removeEventListener('contextmenu', contextMenuCallback);
+				domElement.removeEventListener('pointerdown', pointerdownCallback);
+				domElement.removeEventListener('pointermove', pointermoveCallback);
+				domElement.removeEventListener('pointerup', pointerupCallback);
+				domElement.removeEventListener('wheel', wheelCallback);
+				domElement.removeEventListener('pointerenter', pointerenterCallback);
+			};
+		}
+
+		// override-able functions for retrieving the up direction at a point
+		getUpDirection(point, target) {
+			target.copy(this.up);
+		}
+		getCameraUpDirection(target) {
+			this.getUpDirection(this.camera.position, target);
+		}
+
+		// returns the active / last used pivot point for the scene
+		getPivotPoint(target) {
+			let result = null;
+
+			// get the last interacted point as the focus
+			if (this._lastUsedState === ZOOM) {
+				if (this._zoomPointWasSet) {
+					result = target.copy(this.zoomPoint);
+				}
+			} else if (this._lastUsedState === ROTATE || this._lastUsedState === DRAG) {
+				result = target.copy(this.pivotPoint);
+			}
+
+			// If the last used point is outside the camera view then skip it
+			const {
+				camera,
+				raycaster
+			} = this;
+			if (result !== null) {
+				_vec.copy(result).project(camera);
+				if (_vec.x < -1 || _vec.x > 1 || _vec.y < -1 || _vec.y > 1) {
+					result = null;
+				}
+			}
+
+			// default to the raycast hit if we have not result or the hit is closer to the camera
+			// set a ray in the local ellipsoid frame
+			setRaycasterFromCamera(raycaster, {
+				x: 0,
+				y: 0
+			}, camera);
+			const hit = this._raycast(raycaster);
+			if (hit) {
+				if (result === null || hit.distance < result.distanceTo(raycaster.ray.origin)) {
+					result = target.copy(hit.point);
+				}
+			}
+			return result;
+		}
+		detach() {
+			this.domElement = null;
+			if (this._detachCallback) {
+				this._detachCallback();
+				this._detachCallback = null;
+				this.pointerTracker.reset();
+			}
+		}
+		resetState() {
+			if (this.state !== NONE$1) {
+				this.dispatchEvent(_endEvent);
+			}
+			this.state = NONE$1;
+			this.pivotMesh.removeFromParent();
+			this.pivotMesh.visible = this.enabled;
+			this.actionHeightOffset = 0;
+		}
+		setState(state = this.state, fireEvent = true) {
+			if (this.state === state) {
+				return;
+			}
+			if (this.state === NONE$1 && fireEvent) {
+				this.dispatchEvent(_startEvent);
+			}
+			this.pivotMesh.visible = this.enabled;
+			this.dragInertia.set(0, 0, 0);
+			this.rotationInertia.set(0, 0);
+			this.inertiaStableFrames = 0;
+			this.state = state;
+			if (state !== NONE$1 && state !== WAITING) {
+				this._lastUsedState = state;
+			}
+		}
+		update(deltaTime = 64 / 1000) {
+			if (!this.enabled || !this.camera || deltaTime === 0) {
+				return;
+			}
+			const {
+				camera,
+				cameraRadius,
+				pivotPoint,
+				up,
+				state,
+				adjustHeight
+			} = this;
+			camera.updateMatrix();
+
+			// set the "up" vector immediately so it's available in the following functions
+			this.getCameraUpDirection(_localUp);
+			if (!this._upInitialized) {
+				this._upInitialized = true;
+				this.up.copy(_localUp);
+			}
+
+			// update the actions
+			const inertiaNeedsUpdate = this._inertiaNeedsUpdate();
+			if (this.needsUpdate || inertiaNeedsUpdate) {
+				const zoomDelta = this.zoomDelta;
+				this._updateZoom();
+				this._updatePosition(deltaTime);
+				this._updateRotation(deltaTime);
+				if (state === DRAG || state === ROTATE) {
+					_forward.set(0, 0, -1).transformDirection(camera.worldMatrix);
+					this.inertiaTargetDistance = _vec.copy(this.pivotPoint).sub(camera.position).dot(_forward);
+				} else if (state === NONE$1) {
+					this._updateInertia(deltaTime);
+				}
+				if (state !== NONE$1 || zoomDelta !== 0 || inertiaNeedsUpdate) {
+					this.dispatchEvent(_changeEvent);
+				}
+				this.needsUpdate = false;
+			}
+
+			// update the up direction based on where the camera moved to
+			// if using an orthographic camera then rotate around drag pivot
+			// reuse the "hit" information since it can be slow to perform multiple hits
+			// TODO Orthographic Camera
+			const hit = camera.isOrthographicCamera ? null : adjustHeight && this._getPointBelowCamera() || null;
+			const rotationPoint = camera.isOrthographicCamera ? pivotPoint : hit && hit.point || null;
+			this.getCameraUpDirection(_localUp);
+			this._setFrame(_localUp, rotationPoint);
+
+			// when dragging the camera and drag point may be moved
+			// to accommodate terrain so we try to move it back down
+			// to the original point.
+			if ((this.state === DRAG || this.state === ROTATE) && this.actionHeightOffset !== 0) {
+				const {
+					actionHeightOffset
+				} = this;
+				camera.position.addScaledVector(up, -actionHeightOffset);
+				pivotPoint.addScaledVector(up, -actionHeightOffset);
+
+				// adjust the height
+				if (hit) {
+					hit.distance -= actionHeightOffset;
+				}
+			}
+			this.actionHeightOffset = 0;
+			if (hit) {
+				const dist = hit.distance;
+				if (dist < cameraRadius) {
+					const delta = cameraRadius - dist;
+					camera.position.addScaledVector(up, delta);
+					pivotPoint.addScaledVector(up, delta);
+					this.actionHeightOffset = delta;
+				}
+			}
+			this.pointerTracker.updateFrame();
+		}
+
+		// updates the camera to position it based on the constraints of the controls
+		adjustCamera(camera) {
+			const {
+				adjustHeight,
+				cameraRadius
+			} = this;
+			// if (camera.isPerspectiveCamera) {
+			// adjust the camera height
+			this.getUpDirection(camera.position, _localUp);
+			const hit = adjustHeight && this._getPointBelowCamera(camera.position, _localUp) || null;
+			if (hit) {
+				const dist = hit.distance;
+				if (dist < cameraRadius) {
+					camera.position.addScaledVector(_localUp, cameraRadius - dist);
+				}
+			}
+			// }
+		}
+		dispose() {
+			this.detach();
+		}
+
+		// private
+		_updateInertia(deltaTime) {
+			// update the damping of momentum variables
+			const {
+				rotationInertia,
+				pivotPoint,
+				dragInertia,
+				enableDamping,
+				dampingFactor,
+				camera,
+				cameraRadius,
+				minDistance,
+				inertiaTargetDistance
+			} = this;
+			if (!this.enableDamping || this.inertiaStableFrames > 1) {
+				dragInertia.set(0, 0, 0);
+				rotationInertia.set(0, 0, 0);
+				return;
+			}
+
+			// Based on Freya Holmer's frame-rate independent lerp function
+			const factor = Math.pow(2, -deltaTime / dampingFactor);
+			const stableDistance = Math.max(camera.near, cameraRadius, minDistance, inertiaTargetDistance);
+			const resolution = 2 * 1e3;
+			const pixelWidth = 2 / resolution;
+			const pixelThreshold = 0.25 * pixelWidth;
+
+			// scale the residual rotation motion
+			if (rotationInertia.getLengthSquared() > 0) {
+				// calculate two screen points at 1 pixel apart in our notional resolution so we can stop when the delta is ~ 1 pixel
+				// projected into world space
+				setRaycasterFromCamera(_ray, _vec.set(0, 0, -1), camera);
+				_ray.applyMatrix4(camera.viewMatrix);
+				_ray.direction.normalize();
+				_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _vec);
+				_vec.applyMatrix4(camera.worldMatrix);
+				setRaycasterFromCamera(_ray, _delta.set(pixelThreshold, pixelThreshold, -1), camera);
+				_ray.applyMatrix4(camera.viewMatrix);
+				_ray.direction.normalize();
+				_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _delta);
+				_delta.applyMatrix4(camera.worldMatrix);
+
+				// get implied angle
+				_vec.sub(pivotPoint).normalize();
+				_delta.sub(pivotPoint).normalize();
+
+				// calculate the rotation threshold
+				const threshold = _vec.angleTo(_delta) / deltaTime;
+				rotationInertia.multiplyScalar(factor);
+				if (rotationInertia.getLengthSquared() < threshold ** 2 || !enableDamping) {
+					rotationInertia.set(0, 0);
+				}
+			}
+
+			// scale the residual translation motion
+			if (dragInertia.getLengthSquared() > 0) {
+				// calculate two screen points at 1 pixel apart in our notional resolution so we can stop when the delta is ~ 1 pixel
+				// projected into world space
+				setRaycasterFromCamera(_ray, _vec.set(0, 0, -1), camera);
+				_ray.applyMatrix4(camera.viewMatrix);
+				_ray.direction.normalize();
+				_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _vec);
+				_vec.applyMatrix4(camera.worldMatrix);
+				setRaycasterFromCamera(_ray, _delta.set(pixelThreshold, pixelThreshold, -1), camera);
+				_ray.applyMatrix4(camera.viewMatrix);
+				_ray.direction.normalize();
+				_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _delta);
+				_delta.applyMatrix4(camera.worldMatrix);
+
+				// calculate movement threshold
+				const threshold = _vec.distanceTo(_delta) / deltaTime;
+				dragInertia.multiplyScalar(factor);
+				if (dragInertia.getLengthSquared() < threshold ** 2 || !enableDamping) {
+					dragInertia.set(0, 0, 0);
+				}
+			}
+
+			// apply the inertia changes
+			if (rotationInertia.getLengthSquared() > 0) {
+				this._applyRotation(rotationInertia.x * deltaTime, rotationInertia.y * deltaTime, pivotPoint);
+			}
+			if (dragInertia.getLengthSquared() > 0) {
+				camera.position.addScaledVector(dragInertia, deltaTime);
+				camera.updateMatrix();
+			}
+		}
+		_inertiaNeedsUpdate() {
+			const {
+				rotationInertia,
+				dragInertia
+			} = this;
+			return rotationInertia.getLengthSquared() !== 0 || dragInertia.getLengthSquared() !== 0;
+		}
+		_updateZoom() {
+			const {
+				zoomPoint,
+				zoomDirection,
+				camera,
+				minDistance,
+				maxDistance,
+				pointerTracker,
+				domElement,
+				minZoom,
+				maxZoom,
+				zoomSpeed,
+				state
+			} = this;
+			let scale = this.zoomDelta;
+			this.zoomDelta = 0;
+
+			// get the latest hover / touch point
+			if (!pointerTracker.getLatestPoint(_pointer) || scale === 0 && state !== ZOOM) {
+				return;
+			}
+
+			// reset momentum
+			this.rotationInertia.set(0, 0);
+			this.dragInertia.set(0, 0, 0);
+			if (camera.isOrthographicCamera) {
+				// update the zoom direction
+				this._updateZoomDirection();
+
+				// zoom straight into the globe if we haven't hit anything
+				const zoomIntoPoint = this.zoomPointSet || this._updateZoomPoint();
+
+				// get the mouse position before zoom
+				_mouseBefore.unproject(camera);
+
+				// zoom the camera
+				const normalizedDelta = Math.pow(0.95, Math.abs(scale * 0.05));
+				let scaleFactor = scale > 0 ? 1 / Math.abs(normalizedDelta) : normalizedDelta;
+				scaleFactor *= zoomSpeed;
+				if (scaleFactor > 1) {
+					if (maxZoom < camera.zoom * scaleFactor) {
+						scaleFactor = 1;
+					}
+				} else {
+					if (minZoom > camera.zoom * scaleFactor) {
+						scaleFactor = 1;
+					}
+				}
+
+				// TODO
+				// camera.zoom *= scaleFactor;
+				// camera.updateProjectionMatrix();
+
+				// adjust the surface point to be in the same position if the globe is hovered over
+				if (zoomIntoPoint) {
+					// get the mouse position after zoom
+					mouseToCoords(_pointer.x, _pointer.y, domElement, _mouseAfter);
+					_mouseAfter.unproject(camera);
+
+					// shift the camera on the near plane so the mouse is in the same spot
+					camera.position.sub(_mouseAfter).add(_mouseBefore);
+					camera.updateMatrix();
+				}
+			} else {
+				// initialize the zoom direction
+				this._updateZoomDirection();
+
+				// track the zoom direction we're going to use
+				const finalZoomDirection = _vec.copy(zoomDirection);
+				if (this.zoomPointSet || this._updateZoomPoint()) {
+					const dist = zoomPoint.distanceTo(camera.position);
+
+					// scale the distance based on how far there is to move
+					if (scale < 0) {
+						const remainingDistance = Math.min(0, dist - maxDistance);
+						scale = scale * dist * zoomSpeed * 0.0025;
+						scale = Math.max(scale, remainingDistance);
+					} else {
+						const remainingDistance = Math.max(0, dist - minDistance);
+						scale = scale * Math.max(dist - minDistance, 0) * zoomSpeed * 0.0025;
+						scale = Math.min(scale, remainingDistance);
+					}
+					camera.position.addScaledVector(zoomDirection, scale);
+					camera.updateMatrix();
+				} else {
+					// if we're zooming into nothing then use the distance from the ground to scale movement
+					const hit = this._getPointBelowCamera();
+					if (hit) {
+						const dist = hit.distance;
+						finalZoomDirection.set(0, 0, -1).transformDirection(camera.worldMatrix);
+						camera.position.addScaledVector(finalZoomDirection, scale * dist * 0.01);
+						camera.updateMatrix();
+					}
+				}
+			}
+		}
+		_updateZoomDirection() {
+			if (this.zoomDirectionSet) {
+				return;
+			}
+			const {
+				domElement,
+				raycaster,
+				camera,
+				zoomDirection,
+				pointerTracker
+			} = this;
+			pointerTracker.getLatestPoint(_pointer);
+			mouseToCoords(_pointer.x, _pointer.y, domElement, _mouseBefore);
+			setRaycasterFromCamera(raycaster, _mouseBefore, camera);
+			zoomDirection.copy(raycaster.ray.direction).normalize();
+			this.zoomDirectionSet = true;
+		}
+
+		// update the point being zoomed in to based on the zoom direction
+		_updateZoomPoint() {
+			const {
+				camera,
+				zoomDirectionSet,
+				zoomDirection,
+				raycaster,
+				zoomPoint,
+				pointerTracker,
+				domElement
+			} = this;
+			this._zoomPointWasSet = false;
+			if (!zoomDirectionSet) {
+				return false;
+			}
+
+			// If using an orthographic camera we have to account for the mouse position when picking the point
+			if (camera.isOrthographicCamera && pointerTracker.getLatestPoint(_zoomPointPointer)) {
+				mouseToCoords(_zoomPointPointer.x, _zoomPointPointer.y, domElement, _zoomPointPointer);
+				setRaycasterFromCamera(raycaster, _zoomPointPointer, camera);
+			} else {
+				raycaster.ray.origin.copy(camera.position);
+				raycaster.ray.direction.copy(zoomDirection);
+				raycaster.near = 0;
+				raycaster.far = Infinity;
+			}
+
+			// get the hit point
+			const hit = this._raycast(raycaster);
+			if (hit) {
+				zoomPoint.copy(hit.point);
+				this.zoomPointSet = true;
+				this._zoomPointWasSet = true;
+				return true;
+			}
+			return false;
+		}
+
+		// returns the point below the camera
+		_getPointBelowCamera(point = this.camera.position, up = this.up) {
+			const {
+				raycaster
+			} = this;
+			raycaster.ray.direction.copy(up).multiplyScalar(-1);
+			raycaster.ray.origin.copy(point).addScaledVector(up, 1e5);
+			raycaster.near = 0;
+			raycaster.far = Infinity;
+			const hit = this._raycast(raycaster);
+			if (hit) {
+				hit.distance -= 1e5;
+			}
+			return hit;
+		}
+
+		// update the drag action
+		_updatePosition(deltaTime) {
+			const {
+				raycaster,
+				camera,
+				pivotPoint,
+				up,
+				pointerTracker,
+				domElement,
+				state,
+				dragInertia
+			} = this;
+			if (state === DRAG) {
+				// get the pointer and plane
+				pointerTracker.getCenterPoint(_pointer);
+				mouseToCoords(_pointer.x, _pointer.y, domElement, _pointer);
+				_plane.setFromNormalAndCoplanarPoint(up, pivotPoint);
+				setRaycasterFromCamera(raycaster, _pointer, camera);
+
+				// prevent the drag distance from getting too severe by limiting the drag point
+				// to a reasonable angle with the drag plane
+				if (Math.abs(raycaster.ray.direction.dot(up)) < DRAG_PLANE_THRESHOLD) {
+					// rotate the pointer direction down to the correct angle for horizontal dragging
+					const angle = Math.acos(DRAG_PLANE_THRESHOLD);
+					_rotationAxis.crossVectors(raycaster.ray.direction, up).normalize();
+					raycaster.ray.direction.copy(up).applyAxisAngle(_rotationAxis, angle).multiplyScalar(-1);
+				}
+
+				// TODO: dragging causes the camera to rise because we're getting "pushed" up by lower resolution tiles and
+				// don't lower back down. We should maintain a target height above tiles where possible
+				// prevent the drag from inverting
+
+				// if we drag to a point that's near the edge of the earth then we want to prevent it
+				// from wrapping around and causing unexpected rotations
+				this.getUpDirection(pivotPoint, _localUp);
+				if (Math.abs(raycaster.ray.direction.dot(_localUp)) < DRAG_UP_THRESHOLD) {
+					const angle = Math.acos(DRAG_UP_THRESHOLD);
+					_rotationAxis.crossVectors(raycaster.ray.direction, _localUp).normalize();
+					raycaster.ray.direction.copy(_localUp).applyAxisAngle(_rotationAxis, angle).multiplyScalar(-1);
+				}
+
+				// find the point on the plane that we should drag to
+				if (raycaster.ray.intersectPlane(_plane, _vec)) {
+					_delta.subVectors(pivotPoint, _vec);
+					camera.position.add(_delta);
+					camera.updateMatrix();
+
+					// update the drag inertia
+					_delta.multiplyScalar(1 / deltaTime);
+					if (pointerTracker.getMoveDistance() / deltaTime < 2 * window.devicePixelRatio) {
+						this.inertiaStableFrames++;
+					} else {
+						dragInertia.copy(_delta);
+						this.inertiaStableFrames = 0;
+					}
+				}
+			}
+		}
+		_updateRotation(deltaTime) {
+			const {
+				pivotPoint,
+				pointerTracker,
+				domElement,
+				state,
+				rotationInertia
+			} = this;
+			if (state === ROTATE) {
+				// get the rotation motion and divide out the container height to normalize for element size
+				pointerTracker.getCenterPoint(_pointer);
+				pointerTracker.getPreviousCenterPoint(_prevPointer);
+				_deltaPointer.subVectors(_pointer, _prevPointer).multiplyScalar(2 * Math.PI / domElement.clientHeight);
+				this._applyRotation(_deltaPointer.x, _deltaPointer.y, pivotPoint);
+
+				// update rotation inertia
+				_deltaPointer.multiplyScalar(1 / deltaTime);
+				if (pointerTracker.getMoveDistance() / deltaTime < 2 * window.devicePixelRatio) {
+					this.inertiaStableFrames++;
+				} else {
+					rotationInertia.copy(_deltaPointer);
+					this.inertiaStableFrames = 0;
+				}
+			}
+		}
+		_applyRotation(x, y, pivotPoint) {
+			if (x === 0 && y === 0) {
+				return;
+			}
+			const {
+				camera,
+				minAltitude,
+				maxAltitude,
+				rotationSpeed
+			} = this;
+			const azimuth = -x * rotationSpeed;
+			let altitude = y * rotationSpeed;
+
+			// calculate current angles and clamp
+			_forward.set(0, 0, 1).transformDirection(camera.worldMatrix);
+			this.getUpDirection(pivotPoint, _localUp);
+
+			// get the signed angle relative to the top down view
+			_vec.crossVectors(_localUp, _forward).normalize();
+			_right.set(1, 0, 0).transformDirection(camera.worldMatrix).normalize();
+			const sign = Math.sign(_vec.dot(_right));
+			const angle = sign * _localUp.angleTo(_forward);
+
+			// clamp the rotation to be within the provided limits
+			// clamp to 0 here, as well, so we don't "pop" to the the value range
+			if (altitude > 0) {
+				altitude = Math.min(angle - minAltitude - 1e-2, altitude);
+				altitude = Math.max(0, altitude);
+			} else {
+				altitude = Math.max(angle - maxAltitude, altitude);
+				altitude = Math.min(0, altitude);
+			}
+
+			// rotate around the up axis
+			_quaternion$1.setFromAxisAngle(_localUp, azimuth);
+			makeRotateAroundPoint(pivotPoint, _quaternion$1, _rotMatrix);
+			camera.worldMatrix.premultiply(_rotMatrix);
+
+			// get a rotation axis for altitude and rotate
+			_rotationAxis.set(-1, 0, 0).transformDirection(camera.worldMatrix);
+			_quaternion$1.setFromAxisAngle(_rotationAxis, altitude);
+			makeRotateAroundPoint(pivotPoint, _quaternion$1, _rotMatrix);
+			camera.worldMatrix.premultiply(_rotMatrix);
+
+			// update the transform members
+			camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec);
+		}
+
+		// sets the "up" axis for the current surface of the tile set
+		_setFrame(newUp, pivot) {
+			const {
+				up,
+				camera,
+				state,
+				zoomPoint,
+				zoomDirectionSet,
+				zoomPointSet,
+				reorientOnDrag,
+				scaleZoomOrientationAtEdges
+			} = this;
+			camera.updateMatrix();
+
+			// get the amount needed to rotate
+			_quaternion$1.setFromUnitVectors(up, newUp);
+
+			// If we're zooming then reorient around the zoom point
+			const action = state;
+			if (zoomDirectionSet && (zoomPointSet || this._updateZoomPoint())) {
+				this.getUpDirection(zoomPoint, _vec);
+				if (scaleZoomOrientationAtEdges) {
+					let amt = Math.max(_vec.dot(up) - 0.6, 0) / 0.4;
+					amt = t3d.MathUtils.mapLinear(amt, 0, 0.5, 0, 1);
+					amt = Math.min(amt, 1);
+
+					// scale the value if we're using an orthographic camera so
+					// GlobeControls works correctly
+					if (camera.isOrthographicCamera) {
+						amt *= 0.1;
+					}
+					_quaternion$1.slerpQuaternions(_quaternion$1, _identityQuat, 1.0 - amt);
+				}
+
+				// rotates the camera position around the point being zoomed in to
+				makeRotateAroundPoint(zoomPoint, _quaternion$1, _rotMatrix);
+				camera.worldMatrix.premultiply(_rotMatrix);
+				camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec);
+
+				// recompute the zoom direction after updating rotation to align with frame
+				this.zoomDirectionSet = false;
+				this._updateZoomDirection();
+			} else if (action === DRAG && reorientOnDrag) {
+				// If we're dragging then reorient around the drag point
+
+				// NOTE: We used to derive the pivot point here by getting the point below the camera
+				// but decided to pass it in via "update" to avoid multiple ray casts
+
+				if (pivot) {
+					// perform a simple realignment by rotating the camera around the pivot
+					makeRotateAroundPoint(pivot, _quaternion$1, _rotMatrix);
+					camera.worldMatrix.premultiply(_rotMatrix);
+					camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec);
+				}
+			}
+			up.copy(newUp);
+			camera.updateMatrix();
+		}
+		_raycast(raycaster) {
+			const {
+				scene,
+				useFallbackPlane,
+				fallbackPlane
+			} = this;
+			const result = raycaster.intersectObject(scene, true)[0] || null;
+			if (result) {
+				return result;
+			} else if (useFallbackPlane) {
+				// if we don't hit any geometry then try to intersect the fallback
+				// plane so the camera can still be manipulated
+				const plane = fallbackPlane;
+				if (raycaster.ray.intersectPlane(plane, _vec)) {
+					const planeHit = {
+						point: _vec.clone(),
+						distance: raycaster.ray.origin.distanceTo(_vec)
+					};
+					return planeHit;
+				}
+			}
+			return null;
+		}
+	}
+
 	class FadeManager {
 		constructor() {
 			this.duration = 250;
@@ -6660,17 +8081,17 @@
 			for (let i = 0; i < 3; i++) {
 				const axis1 = axes[i];
 				const axis2 = axes[(i + 1) % 3];
-				_vector.set(0, 0, 0);
+				_vector$1.set(0, 0, 0);
 				for (let a = 0; a < angleSteps; a++) {
 					let angle;
 					angle = 2 * Math.PI * a / (angleSteps - 1);
-					_vector[axis1] = Math.sin(angle);
-					_vector[axis2] = Math.cos(angle);
-					positions.push(_vector.x, _vector.y, _vector.z);
+					_vector$1[axis1] = Math.sin(angle);
+					_vector$1[axis2] = Math.cos(angle);
+					positions.push(_vector$1.x, _vector$1.y, _vector$1.z);
 					angle = 2 * Math.PI * (a + 1) / (angleSteps - 1);
-					_vector[axis1] = Math.sin(angle);
-					_vector[axis2] = Math.cos(angle);
-					positions.push(_vector.x, _vector.y, _vector.z);
+					_vector$1[axis1] = Math.sin(angle);
+					_vector$1[axis2] = Math.cos(angle);
+					positions.push(_vector$1.x, _vector$1.y, _vector$1.z);
 				}
 			}
 			const geometry = new t3d.Geometry();
@@ -6693,7 +8114,7 @@
 		}
 	}
 	SphereHelper.prototype.isSphereHelper = true;
-	const _vector = new t3d.Vector3();
+	const _vector$1 = new t3d.Vector3();
 	const axes = ['x', 'y', 'z'];
 
 	class DebugTilesPlugin {
@@ -7378,6 +8799,7 @@
 	}
 
 	const _quaternion = new t3d.Quaternion();
+	const _vector = new t3d.Vector3();
 	t3d.Matrix4.prototype.makeBasis = function (xAxis, yAxis, zAxis) {
 		this.set(xAxis.x, yAxis.x, zAxis.x, 0, xAxis.y, yAxis.y, zAxis.y, 0, xAxis.z, yAxis.z, zAxis.z, 0, 0, 0, 0, 1);
 		return this;
@@ -7510,6 +8932,18 @@
 	t3d.Vector3.prototype.applyEuler = function (euler) {
 		return this.applyQuaternion(_quaternion.setFromEuler(euler));
 	};
+	t3d.Vector3.prototype.applyAxisAngle = function (axis, angle) {
+		return this.applyQuaternion(_quaternion.setFromAxisAngle(axis, angle));
+	};
+	t3d.Vector3.prototype.angleTo = function (v) {
+		const denominator = Math.sqrt(this.getLengthSquared() * v.getLengthSquared());
+		if (denominator === 0) return Math.PI / 2;
+		const theta = this.dot(v) / denominator;
+
+		// clamp, to handle numerical problems
+
+		return Math.acos(t3d.MathUtils.clamp(theta, -1, 1));
+	};
 	t3d.Vector3.prototype.isVector3 = true;
 	t3d.Quaternion.prototype.angleTo = function (q) {
 		return 2 * Math.acos(Math.abs(t3d.MathUtils.clamp(this.dot(q), -1, 1)));
@@ -7524,12 +8958,28 @@
 		}
 		return this;
 	};
+	t3d.Ray.prototype.closestPointToPoint = function (point, target) {
+		target.subVectors(point, this.origin);
+		const directionDistance = target.dot(this.direction);
+		if (directionDistance < 0) {
+			return target.copy(this.origin);
+		}
+		return target.copy(this.origin).addScaledVector(this.direction, directionDistance);
+	};
+	t3d.Ray.prototype.recast = function (t) {
+		this.origin.copy(this.at(t, _vector));
+		return this;
+	};
+	t3d.MathUtils.mapLinear = function (x, a1, a2, b1, b2) {
+		return b1 + (x - a1) * (b2 - b1) / (a2 - a1);
+	};
 
 	exports.B3DMLoader = B3DMLoader;
 	exports.CMPTLoader = CMPTLoader;
 	exports.CesiumIonAuthPlugin = CesiumIonAuthPlugin;
 	exports.DebugLoadParser = LoadParser;
 	exports.DebugTilesPlugin = DebugTilesPlugin;
+	exports.EnvironmentControls = EnvironmentControls;
 	exports.I3DMLoader = I3DMLoader;
 	exports.InstancedBasicMaterial = InstancedBasicMaterial;
 	exports.InstancedPBRMaterial = InstancedPBRMaterial;
