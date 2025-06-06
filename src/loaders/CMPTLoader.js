@@ -1,4 +1,4 @@
-import { GLTFLoader } from '../libs/glTF/GLTFLoader.js';
+import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
 
 import { HeaderParser } from './parsers/HeaderParser.js';
 import { CMPTParser } from './parsers/cmpt/CMPTParser.js';

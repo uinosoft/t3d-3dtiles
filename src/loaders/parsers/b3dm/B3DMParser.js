@@ -1,4 +1,4 @@
-import { GLTFUtils } from '../../../libs/glTF/GLTFUtils.js';
+import { GLTFUtils } from 't3d/addons/loaders/glTF/GLTFUtils.js';
 
 export class B3DMParser {
 

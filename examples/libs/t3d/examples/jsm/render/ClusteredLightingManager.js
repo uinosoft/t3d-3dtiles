@@ -1,5 +1,7 @@
 import { PIXEL_TYPE, PIXEL_FORMAT, Texture2D, TEXTURE_FILTER, MathUtils, Sphere, Box3, Vector3 } from 't3d';
 
+console.warn('ClusteredLightingManager is deprecated since v0.4.0, use renderer.lightingOptions to enable clustered lighting instead.');
+
 /**
  * ClusteredLightingManager.
  * Supports point and spot lights.
@@ -8,13 +10,13 @@ class ClusteredLightingManager {
 
 	/**
 	 * Constructs a new ClusteredLightingManager.
-	 * @param {Object} [options] - The options.
-	 * @param {Number} [options.maxLights=256] - The maximum number of lights.
-	 * @param {Boolean} [options.floatLights=false] - Whether the lights are stored as floats.
-	 * @param {Number[]} [options.cells=[16, 8, 32]] - The number of cells in each dimension.
-	 * @param {Number} [options.maxLightsPerCell=256] - The maximum number of lights per cell.
-	 * @param {Number} [options.clipNear=-1] - The near clipping plane for the cells.
-	 * @param {Number} [options.clipFar=-1] - The far clipping plane for the cells.
+	 * @param {object} [options] - The options.
+	 * @param {number} [options.maxLights=256] - The maximum number of lights.
+	 * @param {boolean} [options.floatLights=false] - Whether the lights are stored as floats.
+	 * @param {number[]} [options.cells=[16, 8, 32]] - The number of cells in each dimension.
+	 * @param {number} [options.maxLightsPerCell=256] - The maximum number of lights per cell.
+	 * @param {number} [options.clipNear=-1] - The near clipping plane for the cells.
+	 * @param {number} [options.clipFar=-1] - The far clipping plane for the cells.
 	 */
 	constructor({
 		maxLights = 256,
@@ -67,7 +69,7 @@ class ClusteredLightingManager {
 		this.lightsTexture.dispose();
 	}
 
-	update(cameraData, lightData, lightsNeedsUpdate = true) {
+	update(cameraData, lightingGroup, lightsNeedsUpdate = true) {
 		this._updateCellsTransform(cameraData);
 
 		this.cellsTexture.resetLightIndices();
@@ -77,8 +79,8 @@ class ClusteredLightingManager {
 
 		let lightIndicesWritten = false;
 
-		for (let i = 0; i < lightData.pointsNum; i++) {
-			const pointLight = lightData.point[i];
+		for (let i = 0; i < lightingGroup.pointsNum; i++) {
+			const pointLight = lightingGroup.point[i];
 
 			getPointLightBoundingSphere(pointLight, _lightSphere);
 			_lightSphere.center.applyMatrix4(cameraData.viewMatrix);
@@ -90,16 +92,16 @@ class ClusteredLightingManager {
 			}
 		}
 
-		for (let i = 0; i < lightData.spotsNum; i++) {
-			const spotLight = lightData.spot[i];
+		for (let i = 0; i < lightingGroup.spotsNum; i++) {
+			const spotLight = lightingGroup.spot[i];
 
 			getSpotLightBoundingSphere(spotLight, _lightSphere);
 			_lightSphere.center.applyMatrix4(cameraData.viewMatrix);
 			_lightSphere.center.z *= -1;
 
 			if (getCellsRange(_lightSphere, cellsTable, cellsTransform, _cellsRange)) {
-				lightIndicesWritten = this.cellsTexture.setLightIndex(_cellsRange, i + lightData.pointsNum) || lightIndicesWritten;
-				lightsNeedsUpdate && this.lightsTexture.setSpotLight(i + lightData.pointsNum, spotLight);
+				lightIndicesWritten = this.cellsTexture.setLightIndex(_cellsRange, i + lightingGroup.pointsNum) || lightIndicesWritten;
+				lightsNeedsUpdate && this.lightsTexture.setSpotLight(i + lightingGroup.pointsNum, spotLight);
 			}
 		}
 
@@ -215,7 +217,7 @@ class CellsTexture extends Texture2D {
 					const count = counts[idx];
 					if (count < maxLightsPerCell) {
 						const offset = idx * maxLightsPerCell + count;
-						data[offset] = float2Half(index + 1); // 0 is reserved for empty cell, so we offset by 1
+						data[offset] = MathUtils.toHalfFloat(index + 1); // 0 is reserved for empty cell, so we offset by 1
 						counts[idx]++;
 						needsUpdate = true;
 					}
@@ -246,66 +248,66 @@ class LightsTexture extends Texture2D {
 		this.flipY = false;
 	}
 
-	setPointLight(index, lightData) {
+	setPointLight(index, lightInfo) {
 		const data = this.image.data;
 		const halfFloat = this.type === PIXEL_TYPE.HALF_FLOAT;
 
 		const start = index * LIGHT_STRIDE * 4;
-		const { color, decay, position, distance } = lightData;
+		const { color, decay, position, distance } = lightInfo;
 
 		// pixel 0 - R: lightType, G: -, B: -, A: -
 
-		data[start + 0 * 4 + 0] = halfFloat ? float2Half(1) : 1;
+		data[start + 0 * 4 + 0] = halfFloat ? MathUtils.toHalfFloat(1) : 1;
 
 		// pixel 1 - R: color.r, G: color.g, B: color.b, A: decay
 
-		data[start + 1 * 4 + 0] = halfFloat ? float2Half(color[0]) : color[0];
-		data[start + 1 * 4 + 1] = halfFloat ? float2Half(color[1]) : color[1];
-		data[start + 1 * 4 + 2] = halfFloat ? float2Half(color[2]) : color[2];
-		data[start + 1 * 4 + 3] = halfFloat ? float2Half(decay) : decay;
+		data[start + 1 * 4 + 0] = halfFloat ? MathUtils.toHalfFloat(color[0]) : color[0];
+		data[start + 1 * 4 + 1] = halfFloat ? MathUtils.toHalfFloat(color[1]) : color[1];
+		data[start + 1 * 4 + 2] = halfFloat ? MathUtils.toHalfFloat(color[2]) : color[2];
+		data[start + 1 * 4 + 3] = halfFloat ? MathUtils.toHalfFloat(decay) : decay;
 
 		// pixel 2 - R: position.x, G: position.y, B: position.z, A: distance
 
-		data[start + 2 * 4 + 0] = halfFloat ? float2Half(position[0]) : position[0];
-		data[start + 2 * 4 + 1] = halfFloat ? float2Half(position[1]) : position[1];
-		data[start + 2 * 4 + 2] = halfFloat ? float2Half(position[2]) : position[2];
-		data[start + 2 * 4 + 3] = halfFloat ? float2Half(distance) : distance;
+		data[start + 2 * 4 + 0] = halfFloat ? MathUtils.toHalfFloat(position[0]) : position[0];
+		data[start + 2 * 4 + 1] = halfFloat ? MathUtils.toHalfFloat(position[1]) : position[1];
+		data[start + 2 * 4 + 2] = halfFloat ? MathUtils.toHalfFloat(position[2]) : position[2];
+		data[start + 2 * 4 + 3] = halfFloat ? MathUtils.toHalfFloat(distance) : distance;
 
 		// pixel 3 - R: -, G: -, B: -, A: -
 	}
 
-	setSpotLight(index, lightData) {
+	setSpotLight(index, lightInfo) {
 		const data = this.image.data;
 		const halfFloat = this.type === PIXEL_TYPE.HALF_FLOAT;
 
 		const start = index * LIGHT_STRIDE * 4;
-		const { color, decay, position, distance, direction, coneCos, penumbraCos } = lightData;
+		const { color, decay, position, distance, direction, coneCos, penumbraCos } = lightInfo;
 
 		// pixel 0 - R: lightType, G: penumbraCos, B: -, A: -
 
-		data[start + 0 * 4 + 0] = halfFloat ? float2Half(2) : 2;
-		data[start + 0 * 4 + 1] = halfFloat ? float2Half(penumbraCos) : penumbraCos;
+		data[start + 0 * 4 + 0] = halfFloat ? MathUtils.toHalfFloat(2) : 2;
+		data[start + 0 * 4 + 1] = halfFloat ? MathUtils.toHalfFloat(penumbraCos) : penumbraCos;
 
 		// pixel 1 - R: color.r, G: color.g, B: color.b, A: decay
 
-		data[start + 1 * 4 + 0] = halfFloat ? float2Half(color[0]) : color[0];
-		data[start + 1 * 4 + 1] = halfFloat ? float2Half(color[1]) : color[1];
-		data[start + 1 * 4 + 2] = halfFloat ? float2Half(color[2]) : color[2];
-		data[start + 1 * 4 + 3] = halfFloat ? float2Half(decay) : decay;
+		data[start + 1 * 4 + 0] = halfFloat ? MathUtils.toHalfFloat(color[0]) : color[0];
+		data[start + 1 * 4 + 1] = halfFloat ? MathUtils.toHalfFloat(color[1]) : color[1];
+		data[start + 1 * 4 + 2] = halfFloat ? MathUtils.toHalfFloat(color[2]) : color[2];
+		data[start + 1 * 4 + 3] = halfFloat ? MathUtils.toHalfFloat(decay) : decay;
 
 		// pixel 2 - R: position.x, G: position.y, B: position.z, A: distance
 
-		data[start + 2 * 4 + 0] = halfFloat ? float2Half(position[0]) : position[0];
-		data[start + 2 * 4 + 1] = halfFloat ? float2Half(position[1]) : position[1];
-		data[start + 2 * 4 + 2] = halfFloat ? float2Half(position[2]) : position[2];
-		data[start + 2 * 4 + 3] = halfFloat ? float2Half(distance) : distance;
+		data[start + 2 * 4 + 0] = halfFloat ? MathUtils.toHalfFloat(position[0]) : position[0];
+		data[start + 2 * 4 + 1] = halfFloat ? MathUtils.toHalfFloat(position[1]) : position[1];
+		data[start + 2 * 4 + 2] = halfFloat ? MathUtils.toHalfFloat(position[2]) : position[2];
+		data[start + 2 * 4 + 3] = halfFloat ? MathUtils.toHalfFloat(distance) : distance;
 
 		// pixel 3 - R: direction.x, G: direction.y, B: direction.z, A: coneCos
 
-		data[start + 3 * 4 + 0] = halfFloat ? float2Half(direction[0]) : direction[0];
-		data[start + 3 * 4 + 1] = halfFloat ? float2Half(direction[1]) : direction[1];
-		data[start + 3 * 4 + 2] = halfFloat ? float2Half(direction[2]) : direction[2];
-		data[start + 3 * 4 + 3] = halfFloat ? float2Half(coneCos) : coneCos;
+		data[start + 3 * 4 + 0] = halfFloat ? MathUtils.toHalfFloat(direction[0]) : direction[0];
+		data[start + 3 * 4 + 1] = halfFloat ? MathUtils.toHalfFloat(direction[1]) : direction[1];
+		data[start + 3 * 4 + 2] = halfFloat ? MathUtils.toHalfFloat(direction[2]) : direction[2];
+		data[start + 3 * 4 + 3] = halfFloat ? MathUtils.toHalfFloat(coneCos) : coneCos;
 	}
 
 }
@@ -385,57 +387,6 @@ function getCellsRange(lightSphere, cellsTable, cellsTransform, cellsRange) {
 	cellsRange.max.set(xEnd, yEnd, zEnd);
 
 	return true;
-}
-
-const _floatView = new Float32Array(1);
-const _int32View = new Int32Array(_floatView.buffer);
-
-/**
- * Packs a float to a 16-bit half-float representation used by the GPU.
- * @param {number} value - The float value to pack.
- * @returns {number} The packed value.
- */
-function float2Half(value) {
-	// based on https://esdiscuss.org/topic/float16array
-	// This method is faster than the OpenEXR implementation (very often
-	// used, eg. in Ogre), with the additional benefit of rounding, inspired
-	// by James Tursa?s half-precision code.
-	_floatView[0] = value;
-	const x = _int32View[0];
-
-	let bits = (x >> 16) & 0x8000; // Get the sign
-	let m = (x >> 12) & 0x07ff; // Keep one extra bit for rounding
-	const e = (x >> 23) & 0xff; // Using int is faster here
-
-	// If zero, or denormal, or exponent underflows too much for a denormal half, return signed zero.
-	if (e < 103) {
-		return bits;
-	}
-
-	// If NaN, return NaN. If Inf or exponent overflow, return Inf.
-	if (e > 142) {
-		bits |= 0x7c00;
-
-		// If exponent was 0xff and one mantissa bit was set, it means NaN,
-		// not Inf, so make sure we set one mantissa bit too.
-		bits |= ((e === 255) ? 0 : 1) && (x & 0x007fffff);
-		return bits;
-	}
-
-	// If exponent underflows but not too much, return a denormal
-	if (e < 113) {
-		m |= 0x0800;
-
-		// Extra rounding may overflow and set mantissa to 0 and exponent to 1, which is OK.
-		bits |= (m >> (114 - e)) + ((m >> (113 - e)) & 1);
-		return bits;
-	}
-
-	bits |= ((e - 112) << 10) | (m >> 1);
-
-	// Extra rounding. An overflow will set mantissa to 0 and increment the exponent, which is OK.
-	bits += m & 1;
-	return bits;
 }
 
 export { ClusteredLightingManager };

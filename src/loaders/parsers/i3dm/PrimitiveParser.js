@@ -1,6 +1,6 @@
 import { Geometry, /* PBRMaterial, */ VERTEX_COLOR, SHADING_TYPE, PointsMaterial, Material, BasicMaterial } from 't3d';
-import { GLTFUtils } from '../../../libs/glTF/GLTFUtils.js';
-import { ATTRIBUTES, ACCESSOR_COMPONENT_TYPES, WEBGL_DRAW_MODES } from '../../../libs/glTF/Constants.js';
+import { GLTFUtils } from 't3d/addons/loaders/glTF/GLTFUtils.js';
+import { ATTRIBUTES, ACCESSOR_COMPONENT_TYPES, WEBGL_DRAW_MODES } from 't3d/addons/loaders/glTF/Constants.js';
 
 import { InstancedPBRMaterial } from '../../../materials/InstancedPBRMaterial.js'; // @parser-modification - instanced materials
 

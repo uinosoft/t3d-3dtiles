@@ -1,22 +1,22 @@
-import { GLTFLoader } from '../libs/glTF/GLTFLoader.js';
+import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
 
-import { ReferenceParser } from '../libs/glTF/parsers/ReferenceParser.js';
-import { Validator } from '../libs/glTF/parsers/Validator.js';
-import { BufferParser } from '../libs/glTF/parsers/BufferParser.js';
-import { BufferViewParser } from '../libs/glTF/parsers/BufferViewParser.js';
-import { ImageParser } from '../libs/glTF/parsers/ImageParser.js';
-import { TextureParser } from '../libs/glTF/parsers/TextureParser.js';
-import { AccessorParser } from '../libs/glTF/parsers/AccessorParser.js';
-import { PrimitiveParser } from '../libs/glTF/parsers/PrimitiveParser.js';
-import { NodeParser } from '../libs/glTF/parsers/NodeParser.js';
-import { SkinParser } from '../libs/glTF/parsers/SkinParser.js';
-import { SceneParser } from '../libs/glTF/parsers/SceneParser.js';
-import { AnimationParser } from '../libs/glTF/parsers/AnimationParser.js';
+import { ReferenceParser } from 't3d/addons/loaders/glTF/parsers/ReferenceParser.js';
+import { Validator } from 't3d/addons/loaders/glTF/parsers/Validator.js';
+import { BufferParser } from 't3d/addons/loaders/glTF/parsers/BufferParser.js';
+import { BufferViewParser } from 't3d/addons/loaders/glTF/parsers/BufferViewParser.js';
+import { ImageParser } from 't3d/addons/loaders/glTF/parsers/ImageParser.js';
+import { TextureParser } from 't3d/addons/loaders/glTF/parsers/TextureParser.js';
+import { MaterialParser } from 't3d/addons/loaders/glTF/parsers/MaterialParser.js';
+import { AccessorParser } from 't3d/addons/loaders/glTF/parsers/AccessorParser.js';
+import { PrimitiveParser } from 't3d/addons/loaders/glTF/parsers/PrimitiveParser.js';
+import { NodeParser } from 't3d/addons/loaders/glTF/parsers/NodeParser.js';
+import { SkinParser } from 't3d/addons/loaders/glTF/parsers/SkinParser.js';
+import { SceneParser } from 't3d/addons/loaders/glTF/parsers/SceneParser.js';
+import { AnimationParser } from 't3d/addons/loaders/glTF/parsers/AnimationParser.js';
 
 import { HeaderParser } from './parsers/HeaderParser.js';
 import { TableParser } from './parsers/TableParser.js';
 import { B3DMParser } from './parsers/b3dm/B3DMParser.js';
-import { MaterialParser } from './parsers/b3dm/MaterialParser.js';
 import { B3DMRootParser } from './parsers/b3dm/B3DMRootParser.js';
 
 import { KHR_techniques_webgl } from './extensions/KHR_techniques_webgl.js';
@@ -37,7 +37,7 @@ export class B3DMLoader extends GLTFLoader {
 			BufferViewParser,
 			ImageParser,
 			TextureParser,
-			MaterialParser, // replace MaterialParser
+			MaterialParser,
 			AccessorParser,
 			PrimitiveParser,
 			NodeParser,
@@ -48,6 +48,8 @@ export class B3DMLoader extends GLTFLoader {
 		]);
 
 		this.extensions.set('KHR_techniques_webgl', KHR_techniques_webgl);
+
+		this.autoParseConfig.materials.push('KHR_techniques_webgl');
 	}
 
 }

@@ -1,16 +1,16 @@
-import { GLTFLoader } from '../libs/glTF/GLTFLoader.js';
+import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
 
-import { ReferenceParser } from '../libs/glTF/parsers/ReferenceParser.js';
-import { Validator } from '../libs/glTF/parsers/Validator.js';
-import { BufferParser } from '../libs/glTF/parsers/BufferParser.js';
-import { BufferViewParser } from '../libs/glTF/parsers/BufferViewParser.js';
-import { ImageParser } from '../libs/glTF/parsers/ImageParser.js';
-import { TextureParser } from '../libs/glTF/parsers/TextureParser.js';
-import { AccessorParser } from '../libs/glTF/parsers/AccessorParser.js';
-import { NodeParser } from '../libs/glTF/parsers/NodeParser.js';
-import { SkinParser } from '../libs/glTF/parsers/SkinParser.js';
-import { SceneParser } from '../libs/glTF/parsers/SceneParser.js';
-import { AnimationParser } from '../libs/glTF/parsers/AnimationParser.js';
+import { ReferenceParser } from 't3d/addons/loaders/glTF/parsers/ReferenceParser.js';
+import { Validator } from 't3d/addons/loaders/glTF/parsers/Validator.js';
+import { BufferParser } from 't3d/addons/loaders/glTF/parsers/BufferParser.js';
+import { BufferViewParser } from 't3d/addons/loaders/glTF/parsers/BufferViewParser.js';
+import { ImageParser } from 't3d/addons/loaders/glTF/parsers/ImageParser.js';
+import { TextureParser } from 't3d/addons/loaders/glTF/parsers/TextureParser.js';
+import { AccessorParser } from 't3d/addons/loaders/glTF/parsers/AccessorParser.js';
+import { NodeParser } from 't3d/addons/loaders/glTF/parsers/NodeParser.js';
+import { SkinParser } from 't3d/addons/loaders/glTF/parsers/SkinParser.js';
+import { SceneParser } from 't3d/addons/loaders/glTF/parsers/SceneParser.js';
+import { AnimationParser } from 't3d/addons/loaders/glTF/parsers/AnimationParser.js';
 
 import { HeaderParser } from './parsers/HeaderParser.js';
 import { TableParser } from './parsers/TableParser.js';
@@ -55,6 +55,8 @@ export class I3DMLoader extends GLTFLoader {
 		this.extensions.set('KHR_materials_unlit', KHR_materials_unlit_i);
 		this.extensions.set('KHR_materials_pbrSpecularGlossiness', KHR_materials_pbrSpecularGlossiness_i);
 		this.extensions.set('KHR_materials_clearcoat', KHR_materials_clearcoat_i);
+
+		this.autoParseConfig.materials.push('KHR_techniques_webgl');
 	}
 
 }

@@ -121,7 +121,6 @@ export class Tiles3D extends Object3D {
 					} else {
 						ellipsoid.radius.set(1, 1, 1);
 					}
-					console.log(extensions);
 				}
 
 				this.preprocessTileSet(root, processedUrl);

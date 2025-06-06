@@ -1,4 +1,4 @@
-import { GLTFLoader } from '../libs/glTF/GLTFLoader.js';
+import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
 
 import { IndexParser } from './parsers/gltf/IndexParser.js';
 

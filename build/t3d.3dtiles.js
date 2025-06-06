@@ -2149,12 +2149,6 @@
 		MASK: 'MASK',
 		BLEND: 'BLEND'
 	};
-	const PATH_PROPERTIES = {
-		scale: 'scale',
-		translation: 'position',
-		rotation: 'quaternion',
-		weights: 'morphTargetInfluences'
-	};
 	const ACCESSOR_TYPE_SIZES = {
 		'SCALAR': 1,
 		'VEC2': 2,
@@ -2255,6 +2249,11 @@
 				texture.version++;
 				texture.name = textureName || texture.image.__name || `texture_${index}`;
 				texture.flipY = false;
+				const {
+					mimeType,
+					uri
+				} = gltf.images[sourceIndex];
+				texture.userData.mimeType = mimeType || getImageURIMimeType(uri);
 				const samplers = gltf.samplers || {};
 				parseSampler(texture, samplers[sampler]);
 				textureCache.set(cacheKey, texture);
@@ -2278,7 +2277,22 @@
 		texture.wrapT = WEBGL_WRAPPINGS[wrapT] || t3d.TEXTURE_WRAP.REPEAT;
 	}
 
-	let MaterialParser$2 = class MaterialParser {
+	// only for jpeg, png, webp
+	// because other should get mimeType from glTF image object
+	function getImageURIMimeType(uri) {
+		if (uri.startsWith('data:image/')) {
+			// early return for data URIs
+			if (uri.startsWith('data:image/jpeg')) return 'image/jpeg';
+			if (uri.startsWith('data:image/webp')) return 'image/webp';
+			return 'image/png';
+		} else {
+			if (uri.search(/\.jpe?g($|\?)/i) > 0) return 'image/jpeg';
+			if (uri.search(/\.webp($|\?)/i) > 0) return 'image/webp';
+			return 'image/png';
+		}
+	}
+
+	let MaterialParser$1 = class MaterialParser {
 		static parse(context, loader) {
 			const {
 				gltf,
@@ -2286,9 +2300,6 @@
 			} = context;
 			if (!gltf.materials) return;
 			const transformExt = loader.extensions.get('KHR_texture_transform');
-			const unlitExt = loader.extensions.get('KHR_materials_unlit');
-			const pbrSpecularGlossinessExt = loader.extensions.get('KHR_materials_pbrSpecularGlossiness');
-			const clearcoatExt = loader.extensions.get('KHR_materials_clearcoat');
 			const materials = [];
 			for (let i = 0; i < gltf.materials.length; i++) {
 				const {
@@ -2303,24 +2314,33 @@
 					doubleSided,
 					name = ''
 				} = gltf.materials[i];
+				let material = null;
+				const materialExtNames = loader.autoParseConfig.materials;
+
+				// TODO: refactor invoke method
+				for (let j = 0; j < materialExtNames.length; j++) {
+					const extName = materialExtNames[j];
+					const extParams = extensions[extName];
+					const ext = loader.extensions.get(extName);
+					if (extParams && ext && ext.getMaterial) {
+						material = ext.getMaterial();
+						break;
+					}
+				}
+				material = material || new t3d.PBRMaterial();
+				material.name = name;
+				for (let j = 0; j < materialExtNames.length; j++) {
+					const extName = materialExtNames[j];
+					const extParams = extensions[extName];
+					const ext = loader.extensions.get(extName);
+					if (extParams && ext && ext.parseParams) {
+						ext.parseParams(material, extParams, textures, transformExt);
+					}
+				}
 				const {
 					KHR_materials_unlit,
-					KHR_materials_pbrSpecularGlossiness,
-					KHR_materials_clearcoat
+					KHR_materials_pbrSpecularGlossiness
 				} = extensions;
-				let material = null;
-				if (KHR_materials_unlit && unlitExt) {
-					material = unlitExt.getMaterial();
-				} else if (KHR_materials_pbrSpecularGlossiness && pbrSpecularGlossinessExt) {
-					material = pbrSpecularGlossinessExt.getMaterial();
-					pbrSpecularGlossinessExt.parseParams(material, KHR_materials_pbrSpecularGlossiness, textures, transformExt);
-				} else if (KHR_materials_clearcoat && clearcoatExt) {
-					material = clearcoatExt.getMaterial();
-					clearcoatExt.parseParams(material, KHR_materials_clearcoat, textures);
-				} else {
-					material = new t3d.PBRMaterial();
-				}
-				material.name = name;
 				if (pbrMetallicRoughness) {
 					const {
 						baseColorFactor,
@@ -2971,7 +2991,7 @@
 	}
 
 	class AnimationParser {
-		static parse(context) {
+		static parse(context, loader) {
 			const {
 				gltf,
 				nodes,
@@ -2981,73 +3001,87 @@
 				animations
 			} = gltf;
 			if (!animations) return;
+			const pointerExt = loader.extensions.get('KHR_animation_pointer');
 			const animationClips = animations.map((gltfAnimation, index) => {
 				const {
 					channels,
 					samplers,
 					name = `animation_${index}`
 				} = gltfAnimation;
-				const tracks = [];
+				const trackInfos = [];
 				let duration = 0;
 				for (let i = 0; i < channels.length; i++) {
 					const gltfChannel = channels[i];
 					const gltfSampler = samplers[gltfChannel.sampler];
-					if (gltfSampler) {
-						const target = gltfChannel.target;
-						const name = target.node !== undefined ? target.node : target.id; // Note: target.id is deprecated.
-						const inputAccessor = accessors[gltfSampler.input];
-						const outputAccessor = accessors[gltfSampler.output];
-						const node = nodes[name];
-						if (!node) continue;
-						node.updateMatrix();
-						node.matrixAutoUpdate = true;
-						let TypedKeyframeTrack;
-						switch (PATH_PROPERTIES[target.path]) {
-							case PATH_PROPERTIES.rotation:
-								TypedKeyframeTrack = t3d.QuaternionKeyframeTrack;
-								break;
-							case PATH_PROPERTIES.weights:
-								TypedKeyframeTrack = t3d.NumberKeyframeTrack;
-								break;
-							case PATH_PROPERTIES.position:
-							case PATH_PROPERTIES.scale:
-							default:
-								TypedKeyframeTrack = t3d.VectorKeyframeTrack;
-								break;
-						}
-						if (!TypedKeyframeTrack) {
-							continue;
-						}
-						const input = new inputAccessor.buffer.array.constructor(inputAccessor.buffer.array);
-						const output = new Float32Array(outputAccessor.buffer.array);
-						if (outputAccessor.normalized) {
-							const scale = GLTFUtils.getNormalizedComponentScale(outputAccessor.buffer.array.constructor);
-							for (let j = 0, jl = output.length; j < jl; j++) {
-								output[j] *= scale;
-							}
-						}
-						const targetNodes = [];
-						if (PATH_PROPERTIES[target.path] === PATH_PROPERTIES.weights) {
-							// Node may be a Object3D (glTF mesh with several primitives) or a Mesh.
-							node.traverse(function (object) {
-								if (object.isMesh && object.morphTargetInfluences) {
-									targetNodes.push(object);
-								}
-							});
-						} else {
-							targetNodes.push(node);
-						}
-						for (let j = 0, jl = targetNodes.length; j < jl; j++) {
-							const interpolant = getInterpolant(gltfSampler.interpolation, TypedKeyframeTrack === t3d.QuaternionKeyframeTrack);
-							const track = new TypedKeyframeTrack(targetNodes[j], PATH_PROPERTIES[target.path], input, output, interpolant);
-							tracks.push(track);
-						}
-						const maxTime = input[input.length - 1];
-						if (duration < maxTime) {
-							duration = maxTime;
+					if (!gltfSampler) continue;
+					const targetDef = gltfChannel.target;
+					const inputAccessor = accessors[gltfSampler.input];
+					const input = new inputAccessor.buffer.array.constructor(inputAccessor.buffer.array);
+					const outputAccessor = accessors[gltfSampler.output];
+					const output = new Float32Array(outputAccessor.buffer.array);
+					if (outputAccessor.normalized) {
+						const scale = GLTFUtils.getNormalizedComponentScale(outputAccessor.buffer.array.constructor);
+						for (let j = 0, jl = output.length; j < jl; j++) {
+							output[j] *= scale;
 						}
 					}
+					duration = Math.max(duration, input[input.length - 1]);
+					if (pointerExt && targetDef.extensions && targetDef.extensions['KHR_animation_pointer']) {
+						pointerExt.getTrackInfos(context, targetDef.extensions['KHR_animation_pointer'], input, output, gltfSampler.interpolation, trackInfos);
+					} else {
+						const target = nodes[targetDef.node !== undefined ? targetDef.node : targetDef.id]; // Note: targetDef.id is deprecated.
+
+						if (!target) continue;
+						let TypedKeyframeTrack, propertyPath;
+						if (targetDef.path === 'rotation') {
+							TypedKeyframeTrack = t3d.QuaternionKeyframeTrack;
+							propertyPath = 'quaternion';
+						} else if (targetDef.path === 'weights') {
+							TypedKeyframeTrack = t3d.NumberKeyframeTrack;
+							propertyPath = 'morphTargetInfluences';
+						} else if (targetDef.path === 'translation') {
+							TypedKeyframeTrack = t3d.VectorKeyframeTrack;
+							propertyPath = 'position';
+						} else if (targetDef.path === 'scale') {
+							TypedKeyframeTrack = t3d.VectorKeyframeTrack;
+							propertyPath = 'scale';
+						} else {
+							continue;
+						}
+						trackInfos.push({
+							TypedKeyframeTrack,
+							target,
+							propertyPath,
+							times: input,
+							values: output,
+							interpolation: gltfSampler.interpolation
+						});
+					}
 				}
+				const tracks = [];
+				trackInfos.forEach(trackInfo => {
+					const {
+						TypedKeyframeTrack,
+						target,
+						propertyPath,
+						times,
+						values,
+						interpolation
+					} = trackInfo;
+					const interpolant = getInterpolant(interpolation, TypedKeyframeTrack === t3d.QuaternionKeyframeTrack);
+					if (propertyPath === 'morphTargetInfluences') {
+						// node may be a Object3D (glTF mesh with several primitives) or a Mesh.
+						target.traverse(object => {
+							if (object.isMesh && object.morphTargetInfluences) {
+								const track = new TypedKeyframeTrack(object, propertyPath, times, values, interpolant);
+								tracks.push(track);
+							}
+						});
+					} else {
+						const track = new TypedKeyframeTrack(target, propertyPath, times, values, interpolant);
+						tracks.push(track);
+					}
+				});
 				return new t3d.KeyframeClip(name, tracks, duration);
 			});
 			context.animations = animationClips;
@@ -3216,7 +3250,7 @@
 	}
 
 	/**
-	 * Clearcoat Materials Extension
+	 * KHR_materials_clearcoat extension
 	 * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_clearcoat
 	 */
 	class KHR_materials_clearcoat {
@@ -3224,6 +3258,7 @@
 			return new t3d.PBRMaterial();
 		}
 		static parseParams(material, extension, textures) {
+			if (material.constructor !== t3d.PBRMaterial) return;
 			const {
 				clearcoatFactor,
 				clearcoatTexture,
@@ -3268,6 +3303,7 @@
 			return new t3d.PBR2Material();
 		}
 		static parseParams(material, params, textures, transformExt) {
+			if (material.constructor !== t3d.PBR2Material) return;
 			const {
 				diffuseFactor,
 				diffuseTexture,
@@ -3331,38 +3367,122 @@
 			if (!textureDef.extensions) return;
 			const extDef = textureDef.extensions.KHR_texture_transform;
 			if (!extDef) return;
-			let offsetX = 0,
-				offsetY = 0,
-				repeatX = 1,
-				repeatY = 1,
-				rotation = 0;
-			if (extDef.offset !== undefined) {
-				offsetX = extDef.offset[0];
-				offsetY = extDef.offset[1];
-			}
-			if (extDef.rotation !== undefined) {
-				rotation = extDef.rotation;
-			}
-			if (extDef.scale !== undefined) {
-				repeatX = extDef.scale[0];
-				repeatY = extDef.scale[1];
-			}
-			const matrix = material[mapType + 'Transform'];
-			if (matrix) {
-				matrix.setUvTransform(offsetX, offsetY, repeatX, repeatY, rotation, 0, 0);
-			}
 
 			// If texCoord is present, it overrides the texture's texCoord
 			if (extDef.texCoord !== undefined) {
 				material[mapType + 'Coord'] = extDef.texCoord;
 			}
+			const transform = material[mapType + 'Transform'];
+			if (!transform) return;
+			if (extDef.offset !== undefined) {
+				transform.offset.fromArray(extDef.offset);
+			}
+			if (extDef.rotation !== undefined) {
+				transform.rotation = extDef.rotation;
+			}
+			if (extDef.scale !== undefined) {
+				transform.scale.fromArray(extDef.scale);
+			}
+			transform.updateMatrix();
 		}
 	}
 
-	const DefaultParsePipeline = [IndexParser$1, ReferenceParser, Validator, BufferParser, BufferViewParser, ImageParser, TextureParser, MaterialParser$2, AccessorParser, PrimitiveParser$1, NodeParser, SkinParser, SceneParser, AnimationParser];
+	class KHR_animation_pointer {
+		static getTrackInfos(context, extensionDef, input, output, interpolation, trackInfos) {
+			const {
+				pointer
+			} = extensionDef;
+			const segments = pointer.replace(/^\//, '').split('/');
+			const type = segments[0];
+			const index = parseInt(segments[1]);
+			const property = segments[segments.length - 1];
+			const searchArray = context[type];
+			if (!searchArray) return;
+			const target = searchArray[index];
+			if (!target) return;
+			let TypedKeyframeTrack, propertyPath, TypedKeyframeTrack2, propertyPath2;
+			if (property === 'rotation') {
+				TypedKeyframeTrack = t3d.QuaternionKeyframeTrack;
+				propertyPath = 'quaternion';
+			} else if (property === 'weights') {
+				TypedKeyframeTrack = t3d.NumberKeyframeTrack;
+				propertyPath = 'morphTargetInfluences';
+			} else if (property === 'translation') {
+				TypedKeyframeTrack = t3d.VectorKeyframeTrack;
+				propertyPath = 'position';
+			} else if (property === 'scale') {
+				TypedKeyframeTrack = t3d.VectorKeyframeTrack;
+				propertyPath = 'scale';
+			} else if (property === 'baseColorFactor') {
+				TypedKeyframeTrack = t3d.ColorKeyframeTrack;
+				propertyPath = 'diffuse';
+				TypedKeyframeTrack2 = t3d.NumberKeyframeTrack;
+				propertyPath2 = 'opacity';
+			} else if (property === 'metallicFactor') {
+				TypedKeyframeTrack = t3d.NumberKeyframeTrack;
+				propertyPath = 'metalness';
+			} else if (property === 'roughnessFactor') {
+				TypedKeyframeTrack = t3d.NumberKeyframeTrack;
+				propertyPath = 'roughness';
+			} else if (property === 'emissiveFactor') {
+				TypedKeyframeTrack = t3d.VectorKeyframeTrack;
+				propertyPath = 'emissive';
+			} else if (segments[segments.length - 2] === 'KHR_texture_transform') {
+				TypedKeyframeTrack = t3d.VectorKeyframeTrack;
+				const textureProperty = segments[segments.length - 4];
+				if (textureProperty === 'baseColorTexture') {
+					propertyPath = 'diffuseMapTransform.' + property;
+				} else if (textureProperty === 'emissiveTexture') {
+					propertyPath = 'emissiveMapTransform.' + property;
+				} else {
+					return;
+				}
+			} else {
+				return;
+			}
+			if (property === 'baseColorFactor') {
+				// Separate the alpha channel from the color
+				const color3Output = new Float32Array(output.length / 4 * 3);
+				const alphaOutput = new Float32Array(output.length / 4);
+				for (let i = 0; i < output.length / 4; i++) {
+					color3Output[i * 3] = output[i * 4];
+					color3Output[i * 3 + 1] = output[i * 4 + 1];
+					color3Output[i * 3 + 2] = output[i * 4 + 2];
+					alphaOutput[i] = output[i * 4 + 3];
+				}
+				trackInfos.push({
+					TypedKeyframeTrack,
+					target,
+					propertyPath,
+					times: input,
+					values: color3Output,
+					interpolation
+				});
+				trackInfos.push({
+					TypedKeyframeTrack: TypedKeyframeTrack2,
+					target,
+					propertyPath: propertyPath2,
+					times: input,
+					values: alphaOutput,
+					interpolation
+				});
+			} else {
+				trackInfos.push({
+					TypedKeyframeTrack,
+					target,
+					propertyPath,
+					times: input,
+					values: output,
+					interpolation
+				});
+			}
+		}
+	}
+
+	const DefaultParsePipeline = [IndexParser$1, ReferenceParser, Validator, BufferParser, BufferViewParser, ImageParser, TextureParser, MaterialParser$1, AccessorParser, PrimitiveParser$1, NodeParser, SkinParser, SceneParser, AnimationParser];
 	const DefaultExtensions = new Map([['EXT_meshopt_compression', EXT_meshopt_compression], ['KHR_draco_mesh_compression', KHR_draco_mesh_compression], ['KHR_lights_punctual', KHR_lights_punctual], ['KHR_materials_clearcoat', KHR_materials_clearcoat], ['KHR_materials_pbrSpecularGlossiness', KHR_materials_pbrSpecularGlossiness], ['KHR_materials_unlit', KHR_materials_unlit], ['KHR_mesh_quantization', {}],
 	// This is supported by default
-	['KHR_texture_basisu', KHR_texture_basisu], ['KHR_texture_transform', KHR_texture_transform]]);
+	['KHR_texture_basisu', KHR_texture_basisu], ['KHR_texture_transform', KHR_texture_transform], ['KHR_animation_pointer', KHR_animation_pointer]]);
 	class GLTFLoader {
 		constructor(manager = t3d.DefaultLoadingManager, parsers = DefaultParsePipeline, extensions = DefaultExtensions) {
 			this.manager = manager;
@@ -3374,6 +3494,11 @@
 			// If set false, need add Promise.catch to catch errors.
 			this.autoLogError = true;
 			this.extensions = new Map(extensions);
+
+			// Indicate which extensions can be parsed in a uniform way.
+			this.autoParseConfig = {
+				materials: ['KHR_materials_clearcoat', 'KHR_materials_pbrSpecularGlossiness', 'KHR_materials_unlit', 'KHR_materials_transmission', 'KHR_materials_ior', 'KHR_materials_volume', 'KHR_materials_dispersion']
+			};
 			this._parsers = parsers.slice(0);
 			this._dracoLoader = null;
 			this._meshoptDecoder = null;
@@ -3721,134 +3846,6 @@
 		}
 	}
 
-	let MaterialParser$1 = class MaterialParser {
-		static parse(context, loader) {
-			const {
-				gltf,
-				textures
-			} = context;
-			if (!gltf.materials) return;
-			const transformExt = loader.extensions.get('KHR_texture_transform');
-			const unlitExt = loader.extensions.get('KHR_materials_unlit');
-			const pbrSpecularGlossinessExt = loader.extensions.get('KHR_materials_pbrSpecularGlossiness');
-			const clearcoatExt = loader.extensions.get('KHR_materials_clearcoat');
-			const techniquesExt = loader.extensions.get('KHR_techniques_webgl');
-			const materials = [];
-			for (let i = 0; i < gltf.materials.length; i++) {
-				const {
-					extensions = {},
-					pbrMetallicRoughness,
-					normalTexture,
-					occlusionTexture,
-					emissiveTexture,
-					emissiveFactor,
-					alphaMode,
-					alphaCutoff,
-					doubleSided,
-					name = ''
-				} = gltf.materials[i];
-				const {
-					KHR_materials_unlit,
-					KHR_materials_pbrSpecularGlossiness,
-					KHR_materials_clearcoat,
-					KHR_techniques_webgl
-				} = extensions;
-				let material = null;
-				if (KHR_materials_unlit && unlitExt) {
-					material = unlitExt.getMaterial();
-				} else if (KHR_materials_pbrSpecularGlossiness && pbrSpecularGlossinessExt) {
-					material = pbrSpecularGlossinessExt.getMaterial();
-					pbrSpecularGlossinessExt.parseParams(material, KHR_materials_pbrSpecularGlossiness, textures, transformExt);
-				} else if (KHR_materials_clearcoat && clearcoatExt) {
-					material = clearcoatExt.getMaterial();
-					clearcoatExt.parseParams(material, KHR_materials_clearcoat, textures);
-				} else if (KHR_techniques_webgl && techniquesExt) {
-					// @parser-modification - add KHR_techniques_webgl
-					material = techniquesExt.getMaterial();
-					techniquesExt.parseParams(material, KHR_techniques_webgl, textures);
-				} else {
-					material = new t3d.PBRMaterial();
-				}
-				material.name = name;
-				if (pbrMetallicRoughness) {
-					const {
-						baseColorFactor,
-						baseColorTexture,
-						metallicFactor,
-						roughnessFactor,
-						metallicRoughnessTexture
-					} = pbrMetallicRoughness;
-					if (Array.isArray(baseColorFactor)) {
-						material.diffuse.fromArray(baseColorFactor);
-						material.opacity = baseColorFactor[3] !== undefined ? baseColorFactor[3] : 1;
-					}
-					if (baseColorTexture) {
-						material.diffuseMap = textures[baseColorTexture.index];
-						material.diffuseMapCoord = baseColorTexture.texCoord || 0;
-						if (material.diffuseMap) {
-							material.diffuseMap.encoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
-							transformExt && transformExt.handleMaterialMap(material, 'diffuseMap', baseColorTexture);
-						}
-					}
-					if (!KHR_materials_unlit && !KHR_materials_pbrSpecularGlossiness) {
-						material.metalness = metallicFactor !== undefined ? metallicFactor : 1;
-						material.roughness = roughnessFactor !== undefined ? roughnessFactor : 1;
-						if (metallicRoughnessTexture) {
-							material.metalnessMap = textures[metallicRoughnessTexture.index];
-							material.roughnessMap = textures[metallicRoughnessTexture.index];
-							// metallicRoughnessTexture transform not supported yet
-						}
-					}
-				}
-				if (emissiveFactor) {
-					material.emissive.fromArray(emissiveFactor);
-				}
-				if (emissiveTexture) {
-					material.emissiveMap = textures[emissiveTexture.index];
-					material.emissiveMapCoord = emissiveTexture.texCoord || 0;
-					if (material.emissiveMap) {
-						material.emissiveMap.encoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
-						transformExt && transformExt.handleMaterialMap(material, 'emissiveMap', emissiveTexture);
-					}
-				}
-				if (occlusionTexture) {
-					material.aoMap = textures[occlusionTexture.index];
-					material.aoMapCoord = occlusionTexture.texCoord || 0;
-					if (occlusionTexture.strength !== undefined) {
-						material.aoMapIntensity = occlusionTexture.strength;
-					}
-					if (material.aoMap) {
-						transformExt && transformExt.handleMaterialMap(material, 'aoMap', occlusionTexture);
-					}
-				}
-				if (!KHR_materials_unlit) {
-					if (normalTexture) {
-						material.normalMap = textures[normalTexture.index];
-						material.normalScale.set(1, -1);
-						if (normalTexture.scale !== undefined) {
-							// fix flip y for normal map
-							// https://github.com/mrdoob/three.js/issues/11438#issuecomment-507003995
-							material.normalScale.set(normalTexture.scale, -normalTexture.scale);
-						}
-
-						// normal map transform not supported yet
-					}
-				}
-				material.side = doubleSided === true ? t3d.DRAW_SIDE.DOUBLE : t3d.DRAW_SIDE.FRONT;
-				if (alphaMode === ALPHA_MODES.BLEND) {
-					material.transparent = true;
-				} else {
-					material.transparent = false;
-					if (alphaMode === ALPHA_MODES.MASK) {
-						material.alphaTest = alphaCutoff !== undefined ? alphaCutoff : 0.5;
-					}
-				}
-				materials[i] = material;
-			}
-			context.materials = materials;
-		}
-	};
-
 	class B3DMRootParser {
 		static parse(context, loader) {
 			const {
@@ -3907,11 +3904,10 @@
 			// insert TableParser
 			B3DMParser,
 			// insert B3DMParser
-			ReferenceParser, Validator, BufferParser, BufferViewParser, ImageParser, TextureParser, MaterialParser$1,
-			// replace MaterialParser
-			AccessorParser, PrimitiveParser$1, NodeParser, SkinParser, SceneParser, AnimationParser, B3DMRootParser // insert B3DMRootParser
+			ReferenceParser, Validator, BufferParser, BufferViewParser, ImageParser, TextureParser, MaterialParser$1, AccessorParser, PrimitiveParser$1, NodeParser, SkinParser, SceneParser, AnimationParser, B3DMRootParser // insert B3DMRootParser
 			]);
 			this.extensions.set('KHR_techniques_webgl', KHR_techniques_webgl);
+			this.autoParseConfig.materials.push('KHR_techniques_webgl');
 		}
 	}
 
@@ -3988,10 +3984,6 @@
 			} = context;
 			if (!gltf.materials) return;
 			const transformExt = loader.extensions.get('KHR_texture_transform');
-			const unlitExt = loader.extensions.get('KHR_materials_unlit');
-			const pbrSpecularGlossinessExt = loader.extensions.get('KHR_materials_pbrSpecularGlossiness');
-			const clearcoatExt = loader.extensions.get('KHR_materials_clearcoat');
-			const techniquesExt = loader.extensions.get('KHR_techniques_webgl');
 			const materials = [];
 			for (let i = 0; i < gltf.materials.length; i++) {
 				const {
@@ -4006,29 +3998,33 @@
 					doubleSided,
 					name = ''
 				} = gltf.materials[i];
+				let material = null;
+				const materialExtNames = loader.autoParseConfig.materials;
+
+				// TODO: refactor invoke method
+				for (let j = 0; j < materialExtNames.length; j++) {
+					const extName = materialExtNames[j];
+					const extParams = extensions[extName];
+					const ext = loader.extensions.get(extName);
+					if (extParams && ext && ext.getMaterial) {
+						material = ext.getMaterial();
+						break;
+					}
+				}
+				material = material || new InstancedPBRMaterial(); // @parser-modification - instanced materials
+				material.name = name;
+				for (let j = 0; j < materialExtNames.length; j++) {
+					const extName = materialExtNames[j];
+					const extParams = extensions[extName];
+					const ext = loader.extensions.get(extName);
+					if (extParams && ext && ext.parseParams) {
+						ext.parseParams(material, extParams, textures, transformExt);
+					}
+				}
 				const {
 					KHR_materials_unlit,
-					KHR_materials_pbrSpecularGlossiness,
-					KHR_materials_clearcoat,
-					KHR_techniques_webgl
+					KHR_materials_pbrSpecularGlossiness
 				} = extensions;
-				let material = null;
-				if (KHR_materials_unlit && unlitExt) {
-					material = unlitExt.getMaterial();
-				} else if (KHR_materials_pbrSpecularGlossiness && pbrSpecularGlossinessExt) {
-					material = pbrSpecularGlossinessExt.getMaterial();
-					pbrSpecularGlossinessExt.parseParams(material, KHR_materials_pbrSpecularGlossiness, textures, transformExt);
-				} else if (KHR_materials_clearcoat && clearcoatExt) {
-					material = clearcoatExt.getMaterial();
-					clearcoatExt.parseParams(material, KHR_materials_clearcoat, textures);
-				} else if (KHR_techniques_webgl && techniquesExt) {
-					// @parser-modification - add KHR_techniques_webgl
-					material = techniquesExt.getMaterial();
-					techniquesExt.parseParams(material, KHR_techniques_webgl, textures);
-				} else {
-					material = new InstancedPBRMaterial(); // @parser-modification - instanced materials
-				}
-				material.name = name;
 				if (pbrMetallicRoughness) {
 					const {
 						baseColorFactor,
@@ -4512,16 +4508,12 @@
 
 	class KHR_materials_pbrSpecularGlossiness_i extends KHR_materials_pbrSpecularGlossiness {
 		static getMaterial() {
-			const material = new InstancedPBRMaterial();
+			const material = new InstancedPBRMaterial(); // fallback to InstancedPBRMaterial
 			material.specular = new t3d.Color3(0x111111);
 			return material;
 		}
 	}
 
-	/**
-	 * Clearcoat Materials Extension
-	 * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_clearcoat
-	 */
 	class KHR_materials_clearcoat_i extends KHR_materials_clearcoat {
 		static getMaterial() {
 			return new InstancedPBRMaterial();
@@ -4549,6 +4541,7 @@
 			this.extensions.set('KHR_materials_unlit', KHR_materials_unlit_i);
 			this.extensions.set('KHR_materials_pbrSpecularGlossiness', KHR_materials_pbrSpecularGlossiness_i);
 			this.extensions.set('KHR_materials_clearcoat', KHR_materials_clearcoat_i);
+			this.autoParseConfig.materials.push('KHR_techniques_webgl');
 		}
 	}
 
@@ -5275,7 +5268,6 @@
 					} else {
 						ellipsoid.radius.set(1, 1, 1);
 					}
-					console.log(extensions);
 				}
 				this.preprocessTileSet(root, processedUrl);
 				return root;
@@ -5770,31 +5762,31 @@
 	class Raycaster {
 		/**
 		 * This creates a new raycaster object.
-		 * @param {t3d.Vector3} origin — The origin vector where the ray casts from.
-		 * @param {t3d.Vector3} direction — The direction vector that gives direction to the ray. Should be normalized.
+		 * @param {Vector3} origin — The origin vector where the ray casts from.
+		 * @param {Vector3} direction — The direction vector that gives direction to the ray. Should be normalized.
 		 */
 		constructor(origin, direction) {
 			/**
 			 * The Ray used for the raycasting.
-			 * @type {t3d.Ray}
+			 * @type {Ray}
 			 */
 			this.ray = new t3d.Ray(origin, direction);
 		}
 
 		/**
-				* Updates the ray with a new origin and direction.
-				* @param {t3d.Vector3} origin — The origin vector where the ray casts from.
-				* @param {t3d.Vector3} direction — The normalized direction vector that gives direction to the ray.
-				*/
+		 * Updates the ray with a new origin and direction.
+		 * @param {Vector3} origin — The origin vector where the ray casts from.
+		 * @param {Vector3} direction — The normalized direction vector that gives direction to the ray.
+		 */
 		set(origin, direction) {
 			this.ray.set(origin, direction);
 		}
 
 		/**
-				* Updates the ray with a new origin and direction.
-				* @param {t3d.Vector2} coords — 2D coordinates of the mouse, in normalized device coordinates (NDC)---X and Y components should be between -1 and 1.
-				* @param {t3d.Camera} camera — camera from which the ray should originate.
-				*/
+		 * Updates the ray with a new origin and direction.
+		 * @param {Vector2} coords — 2D coordinates of the mouse, in normalized device coordinates (NDC)---X and Y components should be between -1 and 1.
+		 * @param {Camera} camera — camera from which the ray should originate.
+		 */
 		setFromCamera(coords, camera) {
 			if (camera.projectionMatrix.elements[11] === -1) {
 				// perspective
@@ -5810,12 +5802,12 @@
 		}
 
 		/**
-				* Checks all intersection between the ray and the object with or without the descendants. Intersections are returned sorted by distance, closest first. An array of intersections is returned:
-				* [ { distance, point, face, faceIndex, object }, ... ]
-				* @param {t3d.Object3D} object — The object to check for intersection with the ray.
-				* @param {Boolean} [recursive=] — If true, it also checks all descendants. Otherwise it only checks intersecton with the object.
-				* @return {Object[]} An array of intersections
-				*/
+		 * Checks all intersection between the ray and the object with or without the descendants. Intersections are returned sorted by distance, closest first. An array of intersections is returned:
+		 * [ { distance, point, face, faceIndex, object }, ... ]
+		 * @param {Object3D} object — The object to check for intersection with the ray.
+		 * @param {boolean} [recursive] — If true, it also checks all descendants. Otherwise it only checks intersecton with the object.
+		 * @returns {object[]} An array of intersections
+		 */
 		intersectObject(object, recursive) {
 			const intersects = [];
 			intersectObject(object, this, intersects, recursive);
@@ -5824,12 +5816,12 @@
 		}
 
 		/**
-				* Checks all intersection between the ray and the objects with or without the descendants. Intersections are returned sorted by distance, closest first. An array of intersections is returned:
-				* [ { distance, point, face, faceIndex, object }, ... ]
-				* @param {t3d.Object3D[]} objects — The objects to check for intersection with the ray.
-				* @param {Boolean} [recursive=] — If true, it also checks all descendants. Otherwise it only checks intersecton with the object.
-				* @return {Object[]} An array of intersections
-				*/
+		 * Checks all intersection between the ray and the objects with or without the descendants. Intersections are returned sorted by distance, closest first. An array of intersections is returned:
+		 * [ { distance, point, face, faceIndex, object }, ... ]
+		 * @param {Object3D[]} objects — The objects to check for intersection with the ray.
+		 * @param {boolean} [recursive=false] — If true, it also checks all descendants. Otherwise it only checks intersecton with the object.
+		 * @returns {object[]} An array of intersections
+		 */
 		intersectObjects(objects, recursive) {
 			const intersects = [];
 			if (Array.isArray(objects) === false) {
