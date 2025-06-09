@@ -46,38 +46,38 @@ class OBB {
      * @return {OBB} A reference to this OBB.
      */
 	setFromCenterAndAxes(center, axisX, axisY, axisZ) {
-		_vec3_1$5.copy(axisX);
+		_vec3_1$4.copy(axisX);
 		_vec3_2$1.copy(axisY);
 		_vec3_3$1.copy(axisZ);
 
-		const scaleX = _vec3_1$5.getLength();
+		const scaleX = _vec3_1$4.getLength();
 		const scaleY = _vec3_2$1.getLength();
 		const scaleZ = _vec3_3$1.getLength();
 
-		_vec3_1$5.normalize();
+		_vec3_1$4.normalize();
 		_vec3_2$1.normalize();
 		_vec3_3$1.normalize();
 
 		// handle the case where the box has a dimension of 0 in one axis
 		if (scaleX === 0) {
-			_vec3_1$5.crossVectors(_vec3_2$1, _vec3_3$1);
+			_vec3_1$4.crossVectors(_vec3_2$1, _vec3_3$1);
 		}
 
 		if (scaleY === 0) {
-			_vec3_2$1.crossVectors(_vec3_1$5, _vec3_3$1);
+			_vec3_2$1.crossVectors(_vec3_1$4, _vec3_3$1);
 		}
 
 		if (scaleZ === 0) {
-			_vec3_3$1.crossVectors(_vec3_1$5, _vec3_2$1);
+			_vec3_3$1.crossVectors(_vec3_1$4, _vec3_2$1);
 		}
 
 		this.rotation.set(
-			_vec3_1$5.x, _vec3_2$1.x, _vec3_3$1.x,
-			_vec3_1$5.y, _vec3_2$1.y, _vec3_3$1.y,
-			_vec3_1$5.z, _vec3_2$1.z, _vec3_3$1.z
+			_vec3_1$4.x, _vec3_2$1.x, _vec3_3$1.x,
+			_vec3_1$4.y, _vec3_2$1.y, _vec3_3$1.y,
+			_vec3_1$4.z, _vec3_2$1.z, _vec3_3$1.z
 		);
 
-		const halfSize = _vec3_1$5.set(scaleX, scaleY, scaleZ);
+		const halfSize = _vec3_1$4.set(scaleX, scaleY, scaleZ);
 		this.box.min.copy(center).sub(halfSize);
 		this.box.max.copy(center).add(halfSize);
 
@@ -92,9 +92,9 @@ class OBB {
 	applyMatrix4(matrix) {
 		const e = matrix.elements;
 
-		let sx = _vec3_1$5.set(e[0], e[1], e[2]).getLength();
-		const sy = _vec3_1$5.set(e[4], e[5], e[6]).getLength();
-		const sz = _vec3_1$5.set(e[8], e[9], e[10]).getLength();
+		let sx = _vec3_1$4.set(e[0], e[1], e[2]).getLength();
+		const sy = _vec3_1$4.set(e[4], e[5], e[6]).getLength();
+		const sz = _vec3_1$4.set(e[8], e[9], e[10]).getLength();
 
 		const det = matrix.determinant();
 		if (det < 0) sx = -sx;
@@ -119,7 +119,7 @@ class OBB {
 
 		this.rotation.multiply(_mat3_1$1);
 
-		const center = this.box.getCenter(_vec3_1$5);
+		const center = this.box.getCenter(_vec3_1$4);
 		const halfSize = this.box.getSize(_vec3_2$1).multiplyScalar(0.5);
 
 		halfSize.x *= sx;
@@ -141,7 +141,7 @@ class OBB {
      * @return {Vector3[]} The array of points.
      */
 	getPoints(points) {
-		const center = this.box.getCenter(_vec3_1$5);
+		const center = this.box.getCenter(_vec3_1$4);
 		const min = _vec3_2$1.subVectors(this.box.min, center);
 		const max = _vec3_3$1.subVectors(this.box.max, center);
 
@@ -171,25 +171,25 @@ class OBB {
      * @return {Plane[]} The array of planes.
      */
 	getPlanes(planes) {
-		const center = this.box.getCenter(_vec3_1$5);
+		const center = this.box.getCenter(_vec3_1$4);
 		const worldMin = _vec3_2$1.subVectors(this.box.min, center).applyMatrix3(this.rotation).add(center);
 		const worldMax = _vec3_3$1.subVectors(this.box.max, center).applyMatrix3(this.rotation).add(center);
 
-		_vec3_1$5.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
-		planes[0].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMin);
-		planes[1].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMax);
+		_vec3_1$4.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
+		planes[0].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
+		planes[1].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
 		planes[1].normal.negate();
 		planes[1].constant *= -1;
 
-		_vec3_1$5.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
-		planes[2].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMin);
-		planes[3].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMax);
+		_vec3_1$4.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
+		planes[2].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
+		planes[3].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
 		planes[3].normal.negate();
 		planes[3].constant *= -1;
 
-		_vec3_1$5.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
-		planes[4].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMin);
-		planes[5].setFromNormalAndCoplanarPoint(_vec3_1$5, worldMax);
+		_vec3_1$4.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
+		planes[4].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
+		planes[5].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
 		planes[5].normal.negate();
 		planes[5].constant *= -1;
 
@@ -199,7 +199,7 @@ class OBB {
 	containsPoint(point) {
 		const obbStruct = getOBBStruct(this, a);
 
-		const v = _vec3_1$5.subVectors(point, obbStruct.c);
+		const v = _vec3_1$4.subVectors(point, obbStruct.c);
 
 		// project _vec3_4 onto each axis and check if these points lie inside the OBB
 
@@ -215,7 +215,7 @@ class OBB {
 	clampPoint(point, result) {
 		const obbStruct = getOBBStruct(this, a);
 
-		const v = _vec3_1$5.subVectors(point, obbStruct.c);
+		const v = _vec3_1$4.subVectors(point, obbStruct.c);
 
 		// start at the center position of the OBB
 
@@ -258,7 +258,7 @@ class OBB {
 
 		// compute translation vector
 
-		const v1 = _vec3_1$5.subVectors(b.c, a.c);
+		const v1 = _vec3_1$4.subVectors(b.c, a.c);
 
 		// bring translation into a's coordinate frame
 
@@ -361,7 +361,7 @@ class OBB {
      * @param {Matrix4} transform - The transformation matrix.
      */
 	toBoundingBoxWithTransform(box3, transform) {
-		const center = this.box.getCenter(_vec3_1$5);
+		const center = this.box.getCenter(_vec3_1$4);
 
 		box3.min.copy(this.box.min).sub(center);
 		box3.max.copy(this.box.max).sub(center);
@@ -380,7 +380,7 @@ class OBB {
 
 const closestPoint = new Vector3();
 
-const _vec3_1$5 = new Vector3();
+const _vec3_1$4 = new Vector3();
 const _vec3_2$1 = new Vector3();
 const _vec3_3$1 = new Vector3();
 const _mat3_1$1 = new Matrix3();
@@ -444,8 +444,8 @@ class TileOBB extends OBB {
 	}
 
 	containsPoint(point) {
-		_vec3_1$4.copy(point).applyMatrix4(this._originBoxTransformInverse);
-		return this.box.containsPoint(_vec3_1$4);
+		_vec3_1$3.copy(point).applyMatrix4(this._originBoxTransformInverse);
+		return this.box.containsPoint(_vec3_1$3);
 	}
 
 	intersectsRay(ray) {
@@ -500,8 +500,8 @@ class TileOBB extends OBB {
 	distanceToPoint(point) {
 		// originBoxTransformInverse has no scale,
 		// so we don't need to scale the distance
-		_vec3_1$4.copy(point).applyMatrix4(this._originBoxTransformInverse);
-		return this._originBox.distanceToPoint(_vec3_1$4);
+		_vec3_1$3.copy(point).applyMatrix4(this._originBoxTransformInverse);
+		return this._originBox.distanceToPoint(_vec3_1$3);
 	}
 
 	getBoundingSphere(target) {
@@ -515,7 +515,7 @@ class TileOBB extends OBB {
 }
 
 const _ray_1$1 = new Ray();
-const _vec3_1$4 = new Vector3();
+const _vec3_1$3 = new Vector3();
 
 // Cesium / 3D tiles Spheroid:
 // - Up is Z at 90 degrees latitude
@@ -969,7 +969,7 @@ class TileBoundingVolume {
 
 		obb.setFromCenterAndAxes(
 			_vec3_4.set(data[0], data[1], data[2]),
-			_vec3_1$3.set(data[3], data[4], data[5]),
+			_vec3_1$2.set(data[3], data[4], data[5]),
 			_vec3_2.set(data[6], data[7], data[8]),
 			_vec3_3.set(data[9], data[10], data[11])
 		).applyMatrix4(transform);
@@ -1032,14 +1032,14 @@ class TileBoundingVolume {
 		let obbDistSq = -Infinity;
 
 		if (sphere) {
-			if (ray.intersectSphere(sphere, _vec3_1$3)) {
-				sphereDistSq = sphere.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$3);
+			if (ray.intersectSphere(sphere, _vec3_1$2)) {
+				sphereDistSq = sphere.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$2);
 			}
 		}
 
 		if (obb) {
-			if (obb.intersectRay(ray, _vec3_1$3)) {
-				obbDistSq = obb.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$3);
+			if (obb.intersectRay(ray, _vec3_1$2)) {
+				obbDistSq = obb.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$2);
 			}
 		}
 
@@ -1118,7 +1118,7 @@ class TileBoundingVolume {
 
 }
 
-const _vec3_1$3 = new Vector3();
+const _vec3_1$2 = new Vector3();
 const _vec3_2 = new Vector3();
 const _vec3_3 = new Vector3();
 const _vec3_4 = new Vector3();
@@ -1233,10 +1233,10 @@ const raycastTraverseFirstHit = (tile, tiles3D, ray, localRay = null) => {
 
 		const boundingVolume = child.cached.boundingVolume;
 
-		if (boundingVolume.intersectRay(localRay, _vec3_1$2)) {
-			_vec3_1$2.applyMatrix4(tiles3D.worldMatrix);
+		if (boundingVolume.intersectRay(localRay, _vec3_1$1)) {
+			_vec3_1$1.applyMatrix4(tiles3D.worldMatrix);
 			array.push({
-				distance: _vec3_1$2.distanceToSquared(ray.origin),
+				distance: _vec3_1$1.distanceToSquared(ray.origin),
 				tile: child
 			});
 		}
@@ -1316,7 +1316,7 @@ const _intersectTileScene = (tile, ray, intersects) => {
 
 const _mat4_1$1 = new Matrix4();
 const _ray_1 = new Ray();
-const _vec3_1$2 = new Vector3();
+const _vec3_1$1 = new Vector3();
 
 const _hitArray = [];
 
@@ -1453,9 +1453,9 @@ class CameraList {
 
 		_mat4_1.copy(originMatrix).inverse();
 
-		const invScaleX = _vec3_1$1.setFromMatrixColumn(_mat4_1, 0).getLength();
-		const invScaleY = _vec3_1$1.setFromMatrixColumn(_mat4_1, 1).getLength();
-		const invScaleZ = _vec3_1$1.setFromMatrixColumn(_mat4_1, 2).getLength();
+		const invScaleX = _vec3_1.setFromMatrixColumn(_mat4_1, 0).getLength();
+		const invScaleY = _vec3_1.setFromMatrixColumn(_mat4_1, 1).getLength();
+		const invScaleZ = _vec3_1.setFromMatrixColumn(_mat4_1, 2).getLength();
 
 		if (Math.abs(Math.max(invScaleX - invScaleY, invScaleX - invScaleZ)) > 1e-6) {
 			console.warn('CameraList.updateInfos(): Non uniform scale used for tile which may cause issues when calculating screen space error.');
@@ -1513,7 +1513,7 @@ class CameraList {
 
 const _mat4_1 = new Matrix4();
 const _mat4_2 = new Matrix4();
-const _vec3_1$1 = new Vector3();
+const _vec3_1 = new Vector3();
 
 class LRUCache {
 
@@ -1796,7 +1796,7 @@ class TilesLoader {
 		const downloadQueue = this.downloadQueue;
 		const parseQueue = this.parseQueue;
 
-		const isExternalTileSet = tile.__externalTileSet;
+		const isExternalTileSet = tile.__hasUnrenderableContent;
 
 		lruCache.add(tile, t => {
 			if (t.__loadingState === RequestState$1.LOADING) {
@@ -1864,7 +1864,7 @@ class TilesLoader {
 			}
 		};
 
-		let uri = tile.content.uri;
+		let uri = new URL(tile.content.uri, tile.__basePath + '/').toString();
 		tiles3D.invokeAllPlugins(plugin => uri = plugin.preprocessURL ? plugin.preprocessURL(uri, tile) : uri);
 
 		if (isExternalTileSet) {
@@ -3537,7 +3537,7 @@ const determineFrustumSet = (tile, tiles3D) => {
 
 	// Early out if this tile has less error than we're targeting but don't stop
 	// at an external tile set.
-	if ((stopAtEmptyTiles || !tile.__contentEmpty) && !tile.__externalTileSet) {
+	if ((stopAtEmptyTiles || tile.__hasRenderableContent) && !tile.__hasUnrenderableContent) {
 		// compute the _error and __distanceFromCamera fields
 		_calculateError(tile, tiles3D);
 
@@ -3608,8 +3608,8 @@ const markUsedSetLeaves = (tile, tiles3D) => {
 			if (_isUsedThisFrame(c, frameCount)) {
 				const childLoaded =
                     c.__allChildrenLoaded ||
-                    (!c.__contentEmpty && _isDownloadFinished(c.__loadingState)) ||
-                    (c.__externalTileSet && c.__loadingState === RequestState$1.FAILED);
+                    (c.__hasRenderableContent && _isDownloadFinished(c.__loadingState)) ||
+                    (c.__hasUnrenderableContent && c.__loadingState === RequestState$1.FAILED);
 				allChildrenLoaded = allChildrenLoaded && childLoaded;
 			}
 		}
@@ -3643,7 +3643,7 @@ const skipTraversal = (tile, tiles3D) => {
 			}
 			tile.__active = true;
 			stats.active++;
-		} else if (!lruCache.isFull() && (!tile.__contentEmpty || tile.__externalTileSet)) {
+		} else if (!lruCache.isFull() && (tile.__hasRenderableContent || tile.__hasUnrenderableContent)) {
 			tiles3D.$tilesLoader.requestTileContents(tile, tiles3D);
 		}
 
@@ -3653,8 +3653,8 @@ const skipTraversal = (tile, tiles3D) => {
 	const errorRequirement = (tiles3D.errorTarget + 1) * tiles3D.errorThreshold;
 	const meetsSSE = tile.__error <= errorRequirement;
 	const includeTile = meetsSSE || tile.refine === 'ADD';
-	const hasModel = !tile.__contentEmpty;
-	const hasContent = hasModel || tile.__externalTileSet;
+	const hasModel = tile.__hasRenderableContent;
+	const hasContent = tile.__hasContent;
 	const loadedContent = _isDownloadFinished(tile.__loadingState) && hasContent;
 	const childrenWereVisible = tile.__childrenWereVisible;
 	const children = tile.children;
@@ -3731,7 +3731,7 @@ const toggleTiles = (tile, tiles3D) => {
 		}
 
 		// If the active or visible state changed then call the functions.
-		if (!tile.__contentEmpty && tile.__loadingState === RequestState$1.LOADED) {
+		if (tile.__hasRenderableContent && tile.__loadingState === RequestState$1.LOADED) {
 			if (tile.__wasSetActive !== setActive) {
 				tiles3D.$setTileActive(tile, setActive);
 			}
@@ -3815,12 +3815,12 @@ const _calculateError = (tile, tiles3D) => {
 		let error;
 		if (info.isOrthographic) {
 			const pixelSize = info.pixelSize;
-			error = cached.geometricError / (pixelSize * invScale);
+			error = tile.geometricError / (pixelSize * invScale);
 		} else {
 			const distance = boundingVolume.distanceToPoint(info.position);
 			const scaledDistance = distance * invScale;
 			const sseDenominator = info.sseDenominator;
-			error = cached.geometricError / (scaledDistance * sseDenominator);
+			error = tile.geometricError / (scaledDistance * sseDenominator);
 
 			minDistance = Math.min(minDistance, scaledDistance);
 		}
@@ -3838,7 +3838,7 @@ const _recursivelyMarkUsed = (tile, frameCount, lruCache) => {
 
 	tile.__used = true;
 	lruCache.markUsed(tile);
-	if (tile.__contentEmpty) {
+	if (!tile.__hasRenderableContent) {
 		const children = tile.children;
 		for (let i = 0, l = children.length; i < l; i++) {
 			_recursivelyMarkUsed(children[i], frameCount, lruCache);
@@ -3858,8 +3858,8 @@ function _isDownloadFinished(value) {
 const _recursivelyLoadTiles = (tile, depthFromRenderedParent, tiles3D) => {
 	// Try to load any external tile set children if the external tile set has loaded.
 	const doTraverse =
-		tile.__contentEmpty && (
-			!tile.__externalTileSet ||
+		!tile.__hasRenderableContent && (
+			!tile.__hasUnrenderableContent ||
 			_isDownloadFinished(tile.__loadingState)
 		);
 	if (doTraverse) {
@@ -3962,7 +3962,7 @@ class Tiles3D extends Object3D {
 
 		traverseSet(
 			json.root,
-			(node, parent) => preprocessTile(this.ellipsoid, node, parent, basePath),
+			(node, parent) => this.preprocessNode(node, basePath, parent),
 			null,
 			parent,
 			parent ? parent.__depth : 0
@@ -4353,6 +4353,143 @@ class Tiles3D extends Object3D {
 		return pending.length === 0 ? null : Promise.all(pending);
 	}
 
+	preprocessNode(tile, tileSetDir, parentTile = null) {
+		if (tile.contents) {
+			// TODO: multiple contents (1.1) are not supported yet
+			tile.content = tile.contents[0];
+		}
+
+		if (tile.content) {
+			// Fix old file formats
+			if (!('uri' in tile.content) && 'url' in tile.content) {
+				tile.content.uri = tile.content.url;
+				delete tile.content.url;
+			}
+
+			// NOTE: fix for some cases where tile provide the bounding volume
+			// but volumes are not present.
+			if (
+				tile.content.boundingVolume &&
+			!(
+				'box' in tile.content.boundingVolume ||
+				'sphere' in tile.content.boundingVolume ||
+				'region' in tile.content.boundingVolume
+			)
+			) {
+				delete tile.content.boundingVolume;
+			}
+		}
+
+		tile.parent = parentTile;
+		tile.children = tile.children || [];
+
+		if (tile.content?.uri) {
+			// "content" should only indicate loadable meshes, not external tile sets
+			const extension = getUrlExtension(tile.content.uri);
+
+			tile.__hasContent = true;
+			tile.__hasUnrenderableContent = Boolean(extension && /json$/.test(extension));
+			tile.__hasRenderableContent = !tile.__hasUnrenderableContent;
+		} else {
+			tile.__hasContent = false;
+			tile.__hasUnrenderableContent = false;
+			tile.__hasRenderableContent = false;
+		}
+
+		// tracker for determining if all the children have been asynchronously
+		// processed and are ready to be traversed
+		tile.__childrenProcessed = 0;
+		if (parentTile) {
+			parentTile.__childrenProcessed++;
+		}
+
+		tile.__distanceFromCamera = Infinity;
+		tile.__error = Infinity;
+
+		tile.__inFrustum = false;
+		tile.__isLeaf = false;
+
+		tile.__usedLastFrame = false;
+		tile.__used = false;
+
+		tile.__wasSetVisible = false;
+		tile.__visible = false;
+		tile.__childrenWereVisible = false;
+		tile.__allChildrenLoaded = false;
+
+		tile.__wasSetActive = false;
+		tile.__active = false;
+
+		tile.__loadingState = RequestState$1.UNLOADED;
+
+		if (parentTile === null) {
+			tile.__depth = 0;
+			tile.__depthFromRenderedParent = (tile.__hasRenderableContent ? 1 : 0);
+			tile.refine = tile.refine || 'REPLACE';
+		} else {
+			// increment the "depth from parent" when we encounter a new tile with content
+			tile.__depth = parentTile.__depth + 1;
+			tile.__depthFromRenderedParent = parentTile.__depthFromRenderedParent + (tile.__hasRenderableContent ? 1 : 0);
+			tile.refine = tile.refine || parentTile.refine;
+		}
+
+		tile.__basePath = tileSetDir;
+
+		tile.__lastFrameVisited = -1;
+
+		tile.__loadIndex = 0; // TODO remove this
+		tile.__loadAbort = null; // TODO remove this
+
+		this.invokeAllPlugins(plugin => {
+			plugin !== this && plugin.preprocessNode && plugin.preprocessNode(tile, tileSetDir, parentTile);
+		});
+
+		// cached
+
+		const transform = new Matrix4();
+		if (tile.transform) {
+			transform.fromArray(tile.transform);
+		}
+
+		if (parentTile) {
+			transform.premultiply(parentTile.cached.transform);
+		}
+
+		const transformInverse = new Matrix4().copy(transform).inverse();
+		const boundingVolume = new TileBoundingVolume();
+		if ('sphere' in tile.boundingVolume) {
+			boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
+		}
+		if ('box' in tile.boundingVolume) {
+			boundingVolume.setOBBData(tile.boundingVolume.box, transform);
+		}
+		if ('region' in tile.boundingVolume) {
+			boundingVolume.setRegionData(this.ellipsoid, ...tile.boundingVolume.region);
+		}
+
+		tile.cached = {
+			transform,
+			transformInverse,
+
+			active: false,
+
+			boundingVolume,
+
+			metadata: null,
+			scene: null,
+			geometry: null,
+			materials: null,
+			textures: null,
+
+			// TODO remove this
+
+			inFrustum: [],
+
+			featureTable: null,
+			batchTable: null
+		};
+	}
+
 	$parseTile(buffer, tile, extension) {
 		return this.$modelLoader.loadTileContent(buffer, tile, extension, this)
 			.then(scene => {
@@ -4459,135 +4596,6 @@ const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
 	}
 
 	return true;
-};
-
-const _vec3_1 = new Vector3();
-
-const preprocessTile = (ellipsoid, tile, parentTile, tileSetDir) => {
-	if (tile.contents) {
-		// TODO: multiple contents (1.1) are not supported yet
-		tile.content = tile.contents[0];
-	}
-
-	if (tile.content) {
-		// Fix old file formats
-		if (!('uri' in tile.content) && 'url' in tile.content) {
-			tile.content.uri = tile.content.url;
-			delete tile.content.url;
-		}
-
-		if (tile.content.uri) {
-			// tile content uri has to be interpreted relative to the tileset.json
-			tile.content.uri = new URL(tile.content.uri, tileSetDir + '/').toString();
-		}
-
-		// NOTE: fix for some cases where tile provide the bounding volume
-		// but volumes are not present.
-		if (
-			tile.content.boundingVolume &&
-			!(
-				'box' in tile.content.boundingVolume ||
-				'sphere' in tile.content.boundingVolume ||
-				'region' in tile.content.boundingVolume
-			)
-		) {
-			delete tile.content.boundingVolume;
-		}
-	}
-
-	tile.parent = parentTile;
-	tile.children = tile.children || [];
-
-	const uri = tile.content && tile.content.uri;
-	if (uri) {
-		// "content" should only indicate loadable meshes, not external tile sets
-		const extension = getUrlExtension(tile.content.uri);
-		const isExternalTileSet = Boolean(extension && extension.toLowerCase() === 'json');
-		tile.__externalTileSet = isExternalTileSet;
-		tile.__contentEmpty = isExternalTileSet;
-	} else {
-		tile.__externalTileSet = false;
-		tile.__contentEmpty = true;
-	}
-
-	// Expected to be set during calculateError()
-	tile.__distanceFromCamera = Infinity;
-	tile.__error = Infinity;
-
-	tile.__inFrustum = false;
-	tile.__isLeaf = false;
-
-	tile.__usedLastFrame = false;
-	tile.__used = false;
-
-	tile.__wasSetVisible = false;
-	tile.__visible = false;
-	tile.__childrenWereVisible = false;
-	tile.__allChildrenLoaded = false;
-
-	tile.__wasSetActive = false;
-	tile.__active = false;
-
-	tile.__loadingState = RequestState$1.UNLOADED;
-	tile.__loadIndex = 0;
-
-	tile.__loadAbort = null;
-
-	tile.__depthFromRenderedParent = -1;
-	if (parentTile === null) {
-		tile.__depth = 0;
-		tile.refine = tile.refine || 'REPLACE';
-	} else {
-		tile.__depth = parentTile.__depth + 1;
-		tile.refine = tile.refine || parentTile.refine;
-	}
-
-	//
-
-	const transform = new Matrix4();
-	if (tile.transform) {
-		transform.fromArray(tile.transform);
-	}
-	if (parentTile) {
-		transform.premultiply(parentTile.cached.transform);
-	}
-	const transformInverse = (new Matrix4()).copy(transform).inverse();
-
-	const transformScale = _vec3_1.setFromMatrixScale(transform);
-	const uniformScale = Math.max(transformScale.x, transformScale.y, transformScale.z);
-	let geometricError = tile.geometricError * uniformScale;
-
-	const boundingVolume = new TileBoundingVolume();
-	if ('box' in tile.boundingVolume) {
-		boundingVolume.setOBBData(tile.boundingVolume.box, transform);
-	}
-	if ('sphere' in tile.boundingVolume) {
-		boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
-	}
-	if ('region' in tile.boundingVolume) {
-		boundingVolume.setRegionData(ellipsoid, ...tile.boundingVolume.region);
-		geometricError = tile.geometricError;
-	}
-
-	tile.cached = {
-		loadIndex: 0,
-		transform,
-		transformInverse,
-
-		geometricError, // geometric error applied tile transform scale
-
-		boundingVolume,
-
-		active: false,
-		inFrustum: [],
-
-		scene: null,
-		geometry: null,
-		material: null,
-
-		featureTable: null,
-		batchTable: null
-	};
 };
 
 class PivotPointMesh extends Mesh {
@@ -8017,7 +8025,7 @@ class DebugTilesPlugin {
 							break;
 						}
 						case GEOMETRIC_ERROR: {
-							const val = Math.min(tile.cached.geometricError / maxError, 1);
+							const val = Math.min(tile.geometricError / maxError, 1);
 							this.getDebugColor(val, c.material.diffuse);
 							break;
 						}

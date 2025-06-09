@@ -334,7 +334,7 @@ export class DebugTilesPlugin {
 							break;
 						}
 						case GEOMETRIC_ERROR: {
-							const val = Math.min(tile.cached.geometricError / maxError, 1);
+							const val = Math.min(tile.geometricError / maxError, 1);
 							this.getDebugColor(val, c.material.diffuse);
 							break;
 						}

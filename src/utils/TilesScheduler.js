@@ -34,7 +34,7 @@ const determineFrustumSet = (tile, tiles3D) => {
 
 	// Early out if this tile has less error than we're targeting but don't stop
 	// at an external tile set.
-	if ((stopAtEmptyTiles || !tile.__contentEmpty) && !tile.__externalTileSet) {
+	if ((stopAtEmptyTiles || tile.__hasRenderableContent) && !tile.__hasUnrenderableContent) {
 		// compute the _error and __distanceFromCamera fields
 		_calculateError(tile, tiles3D);
 
@@ -105,8 +105,8 @@ const markUsedSetLeaves = (tile, tiles3D) => {
 			if (_isUsedThisFrame(c, frameCount)) {
 				const childLoaded =
                     c.__allChildrenLoaded ||
-                    (!c.__contentEmpty && _isDownloadFinished(c.__loadingState)) ||
-                    (c.__externalTileSet && c.__loadingState === RequestState.FAILED);
+                    (c.__hasRenderableContent && _isDownloadFinished(c.__loadingState)) ||
+                    (c.__hasUnrenderableContent && c.__loadingState === RequestState.FAILED);
 				allChildrenLoaded = allChildrenLoaded && childLoaded;
 			}
 		}
@@ -140,7 +140,7 @@ const skipTraversal = (tile, tiles3D) => {
 			}
 			tile.__active = true;
 			stats.active++;
-		} else if (!lruCache.isFull() && (!tile.__contentEmpty || tile.__externalTileSet)) {
+		} else if (!lruCache.isFull() && (tile.__hasRenderableContent || tile.__hasUnrenderableContent)) {
 			tiles3D.$tilesLoader.requestTileContents(tile, tiles3D);
 		}
 
@@ -150,8 +150,8 @@ const skipTraversal = (tile, tiles3D) => {
 	const errorRequirement = (tiles3D.errorTarget + 1) * tiles3D.errorThreshold;
 	const meetsSSE = tile.__error <= errorRequirement;
 	const includeTile = meetsSSE || tile.refine === 'ADD';
-	const hasModel = !tile.__contentEmpty;
-	const hasContent = hasModel || tile.__externalTileSet;
+	const hasModel = tile.__hasRenderableContent;
+	const hasContent = tile.__hasContent;
 	const loadedContent = _isDownloadFinished(tile.__loadingState) && hasContent;
 	const childrenWereVisible = tile.__childrenWereVisible;
 	const children = tile.children;
@@ -228,7 +228,7 @@ const toggleTiles = (tile, tiles3D) => {
 		}
 
 		// If the active or visible state changed then call the functions.
-		if (!tile.__contentEmpty && tile.__loadingState === RequestState.LOADED) {
+		if (tile.__hasRenderableContent && tile.__loadingState === RequestState.LOADED) {
 			if (tile.__wasSetActive !== setActive) {
 				tiles3D.$setTileActive(tile, setActive);
 			}
@@ -312,12 +312,12 @@ const _calculateError = (tile, tiles3D) => {
 		let error;
 		if (info.isOrthographic) {
 			const pixelSize = info.pixelSize;
-			error = cached.geometricError / (pixelSize * invScale);
+			error = tile.geometricError / (pixelSize * invScale);
 		} else {
 			const distance = boundingVolume.distanceToPoint(info.position);
 			const scaledDistance = distance * invScale;
 			const sseDenominator = info.sseDenominator;
-			error = cached.geometricError / (scaledDistance * sseDenominator);
+			error = tile.geometricError / (scaledDistance * sseDenominator);
 
 			minDistance = Math.min(minDistance, scaledDistance);
 		}
@@ -335,7 +335,7 @@ const _recursivelyMarkUsed = (tile, frameCount, lruCache) => {
 
 	tile.__used = true;
 	lruCache.markUsed(tile);
-	if (tile.__contentEmpty) {
+	if (!tile.__hasRenderableContent) {
 		const children = tile.children;
 		for (let i = 0, l = children.length; i < l; i++) {
 			_recursivelyMarkUsed(children[i], frameCount, lruCache);
@@ -355,8 +355,8 @@ function _isDownloadFinished(value) {
 const _recursivelyLoadTiles = (tile, depthFromRenderedParent, tiles3D) => {
 	// Try to load any external tile set children if the external tile set has loaded.
 	const doTraverse =
-		tile.__contentEmpty && (
-			!tile.__externalTileSet ||
+		!tile.__hasRenderableContent && (
+			!tile.__hasUnrenderableContent ||
 			_isDownloadFinished(tile.__loadingState)
 		);
 	if (doTraverse) {

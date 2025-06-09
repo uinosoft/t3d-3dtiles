@@ -1,4 +1,4 @@
-import { EventDispatcher, LoadingManager, Matrix4, Vector3, Object3D } from 't3d';
+import { EventDispatcher, LoadingManager, Matrix4, Object3D } from 't3d';
 import { TileBoundingVolume } from './math/TileBoundingVolume.js';
 import { traverseSet, getUrlExtension } from './utils/Utils.js';
 import { raycastTraverse, raycastTraverseFirstHit, distanceSort } from './utils/IntersectionUtils.js';
@@ -86,7 +86,7 @@ export class Tiles3D extends Object3D {
 
 		traverseSet(
 			json.root,
-			(node, parent) => preprocessTile(this.ellipsoid, node, parent, basePath),
+			(node, parent) => this.preprocessNode(node, basePath, parent),
 			null,
 			parent,
 			parent ? parent.__depth : 0
@@ -477,6 +477,143 @@ export class Tiles3D extends Object3D {
 		return pending.length === 0 ? null : Promise.all(pending);
 	}
 
+	preprocessNode(tile, tileSetDir, parentTile = null) {
+		if (tile.contents) {
+			// TODO: multiple contents (1.1) are not supported yet
+			tile.content = tile.contents[0];
+		}
+
+		if (tile.content) {
+			// Fix old file formats
+			if (!('uri' in tile.content) && 'url' in tile.content) {
+				tile.content.uri = tile.content.url;
+				delete tile.content.url;
+			}
+
+			// NOTE: fix for some cases where tile provide the bounding volume
+			// but volumes are not present.
+			if (
+				tile.content.boundingVolume &&
+			!(
+				'box' in tile.content.boundingVolume ||
+				'sphere' in tile.content.boundingVolume ||
+				'region' in tile.content.boundingVolume
+			)
+			) {
+				delete tile.content.boundingVolume;
+			}
+		}
+
+		tile.parent = parentTile;
+		tile.children = tile.children || [];
+
+		if (tile.content?.uri) {
+			// "content" should only indicate loadable meshes, not external tile sets
+			const extension = getUrlExtension(tile.content.uri);
+
+			tile.__hasContent = true;
+			tile.__hasUnrenderableContent = Boolean(extension && /json$/.test(extension));
+			tile.__hasRenderableContent = !tile.__hasUnrenderableContent;
+		} else {
+			tile.__hasContent = false;
+			tile.__hasUnrenderableContent = false;
+			tile.__hasRenderableContent = false;
+		}
+
+		// tracker for determining if all the children have been asynchronously
+		// processed and are ready to be traversed
+		tile.__childrenProcessed = 0;
+		if (parentTile) {
+			parentTile.__childrenProcessed++;
+		}
+
+		tile.__distanceFromCamera = Infinity;
+		tile.__error = Infinity;
+
+		tile.__inFrustum = false;
+		tile.__isLeaf = false;
+
+		tile.__usedLastFrame = false;
+		tile.__used = false;
+
+		tile.__wasSetVisible = false;
+		tile.__visible = false;
+		tile.__childrenWereVisible = false;
+		tile.__allChildrenLoaded = false;
+
+		tile.__wasSetActive = false;
+		tile.__active = false;
+
+		tile.__loadingState = RequestState.UNLOADED;
+
+		if (parentTile === null) {
+			tile.__depth = 0;
+			tile.__depthFromRenderedParent = (tile.__hasRenderableContent ? 1 : 0);
+			tile.refine = tile.refine || 'REPLACE';
+		} else {
+			// increment the "depth from parent" when we encounter a new tile with content
+			tile.__depth = parentTile.__depth + 1;
+			tile.__depthFromRenderedParent = parentTile.__depthFromRenderedParent + (tile.__hasRenderableContent ? 1 : 0);
+			tile.refine = tile.refine || parentTile.refine;
+		}
+
+		tile.__basePath = tileSetDir;
+
+		tile.__lastFrameVisited = -1;
+
+		tile.__loadIndex = 0; // TODO remove this
+		tile.__loadAbort = null; // TODO remove this
+
+		this.invokeAllPlugins(plugin => {
+			plugin !== this && plugin.preprocessNode && plugin.preprocessNode(tile, tileSetDir, parentTile);
+		});
+
+		// cached
+
+		const transform = new Matrix4();
+		if (tile.transform) {
+			transform.fromArray(tile.transform);
+		}
+
+		if (parentTile) {
+			transform.premultiply(parentTile.cached.transform);
+		}
+
+		const transformInverse = new Matrix4().copy(transform).inverse();
+		const boundingVolume = new TileBoundingVolume();
+		if ('sphere' in tile.boundingVolume) {
+			boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
+		}
+		if ('box' in tile.boundingVolume) {
+			boundingVolume.setOBBData(tile.boundingVolume.box, transform);
+		}
+		if ('region' in tile.boundingVolume) {
+			boundingVolume.setRegionData(this.ellipsoid, ...tile.boundingVolume.region);
+		}
+
+		tile.cached = {
+			transform,
+			transformInverse,
+
+			active: false,
+
+			boundingVolume,
+
+			metadata: null,
+			scene: null,
+			geometry: null,
+			materials: null,
+			textures: null,
+
+			// TODO remove this
+
+			inFrustum: [],
+
+			featureTable: null,
+			batchTable: null
+		};
+	}
+
 	$parseTile(buffer, tile, extension) {
 		return this.$modelLoader.loadTileContent(buffer, tile, extension, this)
 			.then(scene => {
@@ -583,133 +720,4 @@ const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
 	}
 
 	return true;
-};
-
-const _vec3_1 = new Vector3();
-
-const preprocessTile = (ellipsoid, tile, parentTile, tileSetDir) => {
-	if (tile.contents) {
-		// TODO: multiple contents (1.1) are not supported yet
-		tile.content = tile.contents[0];
-	}
-
-	if (tile.content) {
-		// Fix old file formats
-		if (!('uri' in tile.content) && 'url' in tile.content) {
-			tile.content.uri = tile.content.url;
-			delete tile.content.url;
-		}
-
-		if (tile.content.uri) {
-			// tile content uri has to be interpreted relative to the tileset.json
-			tile.content.uri = new URL(tile.content.uri, tileSetDir + '/').toString();
-		}
-
-		// NOTE: fix for some cases where tile provide the bounding volume
-		// but volumes are not present.
-		if (
-			tile.content.boundingVolume &&
-			!(
-				'box' in tile.content.boundingVolume ||
-				'sphere' in tile.content.boundingVolume ||
-				'region' in tile.content.boundingVolume
-			)
-		) {
-			delete tile.content.boundingVolume;
-		}
-	}
-
-	tile.parent = parentTile;
-	tile.children = tile.children || [];
-
-	const uri = tile.content && tile.content.uri;
-	if (uri) {
-		// "content" should only indicate loadable meshes, not external tile sets
-		const extension = getUrlExtension(tile.content.uri);
-		const isExternalTileSet = Boolean(extension && extension.toLowerCase() === 'json');
-		tile.__externalTileSet = isExternalTileSet;
-		tile.__contentEmpty = isExternalTileSet;
-	} else {
-		tile.__externalTileSet = false;
-		tile.__contentEmpty = true;
-	}
-
-	// Expected to be set during calculateError()
-	tile.__distanceFromCamera = Infinity;
-	tile.__error = Infinity;
-
-	tile.__inFrustum = false;
-	tile.__isLeaf = false;
-
-	tile.__usedLastFrame = false;
-	tile.__used = false;
-
-	tile.__wasSetVisible = false;
-	tile.__visible = false;
-	tile.__childrenWereVisible = false;
-	tile.__allChildrenLoaded = false;
-
-	tile.__wasSetActive = false;
-	tile.__active = false;
-
-	tile.__loadingState = RequestState.UNLOADED;
-	tile.__loadIndex = 0;
-
-	tile.__loadAbort = null;
-
-	tile.__depthFromRenderedParent = -1;
-	if (parentTile === null) {
-		tile.__depth = 0;
-		tile.refine = tile.refine || 'REPLACE';
-	} else {
-		tile.__depth = parentTile.__depth + 1;
-		tile.refine = tile.refine || parentTile.refine;
-	}
-
-	//
-
-	const transform = new Matrix4();
-	if (tile.transform) {
-		transform.fromArray(tile.transform);
-	}
-	if (parentTile) {
-		transform.premultiply(parentTile.cached.transform);
-	}
-	const transformInverse = (new Matrix4()).copy(transform).inverse();
-
-	const transformScale = _vec3_1.setFromMatrixScale(transform);
-	const uniformScale = Math.max(transformScale.x, transformScale.y, transformScale.z);
-	let geometricError = tile.geometricError * uniformScale;
-
-	const boundingVolume = new TileBoundingVolume();
-	if ('box' in tile.boundingVolume) {
-		boundingVolume.setOBBData(tile.boundingVolume.box, transform);
-	}
-	if ('sphere' in tile.boundingVolume) {
-		boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
-	}
-	if ('region' in tile.boundingVolume) {
-		boundingVolume.setRegionData(ellipsoid, ...tile.boundingVolume.region);
-		geometricError = tile.geometricError;
-	}
-
-	tile.cached = {
-		loadIndex: 0,
-		transform,
-		transformInverse,
-
-		geometricError, // geometric error applied tile transform scale
-
-		boundingVolume,
-
-		active: false,
-		inFrustum: [],
-
-		scene: null,
-		geometry: null,
-		material: null,
-
-		featureTable: null,
-		batchTable: null
-	};
 };

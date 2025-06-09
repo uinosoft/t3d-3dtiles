@@ -23,7 +23,7 @@ export class TilesLoader {
 		const downloadQueue = this.downloadQueue;
 		const parseQueue = this.parseQueue;
 
-		const isExternalTileSet = tile.__externalTileSet;
+		const isExternalTileSet = tile.__hasUnrenderableContent;
 
 		lruCache.add(tile, t => {
 			if (t.__loadingState === RequestState.LOADING) {
@@ -91,7 +91,7 @@ export class TilesLoader {
 			}
 		};
 
-		let uri = tile.content.uri;
+		let uri = new URL(tile.content.uri, tile.__basePath + '/').toString();
 		tiles3D.invokeAllPlugins(plugin => uri = plugin.preprocessURL ? plugin.preprocessURL(uri, tile) : uri);
 
 		if (isExternalTileSet) {
