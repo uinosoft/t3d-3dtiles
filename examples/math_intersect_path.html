@@ -1,31 +1,28 @@
 <!DOCTYPE html>
 <html>
-
 <head>
 	<meta charset="utf-8">
 	<title>t3d - 3dtiles</title>
 	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 	<link type="text/css" rel="stylesheet" href="main.css">
 </head>
-
 <body>
 	<div id="info">
-		<a href="" target="_blank">t3d</a> - Path Intersection<br/>
+		<a href="" target="_blank">t3d 3dtiles</a> - Path Intersection<br/>
 		The resource 'ayutthaya' is sourced from <a href="https://ebeaufay.github.io/ThreedTilesViewer.github.io/" target="_blank">jdultra.com</a>
-		<div id="stats_container"></div>
 	</div>
-
-	<script src="./libs/nanobar.min.js"></script>
 
 	<!-- Import maps polyfill -->
 	<!-- Remove this when import maps will be widely supported -->
-	<script async src="./libs/es-module-shims.js"></script>
+	<script async src="./node_modules/es-module-shims/dist/es-module-shims.js"></script>
 
 	<script type="importmap">
         {
             "imports": {
-                "t3d": "./libs/t3d/build/t3d.module.js",
-                "t3d/addons/": "./libs/t3d/examples/jsm/",
+                "t3d": "./node_modules/t3d/build/t3d.module.js",
+                "t3d/addons/": "./node_modules/t3d/examples/jsm/",
+				"tweakpane": "./node_modules/tweakpane/dist/tweakpane.js",
+				"@tweakpane/plugin-essentials": "./node_modules/@tweakpane/plugin-essentials/dist/tweakpane-plugin-essentials.js",
 				"t3d-3dtiles": "../build/t3d.3dtiles.module.js"
             }
         }
@@ -47,8 +44,8 @@
 		import { OBBHelper } from './jsm/helpers/OBBHelper.js';
 		import { LineSegmentHelper } from './jsm/helpers/LineSegmentHelper.js';
 
-		import { GUI } from './libs/lil-gui.esm.min.js';
-		import Stats from './libs/stats.module.js';
+		import { Pane } from 'tweakpane';
+		import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
 
 		let width = window.innerWidth || 2;
 		let height = window.innerHeight || 2;
@@ -203,53 +200,52 @@
 
 		// GUI
 
-		const gui = new GUI();
+		const pane = new Pane();
+		pane.registerPlugin(EssentialsPlugin);
 
-		gui.add(params, 'minDistance').listen().disable();
-		gui.add(params, 'thresholdDistance', 0, 50, 0.1).onChange(() => {
-			lineSegment.getOBB(params.thresholdDistance, obbHelper.obb);
-			doIntersect();
-		});
-		gui.add(sphereHelper, 'visible').name('tileSphere');
-		gui.add(obbHelper, 'visible').name('pathBox');
-		
-		const tileOptions = gui.addFolder('Tiles Options');
-		tileOptions.add(tiles3D, 'errorTarget', 0, 100, 1);
-		tileOptions.close();
+		pane.addBinding(params, 'minDistance', { readonly: true, label: 'Min Distance' });
+		pane.addBinding(params, 'thresholdDistance', { min: 0, max: 50, step: 0.1, label: 'Threshold Distance' })
+			.on('change', () => {
+				lineSegment.getOBB(params.thresholdDistance, obbHelper.obb);
+				doIntersect();
+			});
+		pane.addBinding(sphereHelper, 'visible', { label: 'Tile Sphere' });
+		pane.addBinding(obbHelper, 'visible', { label: 'Path Box' });
 
+		const optionsFolder = pane.addFolder({ title: 'Tiles Options', expanded: false });
+		optionsFolder.addBinding(tiles3D, 'errorTarget', { label: 'Error Target', min: 0, step: 1 });
+
+		const debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });
 		const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+		debugFolder.addBinding(debugTilesPlugin, 'displayBoxBounds', { label: 'Display Box Bounds' });
 
-		const debugFolder = gui.addFolder('Tiles Debug');
-		debugFolder.add(debugTilesPlugin, 'displayBoxBounds');
-		debugFolder.add(debugTilesPlugin, 'displaySphereBounds');
-		debugFolder.close();
+		const monitorFolder = pane.addFolder({ title: 'Tiles Monitor', expanded: true });
+		const monitorOptions = { readonly: true, format: v => v.toFixed(0) };
+		monitorFolder.addBinding(tiles3D.stats, 'downloading', monitorOptions);
+		monitorFolder.addBinding(tiles3D.stats, 'parsing', monitorOptions);
+		monitorFolder.addBinding(tiles3D.stats, 'visible', monitorOptions);
 
-		const statsContainer = document.getElementById('stats_container');
-
-		const stats = new Stats();
-		stats.showPanel(0);
-		document.body.appendChild(stats.dom);
+		const fpsGraph = monitorFolder.addBlade({
+			view: 'fpsgraph',
+			label: 'FPS',
+			rows: 2
+		});
 
 		//
 
 		function loop(count) {
 			requestAnimationFrame(loop);
 
-			stats.begin();
+			fpsGraph.begin();
 
 			tiles3D.update();
 			controller.update();
 
 			transformControls.update();
 
-			const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
-			if (statsContainer.innerHTML !== str) {
-				statsContainer.innerHTML = str;
-			}
-
 			forwardRenderer.render(scene, camera);
 
-			stats.end();
+			fpsGraph.end();
 		}
 		requestAnimationFrame(loop);
 
@@ -268,5 +264,4 @@
 		window.addEventListener('resize', onWindowResize, false);
 	</script>
 </body>
-
 </html>

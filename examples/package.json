@@ -1,0 +1,15 @@
+{
+    "name": "t3d-atmosphere-examples",
+    "version": "0.0.1",
+    "private": true,
+    "description": "Examples for t3d-atmosphere library",
+    "dependencies": {
+        "@tweakpane/plugin-essentials": "^0.2.1",
+        "es-module-shims": "^2.5.1",
+        "ktx-parse": "^1.0.0",
+        "nanobar": "^0.4.2",
+        "t3d": "^0.4.0",
+        "tweakpane": "^4.0.5",
+        "zstddec": "^0.1.0"
+    }
+}

@@ -8,27 +8,22 @@
 </head>
 <body>
 	<div id="info">
-		Paste the evaluation Cesium Ion token from the 
-		<a target="_blank" href="https://github.com/CesiumGS/cesium/blob/main/packages/engine/Source/Core/Ion.js#L6-L7">Cesium repository</a>
-		or your own token and asset id 
-		<br/>
-		into the fields and press "reload" to see the demo. See 
-		<a target="_blank" href="https://cesium.com/platform/cesium-ion/">cesium ion</a>
-		for more information.
-		<div id="stats_container"></div>
+		<a href="" target="_blank">t3d 3dtiles</a> - 
+		<a target="_blank" href="https://cesium.com/platform/cesium-ion/">Cesium Ion</a> Demo
 	</div>
-
-	<script src="./libs/nanobar.min.js"></script>
 
 	<!-- Import maps polyfill -->
     <!-- Remove this when import maps will be widely supported -->
-    <script async src="./libs/es-module-shims.js"></script>
+    <script async src="./node_modules/es-module-shims/dist/es-module-shims.js"></script>
 
     <script type="importmap">
         {
             "imports": {
-                "t3d": "./libs/t3d/build/t3d.module.js",
-                "t3d/addons/": "./libs/t3d/examples/jsm/",
+                "t3d": "./node_modules/t3d/build/t3d.module.js",
+                "t3d/addons/": "./node_modules/t3d/examples/jsm/",
+				"ktx-parse": "./node_modules/ktx-parse/dist/ktx-parse.esm.js",
+				"tweakpane": "./node_modules/tweakpane/dist/tweakpane.js",
+				"zstddec": "./node_modules/zstddec/dist/zstddec.esm.js",
 				"t3d-3dtiles": "../build/t3d.3dtiles.module.js"
             }
         }
@@ -40,13 +35,11 @@
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
 		import { KTX2Loader } from 't3d/addons/loaders/KTX2Loader.js';
-
 		import { Tiles3D, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
 		import ionAccessToken from './ionAccessToken.js';
-
-		import { GUI } from './libs/lil-gui.esm.min.js';
-		import * as KTXParse from './libs/ktx-parse.module.js';
-		import { ZSTDDecoder } from './libs/zstddec.module.js';
+		import { Pane } from 'tweakpane';
+		import * as KTXParse from 'ktx-parse';
+		import { ZSTDDecoder } from 'zstddec';
 
 		let width = window.innerWidth || 2;
 		let height = window.innerHeight || 2;
@@ -84,19 +77,8 @@
 
 		// Create 3D tiles
 
-		// Other available assets:
 		const ionParams = { ionAssetId: '354759', ionAccessToken };
-
-		const gui = new GUI();
-
-		gui.add(ionParams, 'ionAssetId');
-		gui.add(ionParams, 'ionAccessToken');
-		gui.add({ reload: () => {
-			destroyTiles3D();
-			fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
-		} }, 'reload');
-
-		let tiles3D, tileOptionsFolder, debugFolder;
+		let tiles3D;
 
 		async function fetchIonAsset(ionAssetId, ionAccessToken) {
 			tiles3D = new Tiles3D();
@@ -123,16 +105,43 @@
 			tiles3D.addCamera(camera);
 			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
-			tileOptionsFolder = gui.addFolder('Tiles Options');
-			tileOptionsFolder.add(tiles3D, 'errorTarget', 0, 100, 1);
-			tileOptionsFolder.close();
+			optionsFolder = pane.addFolder({ title: 'Tiles Options', expanded: false });
+			optionsFolder.addBinding(tiles3D, 'errorTarget', { label: 'Error Target', min: 0, step: 1 });
 
+			debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });
 			const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+			debugFolder.addBinding(debugTilesPlugin, 'displayBoxBounds', { label: 'Display Box Bounds' });
+			debugFolder.addBinding(debugTilesPlugin, 'displaySphereBounds', { label: 'Display Sphere Bounds' });
+			debugFolder.addBinding(debugTilesPlugin, 'colorMode', {
+				label: 'Color Mode',
+				options: DebugTilesPlugin.ColorModes
+			});
 
-			debugFolder = gui.addFolder('Tiles Debug');
-			debugFolder.add(debugTilesPlugin, 'displayBoxBounds');
-			debugFolder.add(debugTilesPlugin, 'displaySphereBounds');
-			debugFolder.add(debugTilesPlugin, 'colorMode', DebugTilesPlugin.ColorModes);
+			monitorFolder = pane.addFolder({ title: 'Tiles Monitor', expanded: true });
+			monitorFolder.addBinding(tiles3D.stats, 'downloading', {
+				readonly: true,
+				view: 'graph',
+				min: 0,
+				max: 200,
+				step: 1,
+				label: 'Downloading'
+			});
+			monitorFolder.addBinding(tiles3D.stats, 'parsing', {
+				readonly: true,
+				view: 'graph',
+				min: 0,
+				max: 200,
+				step: 1,
+				label: 'Parsing'
+			});
+			monitorFolder.addBinding(tiles3D.stats, 'visible', {
+				readonly: true,
+				view: 'graph',
+				min: 0,
+				max: 200,
+				step: 1,
+				label: 'Visible'
+			});
 		}
 
 		function destroyTiles3D() {
@@ -141,21 +150,38 @@
 				tiles3D.dispose();
 				tiles3D = null;
 			}
-			if (tileOptionsFolder) {
-				tileOptionsFolder.destroy();
-				tileOptionsFolder = null;
+			if (optionsFolder) {
+				optionsFolder.dispose();
 			}
 			if (debugFolder) {
-				debugFolder.destroy();
+				debugFolder.dispose();
 				debugFolder = null;
+			}
+			if (monitorFolder) {
+				monitorFolder.dispose();
+				monitorFolder = null;
 			}
 		}
 
-		fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
+		// GUI
+
+		const pane = new Pane();
+
+		const assetFolder = pane.addFolder({ title: 'Ion Asset', expanded: true });
+		assetFolder.addBinding(ionParams, 'ionAssetId', { label: 'ID' });
+		assetFolder.addBinding(ionParams, 'ionAccessToken', { label: 'Token' });
+		assetFolder.addButton({
+			title: 'Reload Asset'
+		}).on('click', () => {
+			destroyTiles3D();
+			fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
+		});
+
+		let optionsFolder, debugFolder, monitorFolder;
 
 		//
 
-		const statsContainer = document.getElementById('stats_container');
+		fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
 
 		function loop(count) {
 			requestAnimationFrame(loop);
@@ -164,11 +190,6 @@
 
 			if (tiles3D) {
 				tiles3D.update();
-
-				const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
-				if (statsContainer.innerHTML !== str) {
-					statsContainer.innerHTML = str;
-				}
 			}
 
 			forwardRenderer.render(scene, camera);

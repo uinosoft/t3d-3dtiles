@@ -8,22 +8,20 @@
 </head>
 <body>
 	<div id="info">
-		<a href="" target="_blank">t3d</a> - Multiple Cameras Test<br/>
+		<a href="" target="_blank">t3d 3dtiles</a> - Multiple Cameras Test<br/>
 		The resource 'Curiosity Dingo Gap' is sourced from <a href="https://github.com/NASA-AMMOS/3DTilesSampleData/tree/master/msl-dingo-gap" target="_blank">NASA-AMMOS/3DTilesSampleData</a>
-		<div id="stats_container"></div>
 	</div>
-
-	<script src="./libs/nanobar.min.js"></script>
 
 	<!-- Import maps polyfill -->
     <!-- Remove this when import maps will be widely supported -->
-    <script async src="./libs/es-module-shims.js"></script>
+    <script async src="./node_modules/es-module-shims/dist/es-module-shims.js"></script>
 
     <script type="importmap">
         {
             "imports": {
-                "t3d": "./libs/t3d/build/t3d.module.js",
-                "t3d/addons/": "./libs/t3d/examples/jsm/",
+                "t3d": "./node_modules/t3d/build/t3d.module.js",
+                "t3d/addons/": "./node_modules/t3d/examples/jsm/",
+				"tweakpane": "./node_modules/tweakpane/dist/tweakpane.js",
 				"t3d-3dtiles": "../build/t3d.3dtiles.module.js"
             }
         }
@@ -35,10 +33,8 @@
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { CameraHelper } from 't3d/addons/objects/CameraHelper.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
-
 		import { Tiles3D, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
-
-		import { GUI } from './libs/lil-gui.esm.min.js';
+		import { Pane } from 'tweakpane';
 
 		let width = window.innerWidth || 2;
 		let height = window.innerHeight || 2;
@@ -116,15 +112,21 @@
 		setMainCamera(params.mainCamera);
 		tiles3D.addCamera(cameras[0].camera);
 
-		const gui = new GUI();
+		const pane = new Pane();
 
-		const viewsFolder = gui.addFolder('Views');
-		viewsFolder.add(params, 'mainCamera', cameraOptions).name('Main Camera').onChange(setMainCamera);
-		viewsFolder.add(params, 'miniCamera', cameraOptions).name('Mini Camera');
+		const viewsFolder = pane.addFolder({ title: 'Views' });
+		viewsFolder.addBinding(params, 'mainCamera', {
+			options: cameraOptions,
+			label: 'Main Camera'
+		}).on('change', ({ value }) => setMainCamera(value));
+		viewsFolder.addBinding(params, 'miniCamera', {
+			options: cameraOptions,
+			label: 'Mini Camera'
+		});
 
-		const activityFolder = gui.addFolder('Activation');
+		const activityFolder = pane.addFolder({ title: 'Activation' });
 		for (let i = 0; i < 3; i++) {
-			activityFolder.add(params, `camera${i + 1}`).name(`Camera ${i + 1}`).onChange(value => {
+			activityFolder.addBinding(params, `camera${i + 1}`, { label: `Camera ${i + 1}` }).on('change', ({ value }) => {
 				if (value) {
 					tiles3D.addCamera(cameras[i].camera);
 				} else {
@@ -133,14 +135,19 @@
 			});
 		}
 
+		const debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });
 		const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+		debugFolder.addBinding(debugTilesPlugin, 'displayBoxBounds', { label: 'Display Box Bounds' });
+		debugFolder.addBinding(debugTilesPlugin, 'colorMode', {
+			label: 'Color Mode',
+			options: DebugTilesPlugin.ColorModes
+		});
 
-		const debugFolder = gui.addFolder('Debug');
-		debugFolder.add(debugTilesPlugin, 'displayBoxBounds');
-		debugFolder.add(debugTilesPlugin, 'displaySphereBounds');
-		debugFolder.add(debugTilesPlugin, 'colorMode', DebugTilesPlugin.ColorModes);
-
-		const statsContainer = document.getElementById('stats_container');
+		const monitorFolder = pane.addFolder({ title: 'Tiles Monitor', expanded: true });
+		const monitorOptions = { readonly: true, format: v => v.toFixed(0) };
+		monitorFolder.addBinding(tiles3D.stats, 'downloading', monitorOptions);
+		monitorFolder.addBinding(tiles3D.stats, 'parsing', monitorOptions);
+		monitorFolder.addBinding(tiles3D.stats, 'visible', monitorOptions);
 
 		//
 
@@ -150,11 +157,6 @@
 			cameras.forEach(camera => camera.controller.update());
 
 			tiles3D.update();
-
-			const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
-			if (statsContainer.innerHTML !== str) {
-				statsContainer.innerHTML = str;
-			}
 
 			cameras.forEach((camera, i) => camera.helper.visible = i !== params.mainCamera && params[`camera${i + 1}`]);
 			cameras[params.mainCamera].camera.rect.set(0, 0, 1, 1);

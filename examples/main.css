@@ -56,23 +56,6 @@ canvas {
 	user-select: none;
 }
 
-.lil-gui {
-    --number-color: #ff8002;
-	--string-color: lightgreen;
-	z-index: 2 !important; /* TODO Solve this in HTML */
-}
-
-@media all and (max-width: 640px) {
-	.lil-gui.root { 
-		right: auto;
-		top: auto;
-		max-height: 50%;
-		max-width: 80%;
-		bottom: 0;
-		left: 0;
-	}
-}
-
 .bar {
     background: lightgreen;
 }
@@ -83,4 +66,8 @@ canvas {
 	background-color: #f00;
 	margin-top: 20px;
 	padding: 10px;
+}
+
+body .tp-dfwv {
+    z-index: 2;
 }

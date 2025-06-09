@@ -8,27 +8,19 @@
 </head>
 <body>
 	<div id="info">
-		Paste the evaluation Cesium Ion token from the 
-		<a target="_blank" href="https://github.com/CesiumGS/cesium/blob/main/packages/engine/Source/Core/Ion.js#L6-L7">Cesium repository</a>
-		or your own token and asset id 
-		<br/>
-		into the fields and press "reload" to see the demo. See 
-		<a target="_blank" href="https://cesium.com/platform/cesium-ion/">cesium ion</a>
-		for more information.
-		<div id="stats_container"></div>
+		<a href="" target="_blank">t3d 3dtiles</a> - Google Photorealistic 3D Tiles
 	</div>
-
-	<script src="./libs/nanobar.min.js"></script>
 
 	<!-- Import maps polyfill -->
     <!-- Remove this when import maps will be widely supported -->
-    <script async src="./libs/es-module-shims.js"></script>
+    <script async src="./node_modules/es-module-shims/dist/es-module-shims.js"></script>
 
     <script type="importmap">
         {
             "imports": {
-                "t3d": "./libs/t3d/build/t3d.module.js",
-                "t3d/addons/": "./libs/t3d/examples/jsm/",
+                "t3d": "./node_modules/t3d/build/t3d.module.js",
+                "t3d/addons/": "./node_modules/t3d/examples/jsm/",
+				"tweakpane": "./node_modules/tweakpane/dist/tweakpane.js",
 				"t3d-3dtiles": "../build/t3d.3dtiles.module.js"
             }
         }
@@ -38,14 +30,9 @@
 		import * as t3d from 't3d';
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
-		import { KTX2Loader } from 't3d/addons/loaders/KTX2Loader.js';
-
 		import { Tiles3D, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin, GlobeControls } from 't3d-3dtiles';
 		import ionAccessToken from './ionAccessToken.js';
-
-		import { GUI } from './libs/lil-gui.esm.min.js';
-		import * as KTXParse from './libs/ktx-parse.module.js';
-		import { ZSTDDecoder } from './libs/zstddec.module.js';
+		import { Pane } from 'tweakpane';
 
 		let width = window.innerWidth || 2;
 		let height = window.innerHeight || 2;
@@ -63,30 +50,18 @@
 		const scene = new t3d.Scene();
 		scene.logarithmicDepthBuffer = true;
 
-		const ambientLight = new t3d.AmbientLight(0xffffff, 0.2);
-		scene.add(ambientLight);
-
-		const directionalLight = new t3d.DirectionalLight(0xffffff, 0.8);
-		directionalLight.position.set(20, 30, 40);
-		directionalLight.lookAt(new t3d.Vector3(), new t3d.Vector3(0, 1, 0));
-		scene.add(directionalLight);
-
 		const camera = new t3d.Camera();
 		camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
 		camera.position.set(0, 0, 20000000);
-		camera.setPerspective(45 / 180 * Math.PI, width / height, 10, 100000000);
+		camera.setPerspective(45 / 180 * Math.PI, width / height, 10, 10000000);
 		scene.add(camera);
 
 		let controller;
 
 		// Create 3D tiles
 
-		const ionParams = {
-			ionAssetId: '2275207', // Google Photorealistic 3D Tiles
-			ionAccessToken
-		};
-
-		let tiles3D, debugFolder;
+		const ionParams = { ionAssetId: '2275207', ionAccessToken };
+		let tiles3D;
 
 		async function fetchIonAsset(ionAssetId, ionAccessToken) {
 			tiles3D = new Tiles3D();
@@ -104,13 +79,6 @@
 			const dracoLoader = new DRACOLoader();
 			dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
 			tiles3D.setDRACOLoader(dracoLoader);
-
-			const zstdDecoder = new ZSTDDecoder().init();
-			KTX2Loader.setKTXParser(KTXParse).setZSTDDecoder(zstdDecoder);
-			const ktx2Loader = new KTX2Loader()
-				.setTranscoderPath('./libs/basis/')
-				.detectSupport(forwardRenderer);
-			tiles3D.setKTX2Loader(ktx2Loader);
 		
 			tiles3D.addCamera(camera);
 			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
@@ -118,20 +86,22 @@
 			controller = new GlobeControls(scene, camera, canvas, tiles3D);
 			controller.pivotMesh.material.uniforms.resolution = [width, height];
 
-			const gui = new GUI();
+			const pane = new Pane();
 
+			const debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });
 			const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+			debugFolder.addBinding(debugTilesPlugin, 'displayBoxBounds', { label: 'Display Box Bounds' });
 
-			debugFolder = gui.addFolder('Tiles Debug');
-			debugFolder.add(debugTilesPlugin, 'displayBoxBounds');
-			debugFolder.add(debugTilesPlugin, 'displaySphereBounds');
+			const monitorFolder = pane.addFolder({ title: 'Tiles Monitor' });
+			const monitorOptions = { readonly: true, format: v => v.toFixed(0) };
+			monitorFolder.addBinding(tiles3D.stats, 'downloading', monitorOptions);
+			monitorFolder.addBinding(tiles3D.stats, 'parsing', monitorOptions);
+			monitorFolder.addBinding(tiles3D.stats, 'visible', monitorOptions);
 		}
 
 		fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
 
 		//
-
-		const statsContainer = document.getElementById('stats_container');
 
 		function loop(count) {
 			requestAnimationFrame(loop);
@@ -142,11 +112,6 @@
 
 			if (tiles3D) {
 				tiles3D.update();
-
-				const str = `Downloading: ${tiles3D.stats.downloading} Parsing: ${tiles3D.stats.parsing} Visible: ${tiles3D.children.length - 1}`;
-				if (statsContainer.innerHTML !== str) {
-					statsContainer.innerHTML = str;
-				}
 			}
 
 			forwardRenderer.render(scene, camera);
