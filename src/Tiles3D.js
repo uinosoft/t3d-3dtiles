@@ -614,7 +614,7 @@ export class Tiles3D extends Object3D {
 		};
 	}
 
-	$parseTile(buffer, tile, extension) {
+	parseTile(buffer, tile, extension) {
 		return this.$modelLoader.loadTileContent(buffer, tile, extension, this)
 			.then(scene => {
 				scene.traverse(c => {

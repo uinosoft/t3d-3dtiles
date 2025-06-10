@@ -1944,7 +1944,7 @@ class TilesLoader {
 					const uri = parseTile.content.uri;
 					const extension = getUrlExtension(uri);
 
-					return tiles3D.$parseTile(buffer, parseTile, extension);
+					return tiles3D.parseTile(buffer, parseTile, extension);
 				});
 			}).then(() => {
 				// if it has been unloaded then the tile has been disposed
@@ -4490,7 +4490,7 @@ class Tiles3D extends Object3D {
 		};
 	}
 
-	$parseTile(buffer, tile, extension) {
+	parseTile(buffer, tile, extension) {
 		return this.$modelLoader.loadTileContent(buffer, tile, extension, this)
 			.then(scene => {
 				scene.traverse(c => {
