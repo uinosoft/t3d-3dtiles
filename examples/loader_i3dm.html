@@ -79,7 +79,7 @@
 				if (!instance && c.geometry && c.geometry.instanceCount !== -1) {
 					instance = c;
 				}
-			});
+			}, null, false);
 
 			if (instance) {
 				res.root.updateMatrix(true);

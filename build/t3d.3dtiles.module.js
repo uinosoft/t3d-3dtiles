@@ -1515,13 +1515,38 @@ const _mat4_1 = new Matrix4();
 const _mat4_2 = new Matrix4();
 const _vec3_1 = new Vector3();
 
+const GIGABYTE_BYTES = 2 ** 30;
+
 class LRUCache {
 
-	constructor({ maxSize = 800, minSize = 600, unloadPercent = 0.05, unloadPriorityCallback = defaultPriorityCallback$1 }) {
+	get unloadPriorityCallback() {
+		return this._unloadPriorityCallback;
+	}
+
+	set unloadPriorityCallback(cb) {
+		if (cb.length === 1) {
+			console.warn('LRUCache: "unloadPriorityCallback" function has been changed to take two arguments.');
+			this._unloadPriorityCallback = (a, b) => {
+				const valA = cb(a);
+				const valB = cb(b);
+
+				if (valA < valB) return -1;
+				if (valA > valB) return 1;
+				return 0;
+			};
+		} else {
+			this._unloadPriorityCallback = cb;
+		}
+	}
+
+	constructor() {
 		// options
-		this.maxSize = maxSize;
-		this.minSize = minSize;
-		this.unloadPercent = unloadPercent;
+		this.minSize = 6000;
+		this.maxSize = 8000;
+		this.minBytesSize = 0.3 * GIGABYTE_BYTES;
+		this.maxBytesSize = 0.4 * GIGABYTE_BYTES;
+		this.unloadPercent = 0.05;
+		this.autoMarkUnused = true;
 
 		// "itemSet" doubles as both the list of the full set of items currently
 		// stored in the cache (keys) as well as a map to the time the item was last
@@ -1530,14 +1555,25 @@ class LRUCache {
 		this.itemList = [];
 		this.usedSet = new Set();
 		this.callbacks = new Map();
+		this.unloadingHandle = -1;
+		this.cachedBytes = 0;
+		this.bytesMap = new Map();
+		this.loadedSet = new Set();
 
-		this.scheduled = false;
+		this._unloadPriorityCallback = null;
+		this.computeMemoryUsageCallback = () => null;
 
-		this.unloadPriorityCallback = unloadPriorityCallback;
+		const itemSet = this.itemSet;
+		this.defaultPriorityCallback = item => itemSet.get(item);
 	}
 
+	// Returns whether or not the cache has reached the maximum size
 	isFull() {
-		return this.itemSet.size >= this.maxSize;
+		return this.itemSet.size >= this.maxSize || this.cachedBytes >= this.maxBytesSize;
+	}
+
+	getMemoryUsage(item) {
+		return this.bytesMap.get(item) ?? null;
 	}
 
 	add(item, removeCb) {
@@ -1553,21 +1589,36 @@ class LRUCache {
 		const usedSet = this.usedSet;
 		const itemList = this.itemList;
 		const callbacks = this.callbacks;
+		const bytesMap = this.bytesMap;
 		itemList.push(item);
 		usedSet.add(item);
 		itemSet.set(item, Date.now());
 		callbacks.set(item, removeCb);
 
+		// computeMemoryUsageCallback can return "null" if memory usage is not known, yet
+		const bytes = this.computeMemoryUsageCallback(item);
+		this.cachedBytes += bytes || 0;
+		bytesMap.set(item, bytes);
+
 		return true;
+	}
+
+	has(item) {
+		return this.itemSet.has(item);
 	}
 
 	remove(item) {
 		const usedSet = this.usedSet;
 		const itemSet = this.itemSet;
 		const itemList = this.itemList;
+		const bytesMap = this.bytesMap;
 		const callbacks = this.callbacks;
+		const loadedSet = this.loadedSet;
 
 		if (itemSet.has(item)) {
+			this.cachedBytes -= bytesMap.get(item) || 0;
+			bytesMap.delete(item);
+
 			callbacks.get(item)(item);
 
 			const index = itemList.indexOf(item);
@@ -1575,6 +1626,7 @@ class LRUCache {
 			usedSet.delete(item);
 			itemSet.delete(item);
 			callbacks.delete(item);
+			loadedSet.delete(item);
 
 			return true;
 		}
@@ -1582,121 +1634,215 @@ class LRUCache {
 		return false;
 	}
 
+	// Marks whether tiles in the cache have been completely loaded or not. Tiles that have not been completely
+	// loaded are subject to being disposed early if the cache is full above its max size limits, even if they
+	// are marked as used.
+	setLoaded(item, value) {
+		const { itemSet, loadedSet } = this;
+		if (itemSet.has(item)) {
+			if (value === true) {
+				loadedSet.add(item);
+			} else {
+				loadedSet.delete(item);
+			}
+		}
+	}
+
+	updateMemoryUsage(item) {
+		const itemSet = this.itemSet;
+		const bytesMap = this.bytesMap;
+		if (!itemSet.has(item)) {
+			return;
+		}
+
+		this.cachedBytes -= bytesMap.get(item) || 0;
+
+		const bytes = this.computeMemoryUsageCallback(item);
+		bytesMap.set(item, bytes);
+		this.cachedBytes += bytes;
+	}
+
 	markUsed(item) {
 		const itemSet = this.itemSet;
 		const usedSet = this.usedSet;
-		if (!itemSet.has(item) || usedSet.has(item)) {
-			return false;
+		if (itemSet.has(item) && !usedSet.has(item)) {
+			itemSet.set(item, Date.now());
+			usedSet.add(item);
 		}
+	}
 
-		itemSet.set(item, Date.now());
-		usedSet.add(item);
-
-		return true;
+	markUnused(item) {
+		this.usedSet.delete(item);
 	}
 
 	markAllUnused() {
 		this.usedSet.clear();
 	}
 
-	unloadToMinSize() {
-		const unloadPercent = this.unloadPercent;
-		const targetSize = this.minSize;
-		const itemList = this.itemList;
-		const itemSet = this.itemSet;
-		const usedSet = this.usedSet;
-		const callbacks = this.callbacks;
+	// TODO: this should be renamed because it's not necessarily unloading all unused content
+	// Maybe call it "cleanup" or "unloadToMinSize"
+	unloadUnusedContent() {
+		const {
+			unloadPercent,
+			minSize,
+			maxSize,
+			itemList,
+			itemSet,
+			usedSet,
+			loadedSet,
+			callbacks,
+			bytesMap,
+			minBytesSize,
+			maxBytesSize
+		} = this;
+
 		const unused = itemList.length - usedSet.size;
-		const excess = itemList.length - targetSize;
-		const unloadPriorityCallback = this.unloadPriorityCallback;
+		const unloaded = itemList.length - loadedSet.size;
+		const excessNodes = Math.max(Math.min(itemList.length - minSize, unused), 0);
+		const excessBytes = this.cachedBytes - minBytesSize;
+		const unloadPriorityCallback = this.unloadPriorityCallback || this.defaultPriorityCallback;
+		let needsRerun = false;
 
-		if (excess <= 0 || unused <= 0) {
-			return false;
-		}
+		const hasNodesToUnload = excessNodes > 0 && unused > 0 || unloaded && itemList.length > maxSize;
+		const hasBytesToUnload = unused && this.cachedBytes > minBytesSize || unloaded && this.cachedBytes > maxBytesSize;
+		if (hasBytesToUnload || hasNodesToUnload) {
+			// used items should be at the end of the array, "unloaded" items in the middle of the array
+			itemList.sort((a, b) => {
+				const usedA = usedSet.has(a);
+				const usedB = usedSet.has(b);
+				if (usedA === usedB) {
+					const loadedA = loadedSet.has(a);
+					const loadedB = loadedSet.has(b);
+					if (loadedA === loadedB) {
+						// Use the sort function otherwise
+						// higher priority should be further to the left
+						return -unloadPriorityCallback(a, b);
+					} else {
+						return loadedA ? 1 : -1;
+					}
+				} else {
+					// If one is used and the other is not move the used one towards the end of the array
+					return usedA ? 1 : -1;
+				}
+			});
 
-		// used items should be at the end of the array
-		itemList.sort((a, b) => {
-			const usedA = usedSet.has(a);
-			const usedB = usedSet.has(b);
-			if (usedA && usedB) {
-				// If they're both used then don't bother moving them
-				return 0;
-			} else if (!usedA && !usedB) {
-				// Use the sort function otherwise
-				// higher priority should be further to the left
-				return unloadPriorityCallback(itemSet, b) - unloadPriorityCallback(itemSet, a);
-			} else {
-				// If one is used and the other is not move the used one towards the end of the array
-				return usedA ? 1 : -1;
+			// address corner cases where the minSize might be zero or smaller than maxSize - minSize,
+			// which would result in a very small or no items being unloaded.
+			const maxUnload = Math.max(minSize * unloadPercent, excessNodes * unloadPercent);
+			const nodesToUnload = Math.ceil(Math.min(maxUnload, unused, excessNodes));
+			const maxBytesUnload = Math.max(unloadPercent * excessBytes, unloadPercent * minBytesSize);
+			const bytesToUnload = Math.min(maxBytesUnload, excessBytes);
+
+			let removedNodes = 0;
+			let removedBytes = 0;
+
+			// evict up to the max node or bytes size, keeping one more item over the max bytes limit
+			// so the "full" function behaves correctly.
+			while (
+				this.cachedBytes - removedBytes > maxBytesSize ||
+				itemList.length - removedNodes > maxSize
+			) {
+				const item = itemList[removedNodes];
+				const bytes = bytesMap.get(item) || 0;
+				if (
+					usedSet.has(item) && loadedSet.has(item) ||
+					this.cachedBytes - removedBytes - bytes < maxBytesSize &&
+					itemList.length - removedNodes <= maxSize
+				) {
+					break;
+				}
+
+				removedBytes += bytes;
+				removedNodes++;
 			}
-		});
 
-		// address corner cases where the minSize might be zero or smaller than maxSize - minSize,
-		// which would result in a very small or no items being unloaded.
-		const unusedExcess = Math.min(excess, unused);
-		const maxUnload = Math.max(targetSize * unloadPercent, unusedExcess * unloadPercent);
-		let nodesToUnload = Math.min(maxUnload, unused);
-		nodesToUnload = Math.ceil(nodesToUnload);
+			// evict up to the min node or bytes size, keeping one more item over the min bytes limit
+			// so we're meeting it
+			while (
+				removedBytes < bytesToUnload ||
+				removedNodes < nodesToUnload
+			) {
+				const item = itemList[removedNodes];
+				const bytes = bytesMap.get(item) || 0;
+				if (
+					usedSet.has(item) ||
+					this.cachedBytes - removedBytes - bytes < minBytesSize &&
+					removedNodes >= nodesToUnload
+				) {
+					break;
+				}
 
-		const removedItems = itemList.splice(0, nodesToUnload);
-		for (let i = 0, l = removedItems.length; i < l; i++) {
-			const item = removedItems[i];
-			callbacks.get(item)(item);
-			itemSet.delete(item);
-			callbacks.delete(item);
+				removedBytes += bytes;
+				removedNodes++;
+			}
+
+			// remove the nodes
+			itemList.splice(0, removedNodes).forEach(item => {
+				this.cachedBytes -= bytesMap.get(item) || 0;
+
+				callbacks.get(item)(item);
+				bytesMap.delete(item);
+				itemSet.delete(item);
+				callbacks.delete(item);
+				loadedSet.delete(item);
+				usedSet.delete(item);
+			});
+
+			// if we didn't remove enough nodes or we still have excess bytes and there are nodes to removed
+			// then we want to fire another round of unloading
+			needsRerun = removedNodes < excessNodes || removedBytes < excessBytes && removedNodes < unused;
+			needsRerun = needsRerun && removedNodes > 0;
 		}
 
-		return true;
+		if (needsRerun) {
+			this.unloadingHandle = requestAnimationFrame(() => this.scheduleUnload());
+		}
 	}
 
-	scheduleUnload(markAllUnused = true) {
-		if (this.scheduled) {
-			return false;
-		}
+	scheduleUnload() {
+		cancelAnimationFrame(this.unloadingHandle);
 
-		this.scheduled = true;
-		enqueueMicrotask(() => {
-			this.scheduled = false;
-			this.unloadToMinSize();
-			if (markAllUnused) {
-				this.markAllUnused();
-			}
-		});
+		if (!this.scheduled) {
+			this.scheduled = true;
+			queueMicrotask(() => {
+				this.scheduled = false;
+				this.unloadUnusedContent();
+			});
+		}
 	}
 
 }
 
-const defaultPriorityCallback$1 = (map, key) => {
-	return map.get(key);
-};
-
-const enqueueMicrotask = callback => {
-	Promise.resolve().then(callback);
-};
-
 class PriorityQueue {
 
-	constructor({ maxJobs = 6, autoUpdate = true, priorityCallback = defaultPriorityCallback }) {
+	// returns whether tasks are queued or actively running
+	get running() {
+		return this.items.length !== 0 || this.currJobs !== 0;
+	}
+
+	constructor() {
 		// options
-		this.maxJobs = maxJobs;
-		this.autoUpdate = autoUpdate;
+		this.maxJobs = 6;
 
 		this.items = [];
 		this.callbacks = new Map();
 		this.currJobs = 0;
 		this.scheduled = false;
+		this.autoUpdate = true;
 
-		this.priorityCallback = priorityCallback;
+		this.priorityCallback = () => {
+			throw new Error('PriorityQueue: PriorityCallback function not defined.');
+		};
+
+		// Customizable scheduling callback. Default using requestAnimationFrame()
+		this.schedulingCallback = func => {
+			requestAnimationFrame(func);
+		};
 
 		this._runjobs = () => {
-			this.tryRunJobs();
 			this.scheduled = false;
+			this.tryRunJobs();
 		};
-	}
-
-	// Customizable scheduling callback. Default using requestAnimationFrame()
-	schedulingCallback(func) {
-		requestAnimationFrame(func);
 	}
 
 	sort() {
@@ -1705,19 +1851,34 @@ class PriorityQueue {
 		items.sort(priorityCallback);
 	}
 
+	has(item) {
+		return this.callbacks.has(item);
+	}
+
 	add(item, callback) {
-		return new Promise((resolve, reject) => {
-			const prCallback = (...args) => callback(...args).then(resolve).catch(reject);
+		const data = {
+			callback,
+			reject: null,
+			resolve: null,
+			promise: null
+		};
+
+		data.promise = new Promise((resolve, reject) => {
 			const items = this.items;
 			const callbacks = this.callbacks;
 
+			data.resolve = resolve;
+			data.reject = reject;
+
 			items.push(item);
-			callbacks.set(item, prCallback);
+			callbacks.set(item, data);
 
 			if (this.autoUpdate) {
 				this.scheduleJobRun();
 			}
 		});
+
+		return data.promise;
 	}
 
 	remove(item) {
@@ -1726,6 +1887,13 @@ class PriorityQueue {
 
 		const index = items.indexOf(item);
 		if (index !== -1) {
+			// reject the promise to ensure there are no dangling promises - add a
+			// catch here to handle the case where the promise was never used anywhere
+			// else.
+			const info = callbacks.get(item);
+			info.promise.catch(() => {});
+			info.reject(new Error('PriorityQueue: Item removed.'));
+
 			items.splice(index, 1);
 			callbacks.delete(item);
 		}
@@ -1737,44 +1905,52 @@ class PriorityQueue {
 		const items = this.items;
 		const callbacks = this.callbacks;
 		const maxJobs = this.maxJobs;
-		let currJobs = this.currJobs;
-		while (maxJobs > currJobs && items.length > 0) {
-			currJobs++;
+		let iterated = 0;
+
+		const completedCallback = () => {
+			this.currJobs--;
+
+			if (this.autoUpdate) {
+				this.scheduleJobRun();
+			}
+		};
+
+		while (maxJobs > this.currJobs && items.length > 0 && iterated < maxJobs) {
+			this.currJobs++;
+			iterated++;
 			const item = items.pop();
-			const callback = callbacks.get(item);
+			const { callback, resolve, reject } = callbacks.get(item);
 			callbacks.delete(item);
-			callback(item)
-				.then(() => {
-					this.currJobs--;
 
-					if (this.autoUpdate) {
-						this.scheduleJobRun();
-					}
-				})
-				.catch(() => {
-					this.currJobs--;
+			let result;
+			try {
+				result = callback(item);
+			} catch (err) {
+				reject(err);
+				completedCallback();
+			}
 
-					if (this.autoUpdate) {
-						this.scheduleJobRun();
-					}
-				});
+			if (result instanceof Promise) {
+				result
+					.then(resolve)
+					.catch(reject)
+					.finally(completedCallback);
+			} else {
+				resolve(result);
+				completedCallback();
+			}
 		}
-		this.currJobs = currJobs;
 	}
 
 	scheduleJobRun() {
 		if (!this.scheduled) {
-			this.schedulingCallback(this._runjobs.bind(this));
+			this.schedulingCallback(this._runjobs);
 
 			this.scheduled = true;
 		}
 	}
 
 }
-
-const defaultPriorityCallback = () => {
-	throw new Error('PriorityQueue: PriorityCallback function not defined.');
-};
 
 /**
  * This parser is used to parse the header of a 3D Tiles resource.
@@ -3275,15 +3451,6 @@ const mat4_1 = new Matrix4();
 const X_AXIS = new Vector3(1, 0, 0);
 const Y_AXIS = new Vector3(0, 1, 0);
 
-const schedulingTiles = (tile, tiles3D) => {
-	determineFrustumSet(tile, tiles3D);
-	markUsedSetLeaves(tile, tiles3D);
-	skipTraversal(tile, tiles3D);
-	toggleTiles(tile, tiles3D);
-
-	tiles3D.lruCache.scheduleUnload();
-};
-
 const determineFrustumSet = (tile, tiles3D) => {
 	const stats = tiles3D.stats;
 	const frameCount = tiles3D.frameCount;
@@ -3706,7 +3873,26 @@ const priorityCallback = (a, b) => {
 
 // lru cache unload callback that takes two tiles to compare. Returning 1 means "tile a"
 // is unloaded first.
-const lruPriorityCallback = (map, tile) => 1 / (tile.__depthFromRenderedParent + 1);
+const lruPriorityCallback = (a, b) => {
+	if (a.__depthFromRenderedParent !== b.__depthFromRenderedParent) {
+		// dispose of deeper tiles first
+		return a.__depthFromRenderedParent > b.__depthFromRenderedParent ? 1 : -1;
+	} else if (a.__loadingState !== b.__loadingState) {
+		// dispose of tiles that are earlier along in the loading process first
+		return a.__loadingState > b.__loadingState ? -1 : 1;
+	} else if (a.__lastFrameVisited !== b.__lastFrameVisited) {
+		// dispose of least recent tiles first
+		return a.__lastFrameVisited > b.__lastFrameVisited ? -1 : 1;
+	} else if (a.__hasUnrenderableContent !== b.__hasUnrenderableContent) {
+		// dispose of external tile sets last
+		return a.__hasUnrenderableContent ? -1 : 1;
+	} else if (a.__error !== b.__error) {
+		// unload the tile with lower error
+		return a.__error > b.__error ? -1 : 1;
+	}
+
+	return 0;
+};
 
 class Tiles3D extends Object3D {
 
@@ -3751,6 +3937,7 @@ class Tiles3D extends Object3D {
 
 		this.activeTiles = new Set();
 		this.visibleTiles = new Set();
+		this.usedSet = new Set();
 
 		// internals
 
@@ -3761,13 +3948,168 @@ class Tiles3D extends Object3D {
 
 		this.plugins = [];
 
-		this.lruCache = new LRUCache({ unloadPriorityCallback: lruPriorityCallback });
-		this.downloadQueue = new PriorityQueue({ maxJobs: 4, priorityCallback });
-		this.parseQueue = new PriorityQueue({ maxJobs: 1, priorityCallback });
+		const lruCache = new LRUCache();
+		lruCache.unloadPriorityCallback = lruPriorityCallback;
+
+		const downloadQueue = new PriorityQueue();
+		downloadQueue.maxJobs = 10;
+		downloadQueue.priorityCallback = priorityCallback;
+
+		const parseQueue = new PriorityQueue();
+		parseQueue.maxJobs = 1;
+		parseQueue.priorityCallback = priorityCallback;
+
+		this.lruCache = lruCache;
+		this.downloadQueue = downloadQueue;
+		this.parseQueue = parseQueue;
 
 		this.$cameras = new CameraList();
 		this.$modelLoader = new ModelLoader(manager);
 		this.$events = new EventDispatcher();
+
+		this.lruCache.computeMemoryUsageCallback = tile => tile.cached.bytesUsed ?? null;
+	}
+
+	// Plugins
+	registerPlugin(plugin) {
+		if (plugin[PLUGIN_REGISTERED] === true) {
+			throw new Error('Tiles3D: A plugin can only be registered to a single tile set');
+		}
+
+		// insert the plugin based on the priority registered on the plugin
+		const plugins = this.plugins;
+		const priority = plugin.priority || 0;
+		let insertionPoint = plugins.length;
+		for (let i = 0; i < plugins.length; i++) {
+			const otherPriority = plugins[i].priority || 0;
+			if (otherPriority > priority) {
+				insertionPoint = i;
+				break;
+			}
+		}
+
+		plugins.splice(insertionPoint, 0, plugin);
+		plugin[PLUGIN_REGISTERED] = true;
+		if (plugin.init) {
+			plugin.init(this);
+		}
+	}
+
+	unregisterPlugin(plugin) {
+		const plugins = this.plugins;
+		if (typeof plugin === 'string') {
+			plugin = this.getPluginByName(name);
+		}
+
+		if (plugins.includes(plugin)) {
+			const index = plugins.indexOf(plugin);
+			plugins.splice(index, 1);
+			if (plugin.dispose) {
+				plugin.dispose();
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+
+	getPluginByName(name) {
+		return this.plugins.find(p => p.name === name) || null;
+	}
+
+	traverse(beforecb, aftercb, ensureFullyProcessed = true) {
+		if (!this.root) return;
+
+		traverseSet(this.root, (tile, ...args) => {
+			if (ensureFullyProcessed) {
+				this.ensureChildrenArePreprocessed(tile, true);
+			}
+
+			return beforecb ? beforecb(tile, ...args) : false;
+		}, aftercb);
+	}
+
+	markTileUsed(tile) {
+		// save the tile in a separate "used set" so we can mark it as unused
+		// before the next tile set traversal
+		this.usedSet.add(tile);
+		this.lruCache.markUsed(tile);
+	}
+
+	// Public API
+	update() {
+		const { root, stats } = this;
+
+		if (!root) {
+			return;
+		}
+
+		this.dispatchEvent(_updateBeforeEvent);
+
+		this.$cameras.updateInfos(this.worldMatrix);
+
+		stats.inFrustum = 0;
+		stats.used = 0;
+		stats.active = 0;
+		stats.visible = 0;
+		this.frameCount++;
+
+		determineFrustumSet(root, this);
+		markUsedSetLeaves(root, this);
+		skipTraversal(root, this);
+		toggleTiles(root, this);
+
+		this.lruCache.scheduleUnload();
+
+		this.dispatchEvent(_updateAfterEvent);
+	}
+
+	resetFailedTiles() {
+		const stats = this.stats;
+		if (stats.failed === 0) {
+			return;
+		}
+
+		this.traverse(tile => {
+			if (tile.__loadingState === RequestState$1.FAILED) {
+				tile.__loadingState = RequestState$1.UNLOADED;
+			}
+		}, null, false);
+
+		stats.failed = 0;
+	}
+
+	dispose() {
+		// dispose of all the plugins
+		const plugins = [...this.plugins];
+		plugins.forEach(plugin => {
+			this.unregisterPlugin(plugin);
+		});
+
+		const lruCache = this.lruCache;
+
+		// Make sure we've collected all children before disposing of the internal tilesets to avoid
+		// dangling children that we inadvertantly skip when deleting the nested tileset.
+		const toRemove = [];
+		this.traverse(t => {
+			toRemove.push(t);
+			return false;
+		}, null, false);
+		for (let i = 0, l = toRemove.length; i < l; i++) {
+			lruCache.remove(toRemove[i]);
+		}
+
+		this.stats = {
+			parsing: 0,
+			downloading: 0,
+			failed: 0,
+			inFrustum: 0,
+			used: 0,
+			active: 0,
+			visible: 0
+		};
+		this.frameCount = 0;
 	}
 
 	preprocessTileSet(json, url, parent = null) {
@@ -3891,53 +4233,6 @@ class Tiles3D extends Object3D {
 		}
 	}
 
-	registerPlugin(plugin) {
-		if (plugin[PLUGIN_REGISTERED] === true) {
-			throw new Error('Tiles3D: A plugin can only be registered to a single tile set');
-		}
-
-		// insert the plugin based on the priority registered on the plugin
-		const plugins = this.plugins;
-		const priority = plugin.priority || 0;
-		let insertionPoint = plugins.length;
-		for (let i = 0; i < plugins.length; i++) {
-			const otherPriority = plugins[i].priority || 0;
-			if (otherPriority > priority) {
-				insertionPoint = i;
-				break;
-			}
-		}
-
-		plugins.splice(insertionPoint, 0, plugin);
-		plugin[PLUGIN_REGISTERED] = true;
-		if (plugin.init) {
-			plugin.init(this);
-		}
-	}
-
-	unregisterPlugin(plugin) {
-		const plugins = this.plugins;
-		if (typeof plugin === 'string') {
-			plugin = this.getPluginByName(name);
-		}
-
-		if (plugins.includes(plugin)) {
-			const index = plugins.indexOf(plugin);
-			plugins.splice(index, 1);
-			if (plugin.dispose) {
-				plugin.dispose();
-			}
-
-			return true;
-		}
-
-		return false;
-	}
-
-	getPluginByName(name) {
-		return this.plugins.find(p => p.name === name) || null;
-	}
-
 	setDRACOLoader(dracoLoader) {
 		this.$modelLoader.setDRACOLoader(dracoLoader);
 	}
@@ -3956,31 +4251,6 @@ class Tiles3D extends Object3D {
 
 	dispatchEvent(event) {
 		this.$events.dispatchEvent(event);
-	}
-
-	markTileUsed(tile) {
-		this.lruCache.markUsed(tile);
-	}
-
-	update() {
-		const rootTile = this.root;
-		if (!rootTile) return;
-
-		this.dispatchEvent(_updateBeforeEvent);
-
-		const { stats } = this;
-		stats.inFrustum = 0;
-		stats.used = 0;
-		stats.active = 0;
-		stats.visible = 0;
-
-		this.frameCount++;
-
-		this.$cameras.updateInfos(this.worldMatrix);
-
-		schedulingTiles(rootTile, this);
-
-		this.dispatchEvent(_updateAfterEvent);
 	}
 
 	addCamera(camera) {
@@ -4072,51 +4342,7 @@ class Tiles3D extends Object3D {
 			if (scene) {
 				callback(scene, tile);
 			}
-		}, null);
-	}
-
-	traverse(beforecb, aftercb) {
-		const rootTile = this.root;
-		if (!rootTile) return;
-		traverseSet(rootTile, beforecb, aftercb);
-	}
-
-	resetFailedTiles() {
-		const stats = this.stats;
-		if (stats.failed === 0) {
-			return;
-		}
-
-		this.traverse(tile => {
-			if (tile.__loadingState === RequestState$1.FAILED) {
-				tile.__loadingState = RequestState$1.UNLOADED;
-			}
-		});
-
-		stats.failed = 0;
-	}
-
-	dispose() {
-		// dispose of all the plugins
-		this.plugins.forEach(plugin => {
-			this.unregisterPlugin(plugin);
-		});
-
-		const lruCache = this.lruCache;
-		this.traverse(tile => {
-			lruCache.remove(tile);
-		});
-
-		this.stats = {
-			parsing: 0,
-			downloading: 0,
-			failed: 0,
-			inFrustum: 0,
-			used: 0,
-			active: 0,
-			visible: 0
-		};
-		this.frameCount = 0;
+		}, null, false);
 	}
 
 	// override Object3D methods
@@ -4535,6 +4761,10 @@ class Tiles3D extends Object3D {
 				}
 			}).catch(errorCallback);
 		}
+	}
+
+	ensureChildrenArePreprocessed(tile, immediate = false) {
+		// TODO
 	}
 
 	$setTileActive(tile, active) {

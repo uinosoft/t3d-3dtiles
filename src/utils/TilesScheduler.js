@@ -1,15 +1,6 @@
 import RequestState from './RequestState.js';
 
-export const schedulingTiles = (tile, tiles3D) => {
-	determineFrustumSet(tile, tiles3D);
-	markUsedSetLeaves(tile, tiles3D);
-	skipTraversal(tile, tiles3D);
-	toggleTiles(tile, tiles3D);
-
-	tiles3D.lruCache.scheduleUnload();
-};
-
-const determineFrustumSet = (tile, tiles3D) => {
+export const determineFrustumSet = (tile, tiles3D) => {
 	const stats = tiles3D.stats;
 	const frameCount = tiles3D.frameCount;
 	const errorTarget = tiles3D.errorTarget;
@@ -71,7 +62,7 @@ const determineFrustumSet = (tile, tiles3D) => {
 };
 
 // Traverse and mark the tiles that are at the leaf nodes of the "used" tree.
-const markUsedSetLeaves = (tile, tiles3D) => {
+export const markUsedSetLeaves = (tile, tiles3D) => {
 	const stats = tiles3D.stats;
 	const frameCount = tiles3D.frameCount;
 
@@ -116,7 +107,7 @@ const markUsedSetLeaves = (tile, tiles3D) => {
 };
 
 // Skip past tiles we consider unrenderable because they are outside the error threshold.
-const skipTraversal = (tile, tiles3D) => {
+export const skipTraversal = (tile, tiles3D) => {
 	const stats = tiles3D.stats;
 	const frameCount = tiles3D.frameCount;
 
@@ -209,7 +200,7 @@ const skipTraversal = (tile, tiles3D) => {
 };
 
 // Final traverse to toggle tile visibility.
-const toggleTiles = (tile, tiles3D) => {
+export const toggleTiles = (tile, tiles3D) => {
 	const frameCount = tiles3D.frameCount;
 
 	const isUsed = _isUsedThisFrame(tile, frameCount);

@@ -7,7 +7,7 @@ import { CameraList } from './utils/CameraList.js';
 import { LRUCache } from './utils/LRUCache.js';
 import { PriorityQueue } from './utils/PriorityQueue.js';
 import { ModelLoader } from './utils/ModelLoader.js';
-import { schedulingTiles } from './utils/TilesScheduler.js';
+import { determineFrustumSet, markUsedSetLeaves, skipTraversal, toggleTiles } from './utils/TilesScheduler.js';
 import { WGS84_ELLIPSOID } from './math/GeoConstants.js';
 
 const _updateBeforeEvent = { type: 'update-before' };
@@ -59,7 +59,26 @@ const priorityCallback = (a, b) => {
 
 // lru cache unload callback that takes two tiles to compare. Returning 1 means "tile a"
 // is unloaded first.
-const lruPriorityCallback = (map, tile) => 1 / (tile.__depthFromRenderedParent + 1);
+const lruPriorityCallback = (a, b) => {
+	if (a.__depthFromRenderedParent !== b.__depthFromRenderedParent) {
+		// dispose of deeper tiles first
+		return a.__depthFromRenderedParent > b.__depthFromRenderedParent ? 1 : -1;
+	} else if (a.__loadingState !== b.__loadingState) {
+		// dispose of tiles that are earlier along in the loading process first
+		return a.__loadingState > b.__loadingState ? -1 : 1;
+	} else if (a.__lastFrameVisited !== b.__lastFrameVisited) {
+		// dispose of least recent tiles first
+		return a.__lastFrameVisited > b.__lastFrameVisited ? -1 : 1;
+	} else if (a.__hasUnrenderableContent !== b.__hasUnrenderableContent) {
+		// dispose of external tile sets last
+		return a.__hasUnrenderableContent ? -1 : 1;
+	} else if (a.__error !== b.__error) {
+		// unload the tile with lower error
+		return a.__error > b.__error ? -1 : 1;
+	}
+
+	return 0;
+};
 
 export class Tiles3D extends Object3D {
 
@@ -104,6 +123,7 @@ export class Tiles3D extends Object3D {
 
 		this.activeTiles = new Set();
 		this.visibleTiles = new Set();
+		this.usedSet = new Set();
 
 		// internals
 
@@ -114,13 +134,168 @@ export class Tiles3D extends Object3D {
 
 		this.plugins = [];
 
-		this.lruCache = new LRUCache({ unloadPriorityCallback: lruPriorityCallback });
-		this.downloadQueue = new PriorityQueue({ maxJobs: 4, priorityCallback });
-		this.parseQueue = new PriorityQueue({ maxJobs: 1, priorityCallback });
+		const lruCache = new LRUCache();
+		lruCache.unloadPriorityCallback = lruPriorityCallback;
+
+		const downloadQueue = new PriorityQueue();
+		downloadQueue.maxJobs = 10;
+		downloadQueue.priorityCallback = priorityCallback;
+
+		const parseQueue = new PriorityQueue();
+		parseQueue.maxJobs = 1;
+		parseQueue.priorityCallback = priorityCallback;
+
+		this.lruCache = lruCache;
+		this.downloadQueue = downloadQueue;
+		this.parseQueue = parseQueue;
 
 		this.$cameras = new CameraList();
 		this.$modelLoader = new ModelLoader(manager);
 		this.$events = new EventDispatcher();
+
+		this.lruCache.computeMemoryUsageCallback = tile => tile.cached.bytesUsed ?? null;
+	}
+
+	// Plugins
+	registerPlugin(plugin) {
+		if (plugin[PLUGIN_REGISTERED] === true) {
+			throw new Error('Tiles3D: A plugin can only be registered to a single tile set');
+		}
+
+		// insert the plugin based on the priority registered on the plugin
+		const plugins = this.plugins;
+		const priority = plugin.priority || 0;
+		let insertionPoint = plugins.length;
+		for (let i = 0; i < plugins.length; i++) {
+			const otherPriority = plugins[i].priority || 0;
+			if (otherPriority > priority) {
+				insertionPoint = i;
+				break;
+			}
+		}
+
+		plugins.splice(insertionPoint, 0, plugin);
+		plugin[PLUGIN_REGISTERED] = true;
+		if (plugin.init) {
+			plugin.init(this);
+		}
+	}
+
+	unregisterPlugin(plugin) {
+		const plugins = this.plugins;
+		if (typeof plugin === 'string') {
+			plugin = this.getPluginByName(name);
+		}
+
+		if (plugins.includes(plugin)) {
+			const index = plugins.indexOf(plugin);
+			plugins.splice(index, 1);
+			if (plugin.dispose) {
+				plugin.dispose();
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+
+	getPluginByName(name) {
+		return this.plugins.find(p => p.name === name) || null;
+	}
+
+	traverse(beforecb, aftercb, ensureFullyProcessed = true) {
+		if (!this.root) return;
+
+		traverseSet(this.root, (tile, ...args) => {
+			if (ensureFullyProcessed) {
+				this.ensureChildrenArePreprocessed(tile, true);
+			}
+
+			return beforecb ? beforecb(tile, ...args) : false;
+		}, aftercb);
+	}
+
+	markTileUsed(tile) {
+		// save the tile in a separate "used set" so we can mark it as unused
+		// before the next tile set traversal
+		this.usedSet.add(tile);
+		this.lruCache.markUsed(tile);
+	}
+
+	// Public API
+	update() {
+		const { root, stats } = this;
+
+		if (!root) {
+			return;
+		}
+
+		this.dispatchEvent(_updateBeforeEvent);
+
+		this.$cameras.updateInfos(this.worldMatrix);
+
+		stats.inFrustum = 0;
+		stats.used = 0;
+		stats.active = 0;
+		stats.visible = 0;
+		this.frameCount++;
+
+		determineFrustumSet(root, this);
+		markUsedSetLeaves(root, this);
+		skipTraversal(root, this);
+		toggleTiles(root, this);
+
+		this.lruCache.scheduleUnload();
+
+		this.dispatchEvent(_updateAfterEvent);
+	}
+
+	resetFailedTiles() {
+		const stats = this.stats;
+		if (stats.failed === 0) {
+			return;
+		}
+
+		this.traverse(tile => {
+			if (tile.__loadingState === RequestState.FAILED) {
+				tile.__loadingState = RequestState.UNLOADED;
+			}
+		}, null, false);
+
+		stats.failed = 0;
+	}
+
+	dispose() {
+		// dispose of all the plugins
+		const plugins = [...this.plugins];
+		plugins.forEach(plugin => {
+			this.unregisterPlugin(plugin);
+		});
+
+		const lruCache = this.lruCache;
+
+		// Make sure we've collected all children before disposing of the internal tilesets to avoid
+		// dangling children that we inadvertantly skip when deleting the nested tileset.
+		const toRemove = [];
+		this.traverse(t => {
+			toRemove.push(t);
+			return false;
+		}, null, false);
+		for (let i = 0, l = toRemove.length; i < l; i++) {
+			lruCache.remove(toRemove[i]);
+		}
+
+		this.stats = {
+			parsing: 0,
+			downloading: 0,
+			failed: 0,
+			inFrustum: 0,
+			used: 0,
+			active: 0,
+			visible: 0
+		};
+		this.frameCount = 0;
 	}
 
 	preprocessTileSet(json, url, parent = null) {
@@ -244,53 +419,6 @@ export class Tiles3D extends Object3D {
 		}
 	}
 
-	registerPlugin(plugin) {
-		if (plugin[PLUGIN_REGISTERED] === true) {
-			throw new Error('Tiles3D: A plugin can only be registered to a single tile set');
-		}
-
-		// insert the plugin based on the priority registered on the plugin
-		const plugins = this.plugins;
-		const priority = plugin.priority || 0;
-		let insertionPoint = plugins.length;
-		for (let i = 0; i < plugins.length; i++) {
-			const otherPriority = plugins[i].priority || 0;
-			if (otherPriority > priority) {
-				insertionPoint = i;
-				break;
-			}
-		}
-
-		plugins.splice(insertionPoint, 0, plugin);
-		plugin[PLUGIN_REGISTERED] = true;
-		if (plugin.init) {
-			plugin.init(this);
-		}
-	}
-
-	unregisterPlugin(plugin) {
-		const plugins = this.plugins;
-		if (typeof plugin === 'string') {
-			plugin = this.getPluginByName(name);
-		}
-
-		if (plugins.includes(plugin)) {
-			const index = plugins.indexOf(plugin);
-			plugins.splice(index, 1);
-			if (plugin.dispose) {
-				plugin.dispose();
-			}
-
-			return true;
-		}
-
-		return false;
-	}
-
-	getPluginByName(name) {
-		return this.plugins.find(p => p.name === name) || null;
-	}
-
 	setDRACOLoader(dracoLoader) {
 		this.$modelLoader.setDRACOLoader(dracoLoader);
 	}
@@ -309,31 +437,6 @@ export class Tiles3D extends Object3D {
 
 	dispatchEvent(event) {
 		this.$events.dispatchEvent(event);
-	}
-
-	markTileUsed(tile) {
-		this.lruCache.markUsed(tile);
-	}
-
-	update() {
-		const rootTile = this.root;
-		if (!rootTile) return;
-
-		this.dispatchEvent(_updateBeforeEvent);
-
-		const { stats } = this;
-		stats.inFrustum = 0;
-		stats.used = 0;
-		stats.active = 0;
-		stats.visible = 0;
-
-		this.frameCount++;
-
-		this.$cameras.updateInfos(this.worldMatrix);
-
-		schedulingTiles(rootTile, this);
-
-		this.dispatchEvent(_updateAfterEvent);
 	}
 
 	addCamera(camera) {
@@ -425,51 +528,7 @@ export class Tiles3D extends Object3D {
 			if (scene) {
 				callback(scene, tile);
 			}
-		}, null);
-	}
-
-	traverse(beforecb, aftercb) {
-		const rootTile = this.root;
-		if (!rootTile) return;
-		traverseSet(rootTile, beforecb, aftercb);
-	}
-
-	resetFailedTiles() {
-		const stats = this.stats;
-		if (stats.failed === 0) {
-			return;
-		}
-
-		this.traverse(tile => {
-			if (tile.__loadingState === RequestState.FAILED) {
-				tile.__loadingState = RequestState.UNLOADED;
-			}
-		});
-
-		stats.failed = 0;
-	}
-
-	dispose() {
-		// dispose of all the plugins
-		this.plugins.forEach(plugin => {
-			this.unregisterPlugin(plugin);
-		});
-
-		const lruCache = this.lruCache;
-		this.traverse(tile => {
-			lruCache.remove(tile);
-		});
-
-		this.stats = {
-			parsing: 0,
-			downloading: 0,
-			failed: 0,
-			inFrustum: 0,
-			used: 0,
-			active: 0,
-			visible: 0
-		};
-		this.frameCount = 0;
+		}, null, false);
 	}
 
 	// override Object3D methods
@@ -888,6 +947,10 @@ export class Tiles3D extends Object3D {
 				}
 			}).catch(errorCallback);
 		}
+	}
+
+	ensureChildrenArePreprocessed(tile, immediate = false) {
+		// TODO
 	}
 
 	$setTileActive(tile, active) {
