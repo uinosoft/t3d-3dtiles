@@ -6,7 +6,7 @@ export const schedulingTiles = (tile, tiles3D) => {
 	skipTraversal(tile, tiles3D);
 	toggleTiles(tile, tiles3D);
 
-	tiles3D.$tilesLoader.lruCache.scheduleUnload();
+	tiles3D.lruCache.scheduleUnload();
 };
 
 const determineFrustumSet = (tile, tiles3D) => {
@@ -15,7 +15,7 @@ const determineFrustumSet = (tile, tiles3D) => {
 	const errorTarget = tiles3D.errorTarget;
 	const maxDepth = tiles3D.maxDepth;
 	const loadSiblings = tiles3D.loadSiblings;
-	const lruCache = tiles3D.$tilesLoader.lruCache;
+	const lruCache = tiles3D.lruCache;
 	const stopAtEmptyTiles = tiles3D.stopAtEmptyTiles;
 
 	_resetFrameState(tile, frameCount);
@@ -129,7 +129,7 @@ const skipTraversal = (tile, tiles3D) => {
 	tile.__depthFromRenderedParent = parentDepthToParent;
 
 	// Request the tile contents or mark it as visible if we've found a leaf.
-	const lruCache = tiles3D.$tilesLoader.lruCache;
+	const lruCache = tiles3D.lruCache;
 	if (tile.__isLeaf) {
 		tile.__depthFromRenderedParent++;
 
@@ -141,7 +141,7 @@ const skipTraversal = (tile, tiles3D) => {
 			tile.__active = true;
 			stats.active++;
 		} else if (!lruCache.isFull() && (tile.__hasRenderableContent || tile.__hasUnrenderableContent)) {
-			tiles3D.$tilesLoader.requestTileContents(tile, tiles3D);
+			tiles3D.requestTileContents(tile);
 		}
 
 		return;
@@ -165,7 +165,7 @@ const skipTraversal = (tile, tiles3D) => {
 
 	// If we've met the SSE requirements and we can load content then fire a fetch.
 	if (includeTile && !loadedContent && !lruCache.isFull() && hasContent) {
-		tiles3D.$tilesLoader.requestTileContents(tile, tiles3D);
+		tiles3D.requestTileContents(tile);
 	}
 
 	// Only mark this tile as visible if it meets the screen space error requirements, has loaded content, not
@@ -370,6 +370,6 @@ const _recursivelyLoadTiles = (tile, depthFromRenderedParent, tiles3D) => {
 			_recursivelyLoadTiles(child, depthFromRenderedParent, tiles3D);
 		}
 	} else {
-		tiles3D.$tilesLoader.requestTileContents(tile, tiles3D);
+		tiles3D.requestTileContents(tile);
 	}
 };

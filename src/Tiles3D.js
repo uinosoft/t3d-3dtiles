@@ -4,10 +4,62 @@ import { traverseSet, getUrlExtension } from './utils/Utils.js';
 import { raycastTraverse, raycastTraverseFirstHit, distanceSort } from './utils/IntersectionUtils.js';
 import RequestState from './utils/RequestState.js';
 import { CameraList } from './utils/CameraList.js';
-import { TilesLoader } from './utils/TilesLoader.js';
+import { LRUCache } from './utils/LRUCache.js';
+import { PriorityQueue } from './utils/PriorityQueue.js';
 import { ModelLoader } from './utils/ModelLoader.js';
 import { schedulingTiles } from './utils/TilesScheduler.js';
 import { WGS84_ELLIPSOID } from './math/GeoConstants.js';
+
+const _updateBeforeEvent = { type: 'update-before' };
+const _updateAfterEvent = { type: 'update-after' };
+
+const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
+
+const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
+
+const tempMat = new Matrix4();
+
+const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
+	const te = matrixA.elements;
+	const me = matrixB.elements;
+
+	for (let i = 0; i < 16; i++) {
+		if (Math.abs(te[i] - me[i]) > epsilon) {
+			return false;
+		}
+	}
+
+	return true;
+};
+
+// priority queue sort function that takes two tiles to compare. Returning 1 means
+// "tile a" is loaded first.
+const priorityCallback = (a, b) => {
+	if (a.__depthFromRenderedParent !== b.__depthFromRenderedParent) {
+		// load shallower tiles first using "depth from rendered parent" to help
+		// even out depth disparities caused by non-content parent tiles
+		return a.__depthFromRenderedParent > b.__depthFromRenderedParent ? -1 : 1;
+	} else if (a.__inFrustum !== b.__inFrustum) {
+		// load tiles that are in the frustum at the current depth
+		return a.__inFrustum ? 1 : -1;
+	} else if (a.__used !== b.__used) {
+		// load tiles that have been used
+		return a.__used ? 1 : -1;
+	} else if (a.__error !== b.__error) {
+		// load the tile with the higher error
+		return a.__error > b.__error ? 1 : -1;
+	} else if (a.__distanceFromCamera !== b.__distanceFromCamera) {
+		// and finally visible tiles which have equal error (ex: if geometricError === 0)
+		// should prioritize based on distance.
+		return a.__distanceFromCamera > b.__distanceFromCamera ? -1 : 1;
+	}
+
+	return 0;
+};
+
+// lru cache unload callback that takes two tiles to compare. Returning 1 means "tile a"
+// is unloaded first.
+const lruPriorityCallback = (map, tile) => 1 / (tile.__depthFromRenderedParent + 1);
 
 export class Tiles3D extends Object3D {
 
@@ -62,8 +114,11 @@ export class Tiles3D extends Object3D {
 
 		this.plugins = [];
 
+		this.lruCache = new LRUCache({ unloadPriorityCallback: lruPriorityCallback });
+		this.downloadQueue = new PriorityQueue({ maxJobs: 4, priorityCallback });
+		this.parseQueue = new PriorityQueue({ maxJobs: 1, priorityCallback });
+
 		this.$cameras = new CameraList();
-		this.$tilesLoader = new TilesLoader();
 		this.$modelLoader = new ModelLoader(manager);
 		this.$events = new EventDispatcher();
 	}
@@ -73,11 +128,11 @@ export class Tiles3D extends Object3D {
 		const [major, minor] = version.split('.').map(v => parseInt(v));
 		console.assert(
 			major <= 1,
-			'TilesLoader: asset.version is expected to be a 1.x or a compatible version.'
+			'Tiles3D: asset.version is expected to be a 1.x or a compatible version.'
 		);
 
 		if (major === 1 && minor > 0) {
-			console.warn('TilesLoader: tiles versions at 1.1 or higher have limited support. Some new extensions and features may not be supported.');
+			console.warn('Tiles3D: tiles versions at 1.1 or higher have limited support. Some new extensions and features may not be supported.');
 		}
 
 		// remove the last file path path-segment from the URL including the trailing slash
@@ -257,7 +312,7 @@ export class Tiles3D extends Object3D {
 	}
 
 	markTileUsed(tile) {
-		this.$tilesLoader.lruCache.markUsed(tile);
+		this.lruCache.markUsed(tile);
 	}
 
 	update() {
@@ -400,7 +455,7 @@ export class Tiles3D extends Object3D {
 			this.unregisterPlugin(plugin);
 		});
 
-		const lruCache = this.$tilesLoader.lruCache;
+		const lruCache = this.lruCache;
 		this.traverse(tile => {
 			lruCache.remove(tile);
 		});
@@ -653,6 +708,188 @@ export class Tiles3D extends Object3D {
 		});
 	}
 
+	requestTileContents(tile) {
+		// If the tile is already being loaded then don't
+		// start it again.
+		if (tile.__loadingState !== RequestState.UNLOADED) {
+			return;
+		}
+
+		const stats = this.stats;
+		const lruCache = this.lruCache;
+		const downloadQueue = this.downloadQueue;
+		const parseQueue = this.parseQueue;
+
+		const isExternalTileSet = tile.__hasUnrenderableContent;
+
+		lruCache.add(tile, t => {
+			if (t.__loadingState === RequestState.LOADING) {
+				// Stop the load if it's started
+				t.__loadAbort.abort();
+				t.__loadAbort = null;
+			} else if (isExternalTileSet) {
+				t.children.length = 0;
+			} else {
+				this.$disposeTile(t);
+			}
+
+			// Decrement stats
+			if (t.__loadingState === RequestState.LOADING) {
+				stats.downloading--;
+			} else if (t.__loadingState === RequestState.PARSING) {
+				stats.parsing--;
+			}
+
+			t.__loadingState = RequestState.UNLOADED;
+			t.__loadIndex++;
+
+			downloadQueue.remove(t);
+			parseQueue.remove(t);
+		});
+
+		// Track a new load index so we avoid the condition where this load is stopped and
+		// another begins soon after so we don't parse twice.
+		tile.__loadIndex++;
+		const loadIndex = tile.__loadIndex;
+		const controller = new AbortController();
+		const signal = controller.signal;
+
+		stats.downloading++;
+		tile.__loadAbort = controller;
+		tile.__loadingState = RequestState.LOADING;
+
+		const errorCallback = e => {
+			// if it has been unloaded then the tile has been disposed
+			if (tile.__loadIndex !== loadIndex) {
+				return;
+			}
+
+			if (e.name !== 'AbortError') {
+				downloadQueue.remove(tile);
+				parseQueue.remove(tile);
+
+				if (tile.__loadingState === RequestState.PARSING) {
+					stats.parsing--;
+				} else if (tile.__loadingState === RequestState.LOADING) {
+					stats.downloading--;
+				}
+
+				stats.failed++;
+				tile.__loadingState = RequestState.FAILED;
+
+				// Handle fetch bug for switching examples in index.html.
+				// https://stackoverflow.com/questions/12009423/what-does-status-canceled-for-a-resource-mean-in-chrome-developer-tools
+				if (e.message !== 'Failed to fetch') {
+					console.error(`Tiles3D: Failed to load tile at url "${tile.content.uri}".`);
+					console.error(e);
+				}
+			} else {
+				lruCache.remove(tile);
+			}
+		};
+
+		let uri = new URL(tile.content.uri, tile.__basePath + '/').toString();
+		this.invokeAllPlugins(plugin => uri = plugin.preprocessURL ? plugin.preprocessURL(uri, tile) : uri);
+
+		if (isExternalTileSet) {
+			downloadQueue.add(tile, tileCb => {
+				// if it has been unloaded then the tile has been disposed
+				if (tileCb.__loadIndex !== loadIndex) {
+					return Promise.resolve();
+				}
+
+				return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, { ...this.fetchOptions, signal }));
+			}).then(res => {
+				if (res.ok) {
+					return res.json();
+				} else {
+					throw new Error(`Tiles3D: Failed to load tileset "${uri}" with status ${res.status} : ${res.statusText}`);
+				}
+			}).then(json => {
+				this.preprocessTileSet(json, uri, tile);
+				return json;
+			}).then(json => {
+				// if it has been unloaded then the tile has been disposed
+				if (tile.__loadIndex !== loadIndex) {
+					return;
+				}
+
+				stats.downloading--;
+				tile.__loadAbort = null;
+				tile.__loadingState = RequestState.LOADED;
+
+				tile.children.push(json.root);
+
+				this.dispatchEvent({
+					type: 'load-tile-set',
+					tileSet: json,
+					url: uri
+				});
+			}).catch(errorCallback);
+		} else {
+			downloadQueue.add(tile, tileCb => {
+				if (tileCb.__loadIndex !== loadIndex) {
+					return Promise.resolve();
+				}
+
+				return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, { ...this.fetchOptions, signal }));
+			}).then(res => {
+				if (tile.__loadIndex !== loadIndex) {
+					return;
+				}
+
+				if (res.ok) {
+					const extension = getUrlExtension(res.url);
+					if (extension === 'gltf') {
+						return res.json();
+					} else {
+						return res.arrayBuffer();
+					}
+				} else {
+					throw new Error(`Failed to load model with error code ${res.status}`);
+				}
+			}).then(buffer => {
+				// if it has been unloaded then the tile has been disposed
+				if (tile.__loadIndex !== loadIndex) {
+					return;
+				}
+
+				stats.downloading--;
+				stats.parsing++;
+				tile.__loadAbort = null;
+				tile.__loadingState = RequestState.PARSING;
+
+				return parseQueue.add(tile, parseTile => {
+					// if it has been unloaded then the tile has been disposed
+					if (parseTile.__loadIndex !== loadIndex) {
+						return Promise.resolve();
+					}
+
+					const uri = parseTile.content.uri;
+					const extension = getUrlExtension(uri);
+
+					return this.parseTile(buffer, parseTile, extension);
+				});
+			}).then(() => {
+				// if it has been unloaded then the tile has been disposed
+				if (tile.__loadIndex !== loadIndex) {
+					return;
+				}
+
+				stats.parsing--;
+				tile.__loadingState = RequestState.LOADED;
+
+				if (tile.__wasSetVisible) {
+					this.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, true));
+				}
+
+				if (tile.__wasSetActive) {
+					this.$setTileActive(tile, true);
+				}
+			}).catch(errorCallback);
+		}
+	}
+
 	$setTileActive(tile, active) {
 		const activeTiles = this.activeTiles;
 		if (active) {
@@ -699,25 +936,3 @@ export class Tiles3D extends Object3D {
 	}
 
 }
-
-const _updateBeforeEvent = { type: 'update-before' };
-const _updateAfterEvent = { type: 'update-after' };
-
-const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
-
-const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
-
-const tempMat = new Matrix4();
-
-const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
-	const te = matrixA.elements;
-	const me = matrixB.elements;
-
-	for (let i = 0; i < 16; i++) {
-		if (Math.abs(te[i] - me[i]) > epsilon) {
-			return false;
-		}
-	}
-
-	return true;
-};

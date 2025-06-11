@@ -44,8 +44,8 @@ export class GoogleCloudAuthPlugin {
 
 		if (this.useRecommendedSettings) {
 			// This plugin changes below values to be more efficient for the photorealistic tiles
-			tiles.$tilesLoader.parseQueue.maxJobs = 10;
-			tiles.$tilesLoader.downloadQueue.maxJobs = 30;
+			tiles.parseQueue.maxJobs = 10;
+			tiles.downloadQueue.maxJobs = 30;
 			tiles.errorTarget = 20;
 		}
 
