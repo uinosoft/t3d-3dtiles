@@ -1060,20 +1060,6 @@
 	const _vec3_1$1 = new t3d.Vector3();
 	const _hitArray = [];
 
-	/**
-	 * State of the request.
-	 *
-	 * @enum {Number}
-	 */
-	const RequestState = {
-		UNLOADED: 0,
-		LOADING: 1,
-		PARSING: 2,
-		LOADED: 3,
-		FAILED: 4
-	};
-	var RequestState$1 = Object.freeze(RequestState);
-
 	class FastFrustum extends t3d.Frustum {
 		constructor() {
 			super();
@@ -4770,92 +4756,202 @@
 	const X_AXIS = new t3d.Vector3(1, 0, 0);
 	const Y_AXIS = new t3d.Vector3(0, 1, 0);
 
-	const determineFrustumSet = (tile, tiles3D) => {
-		const stats = tiles3D.stats;
-		const frameCount = tiles3D.frameCount;
-		const errorTarget = tiles3D.errorTarget;
-		const maxDepth = tiles3D.maxDepth;
-		const loadSiblings = tiles3D.loadSiblings;
-		const lruCache = tiles3D.lruCache;
-		const stopAtEmptyTiles = tiles3D.stopAtEmptyTiles;
-		_resetFrameState(tile, frameCount);
+	// FAILED is negative so lru cache priority sorting will unload it first
+	const FAILED = -1;
+	const UNLOADED = 0;
+	const LOADING = 1;
+	const PARSING = 2;
+	const LOADED = 3;
 
-		// Early out if this tile is not within view.
-		const inFrustum = _tileInView(tile, tiles3D);
-		if (inFrustum === false) {
-			return false;
+	// https://en.wikipedia.org/wiki/World_Geodetic_System
+	// https://en.wikipedia.org/wiki/Flattening
+	const WGS84_RADIUS = 6378137;
+	const WGS84_HEIGHT = 6356752.314245179;
+
+	const viewErrorTarget$1 = {
+		inView: false,
+		error: Infinity,
+		distance: Infinity
+	};
+	function isDownloadFinished(value) {
+		return value === LOADED || value === FAILED;
+	}
+
+	// Checks whether this tile was last used on the given frame.
+	function isUsedThisFrame(tile, frameCount) {
+		return tile.__lastFrameVisited === frameCount && tile.__used;
+	}
+	function areChildrenProcessed(tile) {
+		// return tile.__childrenProcessed === tile.children.length;
+		return true; // TODO: implement this
+	}
+
+	// Resets the frame frame information for the given tile
+	const resetFrameState = (tile, renderer) => {
+		if (tile.__lastFrameVisited !== renderer.frameCount) {
+			tile.__lastFrameVisited = renderer.frameCount;
+			tile.__used = false;
+			tile.__inFrustum = false;
+			tile.__isLeaf = false;
+			tile.__visible = false;
+			tile.__active = false;
+			tile.__error = Infinity;
+			tile.__distanceFromCamera = Infinity;
+			tile.__childrenWereVisible = false;
+			tile.__allChildrenLoaded = false;
+
+			// update tile frustum and error state
+			renderer.calculateTileViewError(tile, viewErrorTarget$1);
+			tile.__inFrustum = viewErrorTarget$1.inView;
+			tile.__error = viewErrorTarget$1.error;
+			tile.__distanceFromCamera = viewErrorTarget$1.distance;
+		}
+	};
+
+	// Recursively mark tiles used down to the next tile with content
+	const recursivelyMarkUsed = (tile, renderer) => {
+		renderer.ensureChildrenArePreprocessed(tile);
+		resetFrameState(tile, renderer);
+		markUsed(tile, renderer);
+
+		// don't traverse if the children have not been processed, yet
+		if (!tile.__hasRenderableContent && areChildrenProcessed()) {
+			const children = tile.children;
+			for (let i = 0, l = children.length; i < l; i++) {
+				recursivelyMarkUsed(children[i], renderer);
+			}
+		}
+	};
+
+	// Recursively traverses to the next tiles with unloaded renderable content to load them
+	function recursivelyLoadNextRenderableTiles(tile, renderer) {
+		renderer.ensureChildrenArePreprocessed(tile);
+
+		// exit the recursion if the tile hasn't been used this frame
+		if (isUsedThisFrame(tile, renderer.frameCount)) {
+			// queue this tile to download content
+			if (tile.__hasContent && tile.__loadingState === UNLOADED && !renderer.lruCache.isFull()) {
+				renderer.requestTileContents(tile);
+			}
+			{
+				// queue any used child tiles
+				const children = tile.children;
+				for (let i = 0, l = children.length; i < l; i++) {
+					recursivelyLoadNextRenderableTiles(children[i], renderer);
+				}
+			}
+		}
+	}
+
+	// Mark a tile as being used by current view
+	function markUsed(tile, renderer) {
+		if (tile.__used) {
+			return;
 		}
 		tile.__used = true;
-		lruCache.markUsed(tile);
-		tile.__inFrustum = true;
-		stats.inFrustum++;
+		renderer.markTileUsed(tile);
+		renderer.stats.used++;
+		if (tile.__inFrustum === true) {
+			renderer.stats.inFrustum++;
+		}
+	}
 
-		// Early out if this tile has less error than we're targeting but don't stop
-		// at an external tile set.
-		if ((stopAtEmptyTiles || tile.__hasRenderableContent) && !tile.__hasUnrenderableContent) {
-			// compute the _error and __distanceFromCamera fields
-			_calculateError(tile, tiles3D);
-			const error = tile.__error;
-			if (error <= errorTarget) {
-				return true;
-			}
+	// Returns whether the tile can be traversed to the next layer of children by checking the tile metrics
+	function canTraverse(tile, renderer) {
+		// If we've met the error requirements then don't load further
+		if (tile.__error <= renderer.errorTarget) {
+			return false;
+		}
 
-			// Early out if we've reached the maximum allowed depth.
-			if (maxDepth > 0 && tile.__depth + 1 >= maxDepth) {
-				return true;
-			}
+		// Early out if we've reached the maximum allowed depth.
+		if (renderer.maxDepth > 0 && tile.__depth + 1 >= renderer.maxDepth) {
+			return false;
+		}
+		return true;
+	}
+	const markUsedTiles = (tile, renderer) => {
+		// determine frustum set is run first so we can ensure the preprocessing of all the necessary
+		// child tiles has happened here.
+		renderer.ensureChildrenArePreprocessed(tile);
+		resetFrameState(tile, renderer);
+		if (!tile.__inFrustum) {
+			return;
+		}
+		if (!canTraverse(tile, renderer)) {
+			markUsed(tile, renderer);
+			return;
 		}
 
 		// Traverse children and see if any children are in view.
 		let anyChildrenUsed = false;
+		let anyChildrenInFrustum = false;
 		const children = tile.children;
 		for (let i = 0, l = children.length; i < l; i++) {
 			const c = children[i];
-			const r = determineFrustumSet(c, tiles3D);
-			anyChildrenUsed = anyChildrenUsed || r;
+			markUsedTiles(c, renderer);
+			anyChildrenUsed = anyChildrenUsed || isUsedThisFrame(c, renderer.frameCount);
+			anyChildrenInFrustum = anyChildrenInFrustum || c.__inFrustum;
 		}
 
-		// If there are children within view and we are loading siblings then mark
-		// all sibling tiles as used, as well.
-		if (anyChildrenUsed && loadSiblings) {
+		// Disabled for now because this will cause otherwise unused children to be added to the lru cache
+		// if none of the children are in the frustum then this tile shouldn't be displayed.
+		// Otherwise this can cause load oscillation as parents are traversed and loaded and then determined
+		// to not be used because children aren't visible. See #1165.
+		// if (tile.refine === 'REPLACE' && !anyChildrenInFrustum && children.length !== 0 && !tile.__hasUnrenderableContent) {
+		// 	// TODO: we're not checking tiles with unrenderable content here since external tile sets might look like they're in the frustum,
+		// 	// load the children, then the children indicate that it's not visible, causing it to be unloaded. Then it will be loaded again.
+		// 	// The impact when including external tile set roots in the check is more significant but can't be used unless we keep external tile
+		// 	// sets around even when they're not needed. See issue #741.
+
+		// 	// TODO: what if we mark the tile as not in the frustum but we _do_ mark it as used? Then we can stop frustum traversal and at least
+		// 	// prevent tiles from rendering unless they're needed.
+		// 	console.log('FAILED');
+		// 	tile.__inFrustum = false;
+		// 	return;
+		// }
+
+		markUsed(tile, renderer);
+
+		// If this is a tile that needs children loaded to refine then recursively load child
+		// tiles until error is met
+		if (anyChildrenUsed && tile.refine === 'REPLACE') {
 			for (let i = 0, l = children.length; i < l; i++) {
 				const c = children[i];
-				_recursivelyMarkUsed(c, frameCount, lruCache);
+				recursivelyMarkUsed(c, renderer);
 			}
 		}
-		return true;
 	};
 
 	// Traverse and mark the tiles that are at the leaf nodes of the "used" tree.
-	const markUsedSetLeaves = (tile, tiles3D) => {
-		const stats = tiles3D.stats;
-		const frameCount = tiles3D.frameCount;
-		if (!_isUsedThisFrame(tile, frameCount)) {
+	const markUsedSetLeaves = (tile, renderer) => {
+		const frameCount = renderer.frameCount;
+		if (!isUsedThisFrame(tile, frameCount)) {
 			return;
 		}
-		stats.used++;
 
 		// This tile is a leaf if none of the children had been used.
 		const children = tile.children;
 		let anyChildrenUsed = false;
 		for (let i = 0, l = children.length; i < l; i++) {
 			const c = children[i];
-			anyChildrenUsed = anyChildrenUsed || _isUsedThisFrame(c, frameCount);
+			anyChildrenUsed = anyChildrenUsed || isUsedThisFrame(c, frameCount);
 		}
 		if (!anyChildrenUsed) {
-			// TODO: This isn't necessarily right because it's possible that a parent tile is considered in the
-			// frustum while the child tiles are not, making them unused. If all children have loaded and were properly
-			// considered to be in the used set then we shouldn't set ourselves to a leaf here.
 			tile.__isLeaf = true;
 		} else {
 			let childrenWereVisible = false;
 			let allChildrenLoaded = true;
 			for (let i = 0, l = children.length; i < l; i++) {
 				const c = children[i];
-				markUsedSetLeaves(c, tiles3D);
+				markUsedSetLeaves(c, renderer);
 				childrenWereVisible = childrenWereVisible || c.__wasSetVisible || c.__childrenWereVisible;
-				if (_isUsedThisFrame(c, frameCount)) {
-					const childLoaded = c.__allChildrenLoaded || c.__hasRenderableContent && _isDownloadFinished(c.__loadingState) || c.__hasUnrenderableContent && c.__loadingState === RequestState$1.FAILED;
+				if (isUsedThisFrame(c, frameCount)) {
+					// consider a child to be loaded if
+					// - the children's children have been loaded
+					// - the tile content has loaded
+					// - the tile is completely empty - ie has no children and no content
+					// - the child tile set has tried to load but failed
+					const childLoaded = c.__allChildrenLoaded || c.__hasRenderableContent && isDownloadFinished(c.__loadingState) || c.__hasUnrenderableContent && c.__loadingState === FAILED;
 					allChildrenLoaded = allChildrenLoaded && childLoaded;
 				}
 			}
@@ -4865,51 +4961,44 @@
 	};
 
 	// Skip past tiles we consider unrenderable because they are outside the error threshold.
-	const skipTraversal = (tile, tiles3D) => {
-		const stats = tiles3D.stats;
-		const frameCount = tiles3D.frameCount;
-		if (!_isUsedThisFrame(tile, frameCount)) {
+	const markVisibleTiles = (tile, renderer) => {
+		const stats = renderer.stats;
+		if (!isUsedThisFrame(tile, renderer.frameCount)) {
 			return;
 		}
-		const parent = tile.parent;
-		const parentDepthToParent = parent ? parent.__depthFromRenderedParent : -1;
-		tile.__depthFromRenderedParent = parentDepthToParent;
 
 		// Request the tile contents or mark it as visible if we've found a leaf.
-		const lruCache = tiles3D.lruCache;
+		const lruCache = renderer.lruCache;
 		if (tile.__isLeaf) {
-			tile.__depthFromRenderedParent++;
-			if (tile.__loadingState === RequestState$1.LOADED) {
+			if (tile.__loadingState === LOADED) {
 				if (tile.__inFrustum) {
 					tile.__visible = true;
 					stats.visible++;
 				}
 				tile.__active = true;
 				stats.active++;
-			} else if (!lruCache.isFull() && (tile.__hasRenderableContent || tile.__hasUnrenderableContent)) {
-				tiles3D.requestTileContents(tile);
+			} else if (!lruCache.isFull() && tile.__hasContent) {
+				renderer.requestTileContents(tile);
 			}
 			return;
 		}
-		const errorRequirement = (tiles3D.errorTarget + 1) * tiles3D.errorThreshold;
-		const meetsSSE = tile.__error <= errorRequirement;
-		const includeTile = meetsSSE || tile.refine === 'ADD';
-		const hasModel = tile.__hasRenderableContent;
-		const hasContent = tile.__hasContent;
-		const loadedContent = _isDownloadFinished(tile.__loadingState) && hasContent;
-		const childrenWereVisible = tile.__childrenWereVisible;
 		const children = tile.children;
-		const allChildrenHaveContent = tile.__allChildrenLoaded;
+		const hasContent = tile.__hasContent;
+		const loadedContent = isDownloadFinished(tile.__loadingState) && hasContent;
+		const errorRequirement = (renderer.errorTarget + 1) * renderer.errorThreshold;
+		const meetsSSE = tile.__error <= errorRequirement;
+		const childrenWereVisible = tile.__childrenWereVisible;
 
-		// Increment the relative depth of the node to the nearest rendered parent if it has content
-		// and is being rendered.
-		if (includeTile && hasModel) {
-			tile.__depthFromRenderedParent++;
-		}
+		// NOTE: We can "trickle" root tiles in by enabling these lines.
+		// Don't wait for all children tiles to load if this tile set has empty tiles at the root
+		// const emptyRootTile = tile.__depthFromRenderedParent === 0;
+		// const allChildrenLoaded = tile.__allChildrenLoaded || emptyRootTile;
 
 		// If we've met the SSE requirements and we can load content then fire a fetch.
+		const allChildrenLoaded = tile.__allChildrenLoaded;
+		const includeTile = meetsSSE || tile.refine === 'ADD';
 		if (includeTile && !loadedContent && !lruCache.isFull() && hasContent) {
-			tiles3D.requestTileContents(tile);
+			renderer.requestTileContents(tile);
 		}
 
 		// Only mark this tile as visible if it meets the screen space error requirements, has loaded content, not
@@ -4918,7 +5007,7 @@
 		// load in.
 
 		// Skip the tile entirely if there's no content to load
-		if (meetsSSE && !allChildrenHaveContent && !childrenWereVisible && loadedContent || tile.refine === 'ADD' && loadedContent) {
+		if (meetsSSE && !allChildrenLoaded && !childrenWereVisible && loadedContent || tile.refine === 'ADD' && loadedContent) {
 			if (tile.__inFrustum) {
 				tile.__visible = true;
 				stats.visible++;
@@ -4929,50 +5018,50 @@
 
 		// If we're additive then don't stop the traversal here because it doesn't matter whether the children load in
 		// at the same rate.
-		if (tile.refine !== 'ADD' && meetsSSE && !allChildrenHaveContent && loadedContent) {
+		if (tile.refine === 'REPLACE' && meetsSSE && !allChildrenLoaded) {
 			// load the child content if we've found that we've been loaded so we can move down to the next tile
 			// layer when the data has loaded.
 			for (let i = 0, l = children.length; i < l; i++) {
 				const c = children[i];
-				if (_isUsedThisFrame(c, frameCount) && !lruCache.isFull()) {
-					c.__depthFromRenderedParent = tile.__depthFromRenderedParent + 1;
-					_recursivelyLoadTiles(c, c.__depthFromRenderedParent, tiles3D);
+				if (isUsedThisFrame(c, renderer.frameCount)) {
+					recursivelyLoadNextRenderableTiles(c, renderer);
 				}
 			}
 		} else {
 			for (let i = 0, l = children.length; i < l; i++) {
-				const c = children[i];
-				if (_isUsedThisFrame(c, frameCount)) {
-					skipTraversal(c, tiles3D);
-				}
+				markVisibleTiles(children[i], renderer);
 			}
 		}
 	};
 
 	// Final traverse to toggle tile visibility.
-	const toggleTiles = (tile, tiles3D) => {
-		const frameCount = tiles3D.frameCount;
-		const isUsed = _isUsedThisFrame(tile, frameCount);
+	const toggleTiles = (tile, renderer) => {
+		const isUsed = isUsedThisFrame(tile, renderer.frameCount);
 		if (isUsed || tile.__usedLastFrame) {
 			let setActive = false;
 			let setVisible = false;
 			if (isUsed) {
 				// enable visibility if active due to shadows
 				setActive = tile.__active;
-				if (tiles3D.displayActiveTiles) {
+				if (renderer.displayActiveTiles) {
 					setVisible = tile.__active || tile.__visible;
 				} else {
 					setVisible = tile.__visible;
 				}
+			} else {
+				// if the tile was used last frame but not this one then there's potential for the tile
+				// to not have been visited during the traversal, meaning it hasn't been reset and has
+				// stale values. This ensures the values are not stale.
+				resetFrameState(tile, renderer);
 			}
 
 			// If the active or visible state changed then call the functions.
-			if (tile.__hasRenderableContent && tile.__loadingState === RequestState$1.LOADED) {
+			if (tile.__hasRenderableContent && tile.__loadingState === LOADED) {
 				if (tile.__wasSetActive !== setActive) {
-					tiles3D.$setTileActive(tile, setActive);
+					renderer.invokeOnePlugin(plugin => plugin.setTileActive && plugin.setTileActive(tile, setActive));
 				}
 				if (tile.__wasSetVisible !== setVisible) {
-					tiles3D.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, setVisible));
+					renderer.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, setVisible));
 				}
 			}
 			tile.__wasSetActive = setActive;
@@ -4981,119 +5070,10 @@
 			const children = tile.children;
 			for (let i = 0, l = children.length; i < l; i++) {
 				const c = children[i];
-				toggleTiles(c, tiles3D);
+				toggleTiles(c, renderer);
 			}
 		}
 	};
-
-	// Resets the frame frame information for the given tile
-	const _resetFrameState = (tile, frameCount) => {
-		if (tile.__lastFrameVisited !== frameCount) {
-			tile.__lastFrameVisited = frameCount;
-			tile.__used = false;
-			tile.__inFrustum = false;
-			tile.__isLeaf = false;
-			tile.__visible = false;
-			tile.__active = false;
-			tile.__error = Infinity;
-			tile.__distanceFromCamera = Infinity;
-			tile.__childrenWereVisible = false;
-			tile.__allChildrenLoaded = false;
-		}
-	};
-	const _tileInView = (tile, tiles3D) => {
-		const cameraInfos = tiles3D.$cameras.getInfos();
-		const cached = tile.cached;
-		const boundingVolume = cached.boundingVolume;
-		const inFrustum = cached.inFrustum;
-		let inView = false;
-		for (let i = 0, l = cameraInfos.length; i < l; i++) {
-			// Track which camera frustums this tile is in so we can use it
-			// to ignore the error calculations for cameras that can't see it
-			const frustum = cameraInfos[i].frustum;
-			if (boundingVolume.intersectsFrustum(frustum)) {
-				inView = true;
-				inFrustum[i] = true;
-			} else {
-				inFrustum[i] = false;
-			}
-		}
-		return inView;
-	};
-	const _calculateError = (tile, tiles3D) => {
-		const cameraInfos = tiles3D.$cameras.getInfos();
-		const cached = tile.cached;
-		const inFrustum = cached.inFrustum;
-		const boundingVolume = cached.boundingVolume;
-		let maxError = -Infinity;
-		let minDistance = Infinity;
-		for (let i = 0, l = cameraInfos.length; i < l; i++) {
-			if (!inFrustum[i]) {
-				continue;
-			}
-
-			// transform camera position into local frame of the tile bounding box
-			const info = cameraInfos[i];
-			const invScale = info.invScale;
-			let error;
-			if (info.isOrthographic) {
-				const pixelSize = info.pixelSize;
-				error = tile.geometricError / (pixelSize * invScale);
-			} else {
-				const distance = boundingVolume.distanceToPoint(info.position);
-				const scaledDistance = distance * invScale;
-				const sseDenominator = info.sseDenominator;
-				error = tile.geometricError / (scaledDistance * sseDenominator);
-				minDistance = Math.min(minDistance, scaledDistance);
-			}
-			maxError = Math.max(maxError, error);
-		}
-		tile.__distanceFromCamera = minDistance;
-		tile.__error = maxError;
-	};
-
-	// Recursively mark tiles used down to the next tile with content
-	const _recursivelyMarkUsed = (tile, frameCount, lruCache) => {
-		_resetFrameState(tile, frameCount);
-		tile.__used = true;
-		lruCache.markUsed(tile);
-		if (!tile.__hasRenderableContent) {
-			const children = tile.children;
-			for (let i = 0, l = children.length; i < l; i++) {
-				_recursivelyMarkUsed(children[i], frameCount, lruCache);
-			}
-		}
-	};
-
-	// Checks whether this tile was last used on the given frame.
-	const _isUsedThisFrame = (tile, frameCount) => {
-		return tile.__lastFrameVisited === frameCount && tile.__used;
-	};
-	function _isDownloadFinished(value) {
-		return value === RequestState$1.LOADED || value === RequestState$1.FAILED;
-	}
-	const _recursivelyLoadTiles = (tile, depthFromRenderedParent, tiles3D) => {
-		// Try to load any external tile set children if the external tile set has loaded.
-		const doTraverse = !tile.__hasRenderableContent && (!tile.__hasUnrenderableContent || _isDownloadFinished(tile.__loadingState));
-		if (doTraverse) {
-			const children = tile.children;
-			for (let i = 0, l = children.length; i < l; i++) {
-				// don't increment depth to rendered parent here because we should treat
-				// the next layer of rendered children as just a single depth away for the
-				// sake of sorting.
-				const child = children[i];
-				child.__depthFromRenderedParent = depthFromRenderedParent;
-				_recursivelyLoadTiles(child, depthFromRenderedParent, tiles3D);
-			}
-		} else {
-			tiles3D.requestTileContents(tile);
-		}
-	};
-
-	// https://en.wikipedia.org/wiki/World_Geodetic_System
-	// https://en.wikipedia.org/wiki/Flattening
-	const WGS84_RADIUS = 6378137;
-	const WGS84_HEIGHT = 6356752.314245179;
 
 	const WGS84_ELLIPSOID = new Ellipsoid(new t3d.Vector3(WGS84_RADIUS, WGS84_RADIUS, WGS84_HEIGHT));
 	WGS84_ELLIPSOID.name = 'WGS84 Earth';
@@ -5107,6 +5087,10 @@
 	const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
 	const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
 	const tempMat = new t3d.Matrix4();
+	const viewErrorTarget = {
+		inView: false,
+		error: Infinity
+	};
 	const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
 		const te = matrixA.elements;
 		const me = matrixB.elements;
@@ -5164,6 +5148,10 @@
 		return 0;
 	};
 	class Tiles3D extends t3d.Object3D {
+		get root() {
+			const rootTileSet = this.rootTileSet;
+			return rootTileSet ? rootTileSet.root : null;
+		}
 		constructor(url, manager = new t3d.LoadingManager()) {
 			super();
 			this.ellipsoid = WGS84_ELLIPSOID.clone();
@@ -5202,11 +5190,12 @@
 			this.activeTiles = new Set();
 			this.visibleTiles = new Set();
 			this.usedSet = new Set();
+			this.rootLoadingState = UNLOADED;
 
 			// internals
 
 			this.rootURL = url;
-			this._rootTileSet = null;
+			this.rootTileSet = null;
 			this._autoDisableRendererCulling = true;
 			this.plugins = [];
 			const lruCache = new LRUCache();
@@ -5286,9 +5275,37 @@
 		// Public API
 		update() {
 			const {
-				root,
-				stats
+				lruCache,
+				usedSet,
+				stats,
+				root
 			} = this;
+			if (this.rootLoadingState === UNLOADED) {
+				this.rootLoadingState = LOADING;
+				this.invokeOnePlugin(plugin => plugin.loadRootTileSet && plugin.loadRootTileSet()).then(root => {
+					let processedUrl = this.rootURL;
+					if (processedUrl !== null) {
+						this.invokeAllPlugins(plugin => processedUrl = plugin.preprocessURL ? plugin.preprocessURL(processedUrl, null) : processedUrl);
+					}
+					this.rootLoadingState = LOADED;
+					this.rootTileSet = root;
+					this.dispatchEvent({
+						type: 'load-tile-set',
+						tileSet: root,
+						url: processedUrl
+					});
+				}).catch(error => {
+					this.rootLoadingState = FAILED;
+					console.error(error);
+					this.rootTileSet = null;
+					this.dispatchEvent({
+						type: 'load-error',
+						tile: null,
+						error,
+						url: this.rootURL
+					});
+				});
+			}
 			if (!root) {
 				return;
 			}
@@ -5299,21 +5316,27 @@
 			stats.active = 0;
 			stats.visible = 0;
 			this.frameCount++;
-			determineFrustumSet(root, this);
+			usedSet.forEach(tile => lruCache.markUnused(tile));
+			usedSet.clear();
+			markUsedTiles(root, this);
 			markUsedSetLeaves(root, this);
-			skipTraversal(root, this);
+			markVisibleTiles(root, this);
 			toggleTiles(root, this);
 			this.lruCache.scheduleUnload();
 			this.dispatchEvent(_updateAfterEvent);
 		}
 		resetFailedTiles() {
+			// reset the root tile if it's finished but never loaded
+			if (this.rootLoadingState === FAILED) {
+				this.rootLoadingState = UNLOADED;
+			}
 			const stats = this.stats;
 			if (stats.failed === 0) {
 				return;
 			}
 			this.traverse(tile => {
-				if (tile.__loadingState === RequestState$1.FAILED) {
-					tile.__loadingState = RequestState$1.UNLOADED;
+				if (tile.__loadingState === FAILED) {
+					tile.__loadingState = UNLOADED;
 				}
 			}, null, false);
 			stats.failed = 0;
@@ -5347,6 +5370,259 @@
 			};
 			this.frameCount = 0;
 		}
+		dispatchEvent(event) {
+			this.$events.dispatchEvent(event);
+		}
+		fetchData(url, options) {
+			return fetch(url, options);
+		}
+		parseTile(buffer, tile, extension) {
+			return this.$modelLoader.loadTileContent(buffer, tile, extension, this).then(scene => {
+				scene.traverse(c => {
+					c[INITIAL_FRUSTUM_CULLED] = c.frustumCulled; // store initial value
+					c.frustumCulled = c.frustumCulled && !this._autoDisableRendererCulling;
+				});
+				this.dispatchEvent({
+					type: 'load-model',
+					scene,
+					tile
+				});
+			});
+		}
+		disposeTile(tile) {
+			// This could get called before the tile has finished downloading
+			const cached = tile.cached;
+			if (cached.scene) {
+				const materials = cached.materials;
+				const geometry = cached.geometry;
+				const textures = cached.textures;
+				const parent = cached.scene.parent;
+				for (let i = 0, l = geometry.length; i < l; i++) {
+					geometry[i].dispose();
+				}
+				for (let i = 0, l = materials.length; i < l; i++) {
+					materials[i].dispose();
+				}
+				for (let i = 0, l = textures.length; i < l; i++) {
+					const texture = textures[i];
+					if (texture.image instanceof ImageBitmap) {
+						texture.image.close();
+					}
+					texture.dispose();
+				}
+				if (parent) {
+					parent.remove(cached.scene);
+				}
+				this.dispatchEvent({
+					type: 'dispose-model',
+					scene: cached.scene,
+					tile
+				});
+				cached.scene = null;
+				cached.materials = null;
+				cached.textures = null;
+				cached.geometry = null;
+				cached.metadata = null;
+			}
+			tile._loadIndex++;
+		}
+		preprocessNode(tile, tileSetDir, parentTile = null) {
+			if (tile.contents) {
+				// TODO: multiple contents (1.1) are not supported yet
+				tile.content = tile.contents[0];
+			}
+			if (tile.content) {
+				// Fix old file formats
+				if (!('uri' in tile.content) && 'url' in tile.content) {
+					tile.content.uri = tile.content.url;
+					delete tile.content.url;
+				}
+
+				// NOTE: fix for some cases where tile provide the bounding volume
+				// but volumes are not present.
+				if (tile.content.boundingVolume && !('box' in tile.content.boundingVolume || 'sphere' in tile.content.boundingVolume || 'region' in tile.content.boundingVolume)) {
+					delete tile.content.boundingVolume;
+				}
+			}
+			tile.parent = parentTile;
+			tile.children = tile.children || [];
+			if (tile.content?.uri) {
+				// "content" should only indicate loadable meshes, not external tile sets
+				const extension = getUrlExtension(tile.content.uri);
+				tile.__hasContent = true;
+				tile.__hasUnrenderableContent = Boolean(extension && /json$/.test(extension));
+				tile.__hasRenderableContent = !tile.__hasUnrenderableContent;
+			} else {
+				tile.__hasContent = false;
+				tile.__hasUnrenderableContent = false;
+				tile.__hasRenderableContent = false;
+			}
+
+			// tracker for determining if all the children have been asynchronously
+			// processed and are ready to be traversed
+			tile.__childrenProcessed = 0;
+			if (parentTile) {
+				parentTile.__childrenProcessed++;
+			}
+			tile.__distanceFromCamera = Infinity;
+			tile.__error = Infinity;
+			tile.__inFrustum = false;
+			tile.__isLeaf = false;
+			tile.__usedLastFrame = false;
+			tile.__used = false;
+			tile.__wasSetVisible = false;
+			tile.__visible = false;
+			tile.__childrenWereVisible = false;
+			tile.__allChildrenLoaded = false;
+			tile.__wasSetActive = false;
+			tile.__active = false;
+			tile.__loadingState = UNLOADED;
+			if (parentTile === null) {
+				tile.__depth = 0;
+				tile.__depthFromRenderedParent = tile.__hasRenderableContent ? 1 : 0;
+				tile.refine = tile.refine || 'REPLACE';
+			} else {
+				// increment the "depth from parent" when we encounter a new tile with content
+				tile.__depth = parentTile.__depth + 1;
+				tile.__depthFromRenderedParent = parentTile.__depthFromRenderedParent + (tile.__hasRenderableContent ? 1 : 0);
+				tile.refine = tile.refine || parentTile.refine;
+			}
+			tile.__basePath = tileSetDir;
+			tile.__lastFrameVisited = -1;
+			tile.__loadIndex = 0; // TODO remove this
+			tile.__loadAbort = null; // TODO remove this
+
+			this.invokeAllPlugins(plugin => {
+				plugin !== this && plugin.preprocessNode && plugin.preprocessNode(tile, tileSetDir, parentTile);
+			});
+
+			// cached
+
+			const transform = new t3d.Matrix4();
+			if (tile.transform) {
+				transform.fromArray(tile.transform);
+			}
+			if (parentTile) {
+				transform.premultiply(parentTile.cached.transform);
+			}
+			const transformInverse = new t3d.Matrix4().copy(transform).inverse();
+			const boundingVolume = new TileBoundingVolume();
+			if ('sphere' in tile.boundingVolume) {
+				boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
+			}
+			if ('box' in tile.boundingVolume) {
+				boundingVolume.setOBBData(tile.boundingVolume.box, transform);
+			}
+			if ('region' in tile.boundingVolume) {
+				boundingVolume.setRegionData(this.ellipsoid, ...tile.boundingVolume.region);
+			}
+			tile.cached = {
+				transform,
+				transformInverse,
+				active: false,
+				boundingVolume,
+				metadata: null,
+				scene: null,
+				geometry: null,
+				materials: null,
+				textures: null,
+				// TODO remove this
+
+				inFrustum: [],
+				featureTable: null,
+				batchTable: null
+			};
+		}
+		setTileActive(tile, active) {
+			active ? this.activeTiles.add(tile) : this.activeTiles.delete(tile);
+		}
+		setTileVisible(tile, visible) {
+			const scene = tile.cached.scene;
+			if (visible) {
+				if (scene) {
+					this.add(scene);
+					scene.updateMatrix(true);
+				}
+			} else {
+				if (scene) {
+					this.remove(scene);
+				}
+			}
+			visible ? this.visibleTiles.add(tile) : this.visibleTiles.delete(tile);
+			this.dispatchEvent({
+				type: 'tile-visibility-change',
+				scene,
+				tile,
+				visible
+			});
+		}
+		calculateTileViewError(tile, target) {
+			// retrieve whether the tile is visible, screen space error, and distance to camera
+			// set "inView", "error", "distance"
+
+			const cached = tile.cached;
+			const cameraInfo = this.$cameras.getInfos();
+			const boundingVolume = cached.boundingVolume;
+			let inView = false;
+			let inViewError = -Infinity;
+			let inViewDistance = Infinity;
+			let maxError = -Infinity;
+			let minDistance = Infinity;
+			for (let i = 0, l = cameraInfo.length; i < l; i++) {
+				// calculate the camera error
+				const info = cameraInfo[i];
+				let error;
+				let distance;
+				if (info.isOrthographic) {
+					const pixelSize = info.pixelSize;
+					error = tile.geometricError / pixelSize;
+					distance = Infinity;
+				} else {
+					const sseDenominator = info.sseDenominator;
+					distance = boundingVolume.distanceToPoint(info.position);
+					error = tile.geometricError / (distance * sseDenominator);
+				}
+
+				// Track which camera frustums this tile is in so we can use it
+				// to ignore the error calculations for cameras that can't see it
+				const frustum = cameraInfo[i].frustum;
+				if (boundingVolume.intersectsFrustum(frustum)) {
+					inView = true;
+					inViewError = Math.max(inViewError, error);
+					inViewDistance = Math.min(inViewDistance, distance);
+				}
+				maxError = Math.max(maxError, error);
+				minDistance = Math.min(minDistance, distance);
+			}
+
+			// check the plugin visibility
+			this.invokeAllPlugins(plugin => {
+				if (plugin !== this && plugin.calculateTileViewError) {
+					plugin.calculateTileViewError(tile, viewErrorTarget);
+					if (viewErrorTarget.inView) {
+						inView = true;
+						inViewError = Math.max(inViewError, viewErrorTarget.error);
+					}
+					maxError = Math.max(maxError, viewErrorTarget.error);
+				}
+			});
+
+			// If the tiles are out of view then use the global distance and error calculated
+			if (inView) {
+				target.inView = true;
+				target.error = inViewError;
+				target.distanceToCamera = inViewDistance;
+			} else {
+				target.inView = false;
+				target.error = maxError;
+				target.distanceToCamera = minDistance;
+			}
+		}
+		ensureChildrenArePreprocessed(tile, immediate = false) {
+			// TODO
+		}
+
+		// Private Functions
 		preprocessTileSet(json, url, parent = null) {
 			const version = json.asset.version;
 			const [major, minor] = version.split('.').map(v => parseInt(v));
@@ -5395,37 +5671,195 @@
 			});
 			return pr;
 		}
-		fetchData(url, options) {
-			return fetch(url, options);
-		}
-		get rootTileSet() {
-			const rootTileSet = this._rootTileSet;
-			if (!rootTileSet) {
-				this._rootTileSet = this.invokeOnePlugin(plugin => plugin.loadRootTileSet && plugin.loadRootTileSet()).then(root => {
-					let processedUrl = this.rootURL;
-					if (processedUrl !== null) {
-						this.invokeAllPlugins(plugin => processedUrl = plugin.preprocessURL ? plugin.preprocessURL(processedUrl, null) : processedUrl);
+		requestTileContents(tile) {
+			// If the tile is already being loaded then don't
+			// start it again.
+			if (tile.__loadingState !== UNLOADED) {
+				return;
+			}
+			const stats = this.stats;
+			const lruCache = this.lruCache;
+			const downloadQueue = this.downloadQueue;
+			const parseQueue = this.parseQueue;
+			const isExternalTileSet = tile.__hasUnrenderableContent;
+			lruCache.add(tile, t => {
+				if (t.__loadingState === LOADING) {
+					// Stop the load if it's started
+					t.__loadAbort.abort();
+					t.__loadAbort = null;
+				} else if (isExternalTileSet) {
+					t.children.length = 0;
+				} else {
+					this.disposeTile(t);
+				}
+
+				// Decrement stats
+				if (t.__loadingState === LOADING) {
+					stats.downloading--;
+				} else if (t.__loadingState === PARSING) {
+					stats.parsing--;
+				}
+				t.__loadingState = UNLOADED;
+				t.__loadIndex++;
+				downloadQueue.remove(t);
+				parseQueue.remove(t);
+			});
+
+			// Track a new load index so we avoid the condition where this load is stopped and
+			// another begins soon after so we don't parse twice.
+			tile.__loadIndex++;
+			const loadIndex = tile.__loadIndex;
+			const controller = new AbortController();
+			const signal = controller.signal;
+			stats.downloading++;
+			tile.__loadAbort = controller;
+			tile.__loadingState = LOADING;
+			const errorCallback = e => {
+				// if it has been unloaded then the tile has been disposed
+				if (tile.__loadIndex !== loadIndex) {
+					return;
+				}
+				if (e.name !== 'AbortError') {
+					downloadQueue.remove(tile);
+					parseQueue.remove(tile);
+					if (tile.__loadingState === PARSING) {
+						stats.parsing--;
+					} else if (tile.__loadingState === LOADING) {
+						stats.downloading--;
 					}
-					this._rootTileSet = root;
+					stats.failed++;
+					tile.__loadingState = FAILED;
+
+					// Handle fetch bug for switching examples in index.html.
+					// https://stackoverflow.com/questions/12009423/what-does-status-canceled-for-a-resource-mean-in-chrome-developer-tools
+					if (e.message !== 'Failed to fetch') {
+						console.error(`Tiles3D: Failed to load tile at url "${tile.content.uri}".`);
+						console.error(e);
+					}
+				} else {
+					lruCache.remove(tile);
+				}
+			};
+			let uri = new URL(tile.content.uri, tile.__basePath + '/').toString();
+			this.invokeAllPlugins(plugin => uri = plugin.preprocessURL ? plugin.preprocessURL(uri, tile) : uri);
+			if (isExternalTileSet) {
+				downloadQueue.add(tile, tileCb => {
+					// if it has been unloaded then the tile has been disposed
+					if (tileCb.__loadIndex !== loadIndex) {
+						return Promise.resolve();
+					}
+					return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, {
+						...this.fetchOptions,
+						signal
+					}));
+				}).then(res => {
+					if (res.ok) {
+						return res.json();
+					} else {
+						throw new Error(`Tiles3D: Failed to load tileset "${uri}" with status ${res.status} : ${res.statusText}`);
+					}
+				}).then(json => {
+					this.preprocessTileSet(json, uri, tile);
+					return json;
+				}).then(json => {
+					// if it has been unloaded then the tile has been disposed
+					if (tile.__loadIndex !== loadIndex) {
+						return;
+					}
+					stats.downloading--;
+					tile.__loadAbort = null;
+					tile.__loadingState = LOADED;
+					tile.children.push(json.root);
 					this.dispatchEvent({
 						type: 'load-tile-set',
-						tileSet: root,
-						url: processedUrl
+						tileSet: json,
+						url: uri
 					});
-				}).catch(err => {
-					console.error(err);
-					this._rootTileSet = err;
-				});
-				return null;
-			} else if (rootTileSet instanceof Promise || rootTileSet instanceof Error) {
-				return null;
+				}).catch(errorCallback);
+			} else {
+				downloadQueue.add(tile, tileCb => {
+					if (tileCb.__loadIndex !== loadIndex) {
+						return Promise.resolve();
+					}
+					return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, {
+						...this.fetchOptions,
+						signal
+					}));
+				}).then(res => {
+					if (tile.__loadIndex !== loadIndex) {
+						return;
+					}
+					if (res.ok) {
+						const extension = getUrlExtension(res.url);
+						if (extension === 'gltf') {
+							return res.json();
+						} else {
+							return res.arrayBuffer();
+						}
+					} else {
+						throw new Error(`Failed to load model with error code ${res.status}`);
+					}
+				}).then(buffer => {
+					// if it has been unloaded then the tile has been disposed
+					if (tile.__loadIndex !== loadIndex) {
+						return;
+					}
+					stats.downloading--;
+					stats.parsing++;
+					tile.__loadAbort = null;
+					tile.__loadingState = PARSING;
+					return parseQueue.add(tile, parseTile => {
+						// if it has been unloaded then the tile has been disposed
+						if (parseTile.__loadIndex !== loadIndex) {
+							return Promise.resolve();
+						}
+						const uri = parseTile.content.uri;
+						const extension = getUrlExtension(uri);
+						return this.parseTile(buffer, parseTile, extension);
+					});
+				}).then(() => {
+					// if it has been unloaded then the tile has been disposed
+					if (tile.__loadIndex !== loadIndex) {
+						return;
+					}
+					stats.parsing--;
+					tile.__loadingState = LOADED;
+					if (tile.__wasSetVisible) {
+						this.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, true));
+					}
+					if (tile.__wasSetActive) {
+						this.setTileActive(tile, true);
+					}
+				}).catch(errorCallback);
 			}
-			return rootTileSet;
 		}
-		get root() {
-			const rootTileSet = this.rootTileSet;
-			return rootTileSet ? rootTileSet.root : null;
+		getAttributions(target = []) {
+			this.invokeAllPlugins(plugin => plugin !== this && plugin.getAttributions && plugin.getAttributions(target));
+			return target;
 		}
+		invokeOnePlugin(func) {
+			const plugins = [...this.plugins, this];
+			for (let i = 0; i < plugins.length; i++) {
+				const result = func(plugins[i]);
+				if (result) {
+					return result;
+				}
+			}
+			return null;
+		}
+		invokeAllPlugins(func) {
+			const plugins = [...this.plugins, this];
+			const pending = [];
+			for (let i = 0; i < plugins.length; i++) {
+				const result = func(plugins[i]);
+				if (result) {
+					pending.push(result);
+				}
+			}
+			return pending.length === 0 ? null : Promise.all(pending);
+		}
+
+		//
 		get autoDisableRendererCulling() {
 			return this._autoDisableRendererCulling;
 		}
@@ -5453,9 +5887,6 @@
 		}
 		removeEventListener(type, listener, thisObject) {
 			this.$events.removeEventListener(type, listener, thisObject);
-		}
-		dispatchEvent(event) {
-			this.$events.dispatchEvent(event);
 		}
 		addCamera(camera) {
 			const success = this.$cameras.add(camera);
@@ -5563,374 +5994,6 @@
 					}
 				}
 			}
-		}
-		getAttributions(target = []) {
-			this.invokeAllPlugins(plugin => plugin !== this && plugin.getAttributions && plugin.getAttributions(target));
-			return target;
-		}
-		invokeOnePlugin(func) {
-			const plugins = [...this.plugins, this];
-			for (let i = 0; i < plugins.length; i++) {
-				const result = func(plugins[i]);
-				if (result) {
-					return result;
-				}
-			}
-			return null;
-		}
-		invokeAllPlugins(func) {
-			const plugins = [...this.plugins, this];
-			const pending = [];
-			for (let i = 0; i < plugins.length; i++) {
-				const result = func(plugins[i]);
-				if (result) {
-					pending.push(result);
-				}
-			}
-			return pending.length === 0 ? null : Promise.all(pending);
-		}
-		preprocessNode(tile, tileSetDir, parentTile = null) {
-			if (tile.contents) {
-				// TODO: multiple contents (1.1) are not supported yet
-				tile.content = tile.contents[0];
-			}
-			if (tile.content) {
-				// Fix old file formats
-				if (!('uri' in tile.content) && 'url' in tile.content) {
-					tile.content.uri = tile.content.url;
-					delete tile.content.url;
-				}
-
-				// NOTE: fix for some cases where tile provide the bounding volume
-				// but volumes are not present.
-				if (tile.content.boundingVolume && !('box' in tile.content.boundingVolume || 'sphere' in tile.content.boundingVolume || 'region' in tile.content.boundingVolume)) {
-					delete tile.content.boundingVolume;
-				}
-			}
-			tile.parent = parentTile;
-			tile.children = tile.children || [];
-			if (tile.content?.uri) {
-				// "content" should only indicate loadable meshes, not external tile sets
-				const extension = getUrlExtension(tile.content.uri);
-				tile.__hasContent = true;
-				tile.__hasUnrenderableContent = Boolean(extension && /json$/.test(extension));
-				tile.__hasRenderableContent = !tile.__hasUnrenderableContent;
-			} else {
-				tile.__hasContent = false;
-				tile.__hasUnrenderableContent = false;
-				tile.__hasRenderableContent = false;
-			}
-
-			// tracker for determining if all the children have been asynchronously
-			// processed and are ready to be traversed
-			tile.__childrenProcessed = 0;
-			if (parentTile) {
-				parentTile.__childrenProcessed++;
-			}
-			tile.__distanceFromCamera = Infinity;
-			tile.__error = Infinity;
-			tile.__inFrustum = false;
-			tile.__isLeaf = false;
-			tile.__usedLastFrame = false;
-			tile.__used = false;
-			tile.__wasSetVisible = false;
-			tile.__visible = false;
-			tile.__childrenWereVisible = false;
-			tile.__allChildrenLoaded = false;
-			tile.__wasSetActive = false;
-			tile.__active = false;
-			tile.__loadingState = RequestState$1.UNLOADED;
-			if (parentTile === null) {
-				tile.__depth = 0;
-				tile.__depthFromRenderedParent = tile.__hasRenderableContent ? 1 : 0;
-				tile.refine = tile.refine || 'REPLACE';
-			} else {
-				// increment the "depth from parent" when we encounter a new tile with content
-				tile.__depth = parentTile.__depth + 1;
-				tile.__depthFromRenderedParent = parentTile.__depthFromRenderedParent + (tile.__hasRenderableContent ? 1 : 0);
-				tile.refine = tile.refine || parentTile.refine;
-			}
-			tile.__basePath = tileSetDir;
-			tile.__lastFrameVisited = -1;
-			tile.__loadIndex = 0; // TODO remove this
-			tile.__loadAbort = null; // TODO remove this
-
-			this.invokeAllPlugins(plugin => {
-				plugin !== this && plugin.preprocessNode && plugin.preprocessNode(tile, tileSetDir, parentTile);
-			});
-
-			// cached
-
-			const transform = new t3d.Matrix4();
-			if (tile.transform) {
-				transform.fromArray(tile.transform);
-			}
-			if (parentTile) {
-				transform.premultiply(parentTile.cached.transform);
-			}
-			const transformInverse = new t3d.Matrix4().copy(transform).inverse();
-			const boundingVolume = new TileBoundingVolume();
-			if ('sphere' in tile.boundingVolume) {
-				boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
-			}
-			if ('box' in tile.boundingVolume) {
-				boundingVolume.setOBBData(tile.boundingVolume.box, transform);
-			}
-			if ('region' in tile.boundingVolume) {
-				boundingVolume.setRegionData(this.ellipsoid, ...tile.boundingVolume.region);
-			}
-			tile.cached = {
-				transform,
-				transformInverse,
-				active: false,
-				boundingVolume,
-				metadata: null,
-				scene: null,
-				geometry: null,
-				materials: null,
-				textures: null,
-				// TODO remove this
-
-				inFrustum: [],
-				featureTable: null,
-				batchTable: null
-			};
-		}
-		parseTile(buffer, tile, extension) {
-			return this.$modelLoader.loadTileContent(buffer, tile, extension, this).then(scene => {
-				scene.traverse(c => {
-					c[INITIAL_FRUSTUM_CULLED] = c.frustumCulled; // store initial value
-					c.frustumCulled = c.frustumCulled && !this._autoDisableRendererCulling;
-				});
-				this.dispatchEvent({
-					type: 'load-model',
-					scene,
-					tile
-				});
-			});
-		}
-		setTileVisible(tile, visible) {
-			const scene = tile.cached.scene;
-			if (!scene) {
-				return;
-			}
-			const visibleTiles = this.visibleTiles;
-			if (visible) {
-				this.add(scene);
-				visibleTiles.add(tile);
-				scene.updateMatrix(true); // TODO: remove this?
-			} else {
-				this.remove(scene);
-				visibleTiles.delete(tile);
-			}
-			this.dispatchEvent({
-				type: 'tile-visibility-change',
-				scene,
-				tile,
-				visible
-			});
-		}
-		requestTileContents(tile) {
-			// If the tile is already being loaded then don't
-			// start it again.
-			if (tile.__loadingState !== RequestState$1.UNLOADED) {
-				return;
-			}
-			const stats = this.stats;
-			const lruCache = this.lruCache;
-			const downloadQueue = this.downloadQueue;
-			const parseQueue = this.parseQueue;
-			const isExternalTileSet = tile.__hasUnrenderableContent;
-			lruCache.add(tile, t => {
-				if (t.__loadingState === RequestState$1.LOADING) {
-					// Stop the load if it's started
-					t.__loadAbort.abort();
-					t.__loadAbort = null;
-				} else if (isExternalTileSet) {
-					t.children.length = 0;
-				} else {
-					this.$disposeTile(t);
-				}
-
-				// Decrement stats
-				if (t.__loadingState === RequestState$1.LOADING) {
-					stats.downloading--;
-				} else if (t.__loadingState === RequestState$1.PARSING) {
-					stats.parsing--;
-				}
-				t.__loadingState = RequestState$1.UNLOADED;
-				t.__loadIndex++;
-				downloadQueue.remove(t);
-				parseQueue.remove(t);
-			});
-
-			// Track a new load index so we avoid the condition where this load is stopped and
-			// another begins soon after so we don't parse twice.
-			tile.__loadIndex++;
-			const loadIndex = tile.__loadIndex;
-			const controller = new AbortController();
-			const signal = controller.signal;
-			stats.downloading++;
-			tile.__loadAbort = controller;
-			tile.__loadingState = RequestState$1.LOADING;
-			const errorCallback = e => {
-				// if it has been unloaded then the tile has been disposed
-				if (tile.__loadIndex !== loadIndex) {
-					return;
-				}
-				if (e.name !== 'AbortError') {
-					downloadQueue.remove(tile);
-					parseQueue.remove(tile);
-					if (tile.__loadingState === RequestState$1.PARSING) {
-						stats.parsing--;
-					} else if (tile.__loadingState === RequestState$1.LOADING) {
-						stats.downloading--;
-					}
-					stats.failed++;
-					tile.__loadingState = RequestState$1.FAILED;
-
-					// Handle fetch bug for switching examples in index.html.
-					// https://stackoverflow.com/questions/12009423/what-does-status-canceled-for-a-resource-mean-in-chrome-developer-tools
-					if (e.message !== 'Failed to fetch') {
-						console.error(`Tiles3D: Failed to load tile at url "${tile.content.uri}".`);
-						console.error(e);
-					}
-				} else {
-					lruCache.remove(tile);
-				}
-			};
-			let uri = new URL(tile.content.uri, tile.__basePath + '/').toString();
-			this.invokeAllPlugins(plugin => uri = plugin.preprocessURL ? plugin.preprocessURL(uri, tile) : uri);
-			if (isExternalTileSet) {
-				downloadQueue.add(tile, tileCb => {
-					// if it has been unloaded then the tile has been disposed
-					if (tileCb.__loadIndex !== loadIndex) {
-						return Promise.resolve();
-					}
-					return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, {
-						...this.fetchOptions,
-						signal
-					}));
-				}).then(res => {
-					if (res.ok) {
-						return res.json();
-					} else {
-						throw new Error(`Tiles3D: Failed to load tileset "${uri}" with status ${res.status} : ${res.statusText}`);
-					}
-				}).then(json => {
-					this.preprocessTileSet(json, uri, tile);
-					return json;
-				}).then(json => {
-					// if it has been unloaded then the tile has been disposed
-					if (tile.__loadIndex !== loadIndex) {
-						return;
-					}
-					stats.downloading--;
-					tile.__loadAbort = null;
-					tile.__loadingState = RequestState$1.LOADED;
-					tile.children.push(json.root);
-					this.dispatchEvent({
-						type: 'load-tile-set',
-						tileSet: json,
-						url: uri
-					});
-				}).catch(errorCallback);
-			} else {
-				downloadQueue.add(tile, tileCb => {
-					if (tileCb.__loadIndex !== loadIndex) {
-						return Promise.resolve();
-					}
-					return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, {
-						...this.fetchOptions,
-						signal
-					}));
-				}).then(res => {
-					if (tile.__loadIndex !== loadIndex) {
-						return;
-					}
-					if (res.ok) {
-						const extension = getUrlExtension(res.url);
-						if (extension === 'gltf') {
-							return res.json();
-						} else {
-							return res.arrayBuffer();
-						}
-					} else {
-						throw new Error(`Failed to load model with error code ${res.status}`);
-					}
-				}).then(buffer => {
-					// if it has been unloaded then the tile has been disposed
-					if (tile.__loadIndex !== loadIndex) {
-						return;
-					}
-					stats.downloading--;
-					stats.parsing++;
-					tile.__loadAbort = null;
-					tile.__loadingState = RequestState$1.PARSING;
-					return parseQueue.add(tile, parseTile => {
-						// if it has been unloaded then the tile has been disposed
-						if (parseTile.__loadIndex !== loadIndex) {
-							return Promise.resolve();
-						}
-						const uri = parseTile.content.uri;
-						const extension = getUrlExtension(uri);
-						return this.parseTile(buffer, parseTile, extension);
-					});
-				}).then(() => {
-					// if it has been unloaded then the tile has been disposed
-					if (tile.__loadIndex !== loadIndex) {
-						return;
-					}
-					stats.parsing--;
-					tile.__loadingState = RequestState$1.LOADED;
-					if (tile.__wasSetVisible) {
-						this.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, true));
-					}
-					if (tile.__wasSetActive) {
-						this.$setTileActive(tile, true);
-					}
-				}).catch(errorCallback);
-			}
-		}
-		ensureChildrenArePreprocessed(tile, immediate = false) {
-			// TODO
-		}
-		$setTileActive(tile, active) {
-			const activeTiles = this.activeTiles;
-			if (active) {
-				activeTiles.add(tile);
-			} else {
-				activeTiles.delete(tile);
-			}
-		}
-		$disposeTile(tile) {
-			// This could get called before the tile has finished downloading
-			const cached = tile.cached;
-			if (cached.scene) {
-				const materials = cached.materials;
-				const geometry = cached.geometry;
-				const textures = cached.textures;
-				for (let i = 0, l = geometry.length; i < l; i++) {
-					geometry[i].dispose();
-				}
-				for (let i = 0, l = materials.length; i < l; i++) {
-					materials[i].dispose();
-				}
-				for (let i = 0, l = textures.length; i < l; i++) {
-					const texture = textures[i];
-					texture.dispose();
-				}
-				this.dispatchEvent({
-					type: 'dispose-model',
-					scene: cached.scene,
-					tile
-				});
-				cached.scene = null;
-				cached.materials = null;
-				cached.textures = null;
-				cached.geometry = null;
-			}
-			tile._loadIndex++;
 		}
 	}
 

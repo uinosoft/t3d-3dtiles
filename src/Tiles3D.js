@@ -2,12 +2,12 @@ import { EventDispatcher, LoadingManager, Matrix4, Object3D } from 't3d';
 import { TileBoundingVolume } from './math/TileBoundingVolume.js';
 import { traverseSet, getUrlExtension } from './utils/Utils.js';
 import { raycastTraverse, raycastTraverseFirstHit, distanceSort } from './utils/IntersectionUtils.js';
-import RequestState from './utils/RequestState.js';
 import { CameraList } from './utils/CameraList.js';
 import { LRUCache } from './utils/LRUCache.js';
 import { PriorityQueue } from './utils/PriorityQueue.js';
 import { ModelLoader } from './utils/ModelLoader.js';
-import { determineFrustumSet, markUsedSetLeaves, skipTraversal, toggleTiles } from './utils/TilesScheduler.js';
+import { markUsedTiles, markUsedSetLeaves, markVisibleTiles, toggleTiles } from './utils/TilesScheduler.js';
+import { UNLOADED, LOADING, PARSING, LOADED, FAILED } from './constants.js';
 import { WGS84_ELLIPSOID } from './math/GeoConstants.js';
 
 const _updateBeforeEvent = { type: 'update-before' };
@@ -18,6 +18,10 @@ const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
 const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
 
 const tempMat = new Matrix4();
+const viewErrorTarget = {
+	inView: false,
+	error: Infinity
+};
 
 const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
 	const te = matrixA.elements;
@@ -82,6 +86,11 @@ const lruPriorityCallback = (a, b) => {
 
 export class Tiles3D extends Object3D {
 
+	get root() {
+		const rootTileSet = this.rootTileSet;
+		return rootTileSet ? rootTileSet.root : null;
+	}
+
 	constructor(url, manager = new LoadingManager()) {
 		super();
 
@@ -125,10 +134,12 @@ export class Tiles3D extends Object3D {
 		this.visibleTiles = new Set();
 		this.usedSet = new Set();
 
+		this.rootLoadingState = UNLOADED;
+
 		// internals
 
 		this.rootURL = url;
-		this._rootTileSet = null;
+		this.rootTileSet = null;
 
 		this._autoDisableRendererCulling = true;
 
@@ -225,7 +236,39 @@ export class Tiles3D extends Object3D {
 
 	// Public API
 	update() {
-		const { root, stats } = this;
+		const { lruCache, usedSet, stats, root } = this;
+
+		if (this.rootLoadingState === UNLOADED) {
+			this.rootLoadingState = LOADING;
+			this.invokeOnePlugin(plugin => plugin.loadRootTileSet && plugin.loadRootTileSet())
+				.then(root => {
+					let processedUrl = this.rootURL;
+					if (processedUrl !== null) {
+						this.invokeAllPlugins(plugin => processedUrl = plugin.preprocessURL ? plugin.preprocessURL(processedUrl, null) : processedUrl);
+					}
+
+					this.rootLoadingState = LOADED;
+					this.rootTileSet = root;
+
+					this.dispatchEvent({
+						type: 'load-tile-set',
+						tileSet: root,
+						url: processedUrl
+					});
+				})
+				.catch(error => {
+					this.rootLoadingState = FAILED;
+					console.error(error);
+
+					this.rootTileSet = null;
+					this.dispatchEvent({
+						type: 'load-error',
+						tile: null,
+						error,
+						url: this.rootURL
+					});
+				});
+		}
 
 		if (!root) {
 			return;
@@ -241,9 +284,12 @@ export class Tiles3D extends Object3D {
 		stats.visible = 0;
 		this.frameCount++;
 
-		determineFrustumSet(root, this);
+		usedSet.forEach(tile => lruCache.markUnused(tile));
+		usedSet.clear();
+
+		markUsedTiles(root, this);
 		markUsedSetLeaves(root, this);
-		skipTraversal(root, this);
+		markVisibleTiles(root, this);
 		toggleTiles(root, this);
 
 		this.lruCache.scheduleUnload();
@@ -252,14 +298,19 @@ export class Tiles3D extends Object3D {
 	}
 
 	resetFailedTiles() {
+		// reset the root tile if it's finished but never loaded
+		if (this.rootLoadingState === FAILED) {
+			this.rootLoadingState = UNLOADED;
+		}
+
 		const stats = this.stats;
 		if (stats.failed === 0) {
 			return;
 		}
 
 		this.traverse(tile => {
-			if (tile.__loadingState === RequestState.FAILED) {
-				tile.__loadingState = RequestState.UNLOADED;
+			if (tile.__loadingState === FAILED) {
+				tile.__loadingState = UNLOADED;
 			}
 		}, null, false);
 
@@ -298,6 +349,314 @@ export class Tiles3D extends Object3D {
 		this.frameCount = 0;
 	}
 
+	dispatchEvent(event) {
+		this.$events.dispatchEvent(event);
+	}
+
+	fetchData(url, options) {
+		return fetch(url, options);
+	}
+
+	parseTile(buffer, tile, extension) {
+		return this.$modelLoader.loadTileContent(buffer, tile, extension, this)
+			.then(scene => {
+				scene.traverse(c => {
+					c[INITIAL_FRUSTUM_CULLED] = c.frustumCulled; // store initial value
+					c.frustumCulled = c.frustumCulled && !this._autoDisableRendererCulling;
+				});
+
+				this.dispatchEvent({
+					type: 'load-model',
+					scene,
+					tile
+				});
+			});
+	}
+
+	disposeTile(tile) {
+		// This could get called before the tile has finished downloading
+		const cached = tile.cached;
+		if (cached.scene) {
+			const materials = cached.materials;
+			const geometry = cached.geometry;
+			const textures = cached.textures;
+			const parent = cached.scene.parent;
+
+			for (let i = 0, l = geometry.length; i < l; i++) {
+				geometry[i].dispose();
+			}
+
+			for (let i = 0, l = materials.length; i < l; i++) {
+				materials[i].dispose();
+			}
+
+			for (let i = 0, l = textures.length; i < l; i++) {
+				const texture = textures[i];
+
+				if (texture.image instanceof ImageBitmap) {
+					texture.image.close();
+				}
+
+				texture.dispose();
+			}
+
+			if (parent) {
+				parent.remove(cached.scene);
+			}
+
+			this.dispatchEvent({
+				type: 'dispose-model',
+				scene: cached.scene,
+				tile
+			});
+
+			cached.scene = null;
+			cached.materials = null;
+			cached.textures = null;
+			cached.geometry = null;
+			cached.metadata = null;
+		}
+
+		tile._loadIndex++;
+	}
+
+	preprocessNode(tile, tileSetDir, parentTile = null) {
+		if (tile.contents) {
+			// TODO: multiple contents (1.1) are not supported yet
+			tile.content = tile.contents[0];
+		}
+
+		if (tile.content) {
+			// Fix old file formats
+			if (!('uri' in tile.content) && 'url' in tile.content) {
+				tile.content.uri = tile.content.url;
+				delete tile.content.url;
+			}
+
+			// NOTE: fix for some cases where tile provide the bounding volume
+			// but volumes are not present.
+			if (
+				tile.content.boundingVolume &&
+			!(
+				'box' in tile.content.boundingVolume ||
+				'sphere' in tile.content.boundingVolume ||
+				'region' in tile.content.boundingVolume
+			)
+			) {
+				delete tile.content.boundingVolume;
+			}
+		}
+
+		tile.parent = parentTile;
+		tile.children = tile.children || [];
+
+		if (tile.content?.uri) {
+			// "content" should only indicate loadable meshes, not external tile sets
+			const extension = getUrlExtension(tile.content.uri);
+
+			tile.__hasContent = true;
+			tile.__hasUnrenderableContent = Boolean(extension && /json$/.test(extension));
+			tile.__hasRenderableContent = !tile.__hasUnrenderableContent;
+		} else {
+			tile.__hasContent = false;
+			tile.__hasUnrenderableContent = false;
+			tile.__hasRenderableContent = false;
+		}
+
+		// tracker for determining if all the children have been asynchronously
+		// processed and are ready to be traversed
+		tile.__childrenProcessed = 0;
+		if (parentTile) {
+			parentTile.__childrenProcessed++;
+		}
+
+		tile.__distanceFromCamera = Infinity;
+		tile.__error = Infinity;
+
+		tile.__inFrustum = false;
+		tile.__isLeaf = false;
+
+		tile.__usedLastFrame = false;
+		tile.__used = false;
+
+		tile.__wasSetVisible = false;
+		tile.__visible = false;
+		tile.__childrenWereVisible = false;
+		tile.__allChildrenLoaded = false;
+
+		tile.__wasSetActive = false;
+		tile.__active = false;
+
+		tile.__loadingState = UNLOADED;
+
+		if (parentTile === null) {
+			tile.__depth = 0;
+			tile.__depthFromRenderedParent = (tile.__hasRenderableContent ? 1 : 0);
+			tile.refine = tile.refine || 'REPLACE';
+		} else {
+			// increment the "depth from parent" when we encounter a new tile with content
+			tile.__depth = parentTile.__depth + 1;
+			tile.__depthFromRenderedParent = parentTile.__depthFromRenderedParent + (tile.__hasRenderableContent ? 1 : 0);
+			tile.refine = tile.refine || parentTile.refine;
+		}
+
+		tile.__basePath = tileSetDir;
+
+		tile.__lastFrameVisited = -1;
+
+		tile.__loadIndex = 0; // TODO remove this
+		tile.__loadAbort = null; // TODO remove this
+
+		this.invokeAllPlugins(plugin => {
+			plugin !== this && plugin.preprocessNode && plugin.preprocessNode(tile, tileSetDir, parentTile);
+		});
+
+		// cached
+
+		const transform = new Matrix4();
+		if (tile.transform) {
+			transform.fromArray(tile.transform);
+		}
+
+		if (parentTile) {
+			transform.premultiply(parentTile.cached.transform);
+		}
+
+		const transformInverse = new Matrix4().copy(transform).inverse();
+		const boundingVolume = new TileBoundingVolume();
+		if ('sphere' in tile.boundingVolume) {
+			boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
+		}
+		if ('box' in tile.boundingVolume) {
+			boundingVolume.setOBBData(tile.boundingVolume.box, transform);
+		}
+		if ('region' in tile.boundingVolume) {
+			boundingVolume.setRegionData(this.ellipsoid, ...tile.boundingVolume.region);
+		}
+
+		tile.cached = {
+			transform,
+			transformInverse,
+
+			active: false,
+
+			boundingVolume,
+
+			metadata: null,
+			scene: null,
+			geometry: null,
+			materials: null,
+			textures: null,
+
+			// TODO remove this
+
+			inFrustum: [],
+
+			featureTable: null,
+			batchTable: null
+		};
+	}
+
+	setTileActive(tile, active) {
+		active ? this.activeTiles.add(tile) : this.activeTiles.delete(tile);
+	}
+
+	setTileVisible(tile, visible) {
+		const scene = tile.cached.scene;
+
+		if (visible) {
+			if (scene) {
+				this.add(scene);
+				scene.updateMatrix(true);
+			}
+		} else {
+			if (scene) {
+				this.remove(scene);
+			}
+		}
+
+		visible ? this.visibleTiles.add(tile) : this.visibleTiles.delete(tile);
+
+		this.dispatchEvent({
+			type: 'tile-visibility-change',
+			scene,
+			tile,
+			visible
+		});
+	}
+
+	calculateTileViewError(tile, target) {
+		// retrieve whether the tile is visible, screen space error, and distance to camera
+		// set "inView", "error", "distance"
+
+		const cached = tile.cached;
+		const cameraInfo = this.$cameras.getInfos();
+		const boundingVolume = cached.boundingVolume;
+
+		let inView = false;
+		let inViewError = -Infinity;
+		let inViewDistance = Infinity;
+		let maxError = -Infinity;
+		let minDistance = Infinity;
+
+		for (let i = 0, l = cameraInfo.length; i < l; i++) {
+			// calculate the camera error
+			const info = cameraInfo[i];
+			let error;
+			let distance;
+			if (info.isOrthographic) {
+				const pixelSize = info.pixelSize;
+				error = tile.geometricError / pixelSize;
+				distance = Infinity;
+			} else {
+				const sseDenominator = info.sseDenominator;
+				distance = boundingVolume.distanceToPoint(info.position);
+				error = tile.geometricError / (distance * sseDenominator);
+			}
+
+			// Track which camera frustums this tile is in so we can use it
+			// to ignore the error calculations for cameras that can't see it
+			const frustum = cameraInfo[i].frustum;
+			if (boundingVolume.intersectsFrustum(frustum)) {
+				inView = true;
+				inViewError = Math.max(inViewError, error);
+				inViewDistance = Math.min(inViewDistance, distance);
+			}
+
+			maxError = Math.max(maxError, error);
+			minDistance = Math.min(minDistance, distance);
+		}
+
+		// check the plugin visibility
+		this.invokeAllPlugins(plugin => {
+			if (plugin !== this && plugin.calculateTileViewError) {
+				plugin.calculateTileViewError(tile, viewErrorTarget);
+				if (viewErrorTarget.inView) {
+					inView = true;
+					inViewError = Math.max(inViewError, viewErrorTarget.error);
+				}
+
+				maxError = Math.max(maxError, viewErrorTarget.error);
+			}
+		});
+
+		// If the tiles are out of view then use the global distance and error calculated
+		if (inView) {
+			target.inView = true;
+			target.error = inViewError;
+			target.distanceToCamera = inViewDistance;
+		} else {
+			target.inView = false;
+			target.error = maxError;
+			target.distanceToCamera = minDistance;
+		}
+	}
+
+	ensureChildrenArePreprocessed(tile, immediate = false) {
+		// TODO
+	}
+
+	// Private Functions
 	preprocessTileSet(json, url, parent = null) {
 		const version = json.asset.version;
 		const [major, minor] = version.split('.').map(v => parseInt(v));
@@ -361,46 +720,219 @@ export class Tiles3D extends Object3D {
 		return pr;
 	}
 
-	fetchData(url, options) {
-		return fetch(url, options);
-	}
-
-	get rootTileSet() {
-		const rootTileSet = this._rootTileSet;
-
-		if (!rootTileSet) {
-			this._rootTileSet = this.invokeOnePlugin(plugin => plugin.loadRootTileSet && plugin.loadRootTileSet())
-				.then(root => {
-					let processedUrl = this.rootURL;
-					if (processedUrl !== null) {
-						this.invokeAllPlugins(plugin => processedUrl = plugin.preprocessURL ? plugin.preprocessURL(processedUrl, null) : processedUrl);
-					}
-
-					this._rootTileSet = root;
-
-					this.dispatchEvent({
-						type: 'load-tile-set',
-						tileSet: root,
-						url: processedUrl
-					});
-				})
-				.catch(err => {
-					console.error(err);
-					this._rootTileSet = err;
-				});
-			return null;
-		} else if (rootTileSet instanceof Promise || rootTileSet instanceof Error) {
-			return null;
+	requestTileContents(tile) {
+		// If the tile is already being loaded then don't
+		// start it again.
+		if (tile.__loadingState !== UNLOADED) {
+			return;
 		}
 
-		return rootTileSet;
+		const stats = this.stats;
+		const lruCache = this.lruCache;
+		const downloadQueue = this.downloadQueue;
+		const parseQueue = this.parseQueue;
+
+		const isExternalTileSet = tile.__hasUnrenderableContent;
+
+		lruCache.add(tile, t => {
+			if (t.__loadingState === LOADING) {
+				// Stop the load if it's started
+				t.__loadAbort.abort();
+				t.__loadAbort = null;
+			} else if (isExternalTileSet) {
+				t.children.length = 0;
+			} else {
+				this.disposeTile(t);
+			}
+
+			// Decrement stats
+			if (t.__loadingState === LOADING) {
+				stats.downloading--;
+			} else if (t.__loadingState === PARSING) {
+				stats.parsing--;
+			}
+
+			t.__loadingState = UNLOADED;
+			t.__loadIndex++;
+
+			downloadQueue.remove(t);
+			parseQueue.remove(t);
+		});
+
+		// Track a new load index so we avoid the condition where this load is stopped and
+		// another begins soon after so we don't parse twice.
+		tile.__loadIndex++;
+		const loadIndex = tile.__loadIndex;
+		const controller = new AbortController();
+		const signal = controller.signal;
+
+		stats.downloading++;
+		tile.__loadAbort = controller;
+		tile.__loadingState = LOADING;
+
+		const errorCallback = e => {
+			// if it has been unloaded then the tile has been disposed
+			if (tile.__loadIndex !== loadIndex) {
+				return;
+			}
+
+			if (e.name !== 'AbortError') {
+				downloadQueue.remove(tile);
+				parseQueue.remove(tile);
+
+				if (tile.__loadingState === PARSING) {
+					stats.parsing--;
+				} else if (tile.__loadingState === LOADING) {
+					stats.downloading--;
+				}
+
+				stats.failed++;
+				tile.__loadingState = FAILED;
+
+				// Handle fetch bug for switching examples in index.html.
+				// https://stackoverflow.com/questions/12009423/what-does-status-canceled-for-a-resource-mean-in-chrome-developer-tools
+				if (e.message !== 'Failed to fetch') {
+					console.error(`Tiles3D: Failed to load tile at url "${tile.content.uri}".`);
+					console.error(e);
+				}
+			} else {
+				lruCache.remove(tile);
+			}
+		};
+
+		let uri = new URL(tile.content.uri, tile.__basePath + '/').toString();
+		this.invokeAllPlugins(plugin => uri = plugin.preprocessURL ? plugin.preprocessURL(uri, tile) : uri);
+
+		if (isExternalTileSet) {
+			downloadQueue.add(tile, tileCb => {
+				// if it has been unloaded then the tile has been disposed
+				if (tileCb.__loadIndex !== loadIndex) {
+					return Promise.resolve();
+				}
+
+				return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, { ...this.fetchOptions, signal }));
+			}).then(res => {
+				if (res.ok) {
+					return res.json();
+				} else {
+					throw new Error(`Tiles3D: Failed to load tileset "${uri}" with status ${res.status} : ${res.statusText}`);
+				}
+			}).then(json => {
+				this.preprocessTileSet(json, uri, tile);
+				return json;
+			}).then(json => {
+				// if it has been unloaded then the tile has been disposed
+				if (tile.__loadIndex !== loadIndex) {
+					return;
+				}
+
+				stats.downloading--;
+				tile.__loadAbort = null;
+				tile.__loadingState = LOADED;
+
+				tile.children.push(json.root);
+
+				this.dispatchEvent({
+					type: 'load-tile-set',
+					tileSet: json,
+					url: uri
+				});
+			}).catch(errorCallback);
+		} else {
+			downloadQueue.add(tile, tileCb => {
+				if (tileCb.__loadIndex !== loadIndex) {
+					return Promise.resolve();
+				}
+
+				return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, { ...this.fetchOptions, signal }));
+			}).then(res => {
+				if (tile.__loadIndex !== loadIndex) {
+					return;
+				}
+
+				if (res.ok) {
+					const extension = getUrlExtension(res.url);
+					if (extension === 'gltf') {
+						return res.json();
+					} else {
+						return res.arrayBuffer();
+					}
+				} else {
+					throw new Error(`Failed to load model with error code ${res.status}`);
+				}
+			}).then(buffer => {
+				// if it has been unloaded then the tile has been disposed
+				if (tile.__loadIndex !== loadIndex) {
+					return;
+				}
+
+				stats.downloading--;
+				stats.parsing++;
+				tile.__loadAbort = null;
+				tile.__loadingState = PARSING;
+
+				return parseQueue.add(tile, parseTile => {
+					// if it has been unloaded then the tile has been disposed
+					if (parseTile.__loadIndex !== loadIndex) {
+						return Promise.resolve();
+					}
+
+					const uri = parseTile.content.uri;
+					const extension = getUrlExtension(uri);
+
+					return this.parseTile(buffer, parseTile, extension);
+				});
+			}).then(() => {
+				// if it has been unloaded then the tile has been disposed
+				if (tile.__loadIndex !== loadIndex) {
+					return;
+				}
+
+				stats.parsing--;
+				tile.__loadingState = LOADED;
+
+				if (tile.__wasSetVisible) {
+					this.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, true));
+				}
+
+				if (tile.__wasSetActive) {
+					this.setTileActive(tile, true);
+				}
+			}).catch(errorCallback);
+		}
 	}
 
-	get root() {
-		const rootTileSet = this.rootTileSet;
-		return rootTileSet ? rootTileSet.root : null;
+	getAttributions(target = []) {
+		this.invokeAllPlugins(plugin => plugin !== this && plugin.getAttributions && plugin.getAttributions(target));
+		return target;
 	}
 
+	invokeOnePlugin(func) {
+		const plugins = [...this.plugins, this];
+		for (let i = 0; i < plugins.length; i++) {
+			const result = func(plugins[i]);
+			if (result) {
+				return result;
+			}
+		}
+
+		return null;
+	}
+
+	invokeAllPlugins(func) {
+		const plugins = [...this.plugins, this];
+		const pending = [];
+		for (let i = 0; i < plugins.length; i++) {
+			const result = func(plugins[i]);
+			if (result) {
+				pending.push(result);
+			}
+		}
+
+		return pending.length === 0 ? null : Promise.all(pending);
+	}
+
+	//
 	get autoDisableRendererCulling() {
 		return this._autoDisableRendererCulling;
 	}
@@ -433,10 +965,6 @@ export class Tiles3D extends Object3D {
 
 	removeEventListener(type, listener, thisObject) {
 		this.$events.removeEventListener(type, listener, thisObject);
-	}
-
-	dispatchEvent(event) {
-		this.$events.dispatchEvent(event);
 	}
 
 	addCamera(camera) {
@@ -559,443 +1087,6 @@ export class Tiles3D extends Object3D {
 				}
 			}
 		}
-	}
-
-	getAttributions(target = []) {
-		this.invokeAllPlugins(plugin => plugin !== this && plugin.getAttributions && plugin.getAttributions(target));
-		return target;
-	}
-
-	invokeOnePlugin(func) {
-		const plugins = [...this.plugins, this];
-		for (let i = 0; i < plugins.length; i++) {
-			const result = func(plugins[i]);
-			if (result) {
-				return result;
-			}
-		}
-
-		return null;
-	}
-
-	invokeAllPlugins(func) {
-		const plugins = [...this.plugins, this];
-		const pending = [];
-		for (let i = 0; i < plugins.length; i++) {
-			const result = func(plugins[i]);
-			if (result) {
-				pending.push(result);
-			}
-		}
-
-		return pending.length === 0 ? null : Promise.all(pending);
-	}
-
-	preprocessNode(tile, tileSetDir, parentTile = null) {
-		if (tile.contents) {
-			// TODO: multiple contents (1.1) are not supported yet
-			tile.content = tile.contents[0];
-		}
-
-		if (tile.content) {
-			// Fix old file formats
-			if (!('uri' in tile.content) && 'url' in tile.content) {
-				tile.content.uri = tile.content.url;
-				delete tile.content.url;
-			}
-
-			// NOTE: fix for some cases where tile provide the bounding volume
-			// but volumes are not present.
-			if (
-				tile.content.boundingVolume &&
-			!(
-				'box' in tile.content.boundingVolume ||
-				'sphere' in tile.content.boundingVolume ||
-				'region' in tile.content.boundingVolume
-			)
-			) {
-				delete tile.content.boundingVolume;
-			}
-		}
-
-		tile.parent = parentTile;
-		tile.children = tile.children || [];
-
-		if (tile.content?.uri) {
-			// "content" should only indicate loadable meshes, not external tile sets
-			const extension = getUrlExtension(tile.content.uri);
-
-			tile.__hasContent = true;
-			tile.__hasUnrenderableContent = Boolean(extension && /json$/.test(extension));
-			tile.__hasRenderableContent = !tile.__hasUnrenderableContent;
-		} else {
-			tile.__hasContent = false;
-			tile.__hasUnrenderableContent = false;
-			tile.__hasRenderableContent = false;
-		}
-
-		// tracker for determining if all the children have been asynchronously
-		// processed and are ready to be traversed
-		tile.__childrenProcessed = 0;
-		if (parentTile) {
-			parentTile.__childrenProcessed++;
-		}
-
-		tile.__distanceFromCamera = Infinity;
-		tile.__error = Infinity;
-
-		tile.__inFrustum = false;
-		tile.__isLeaf = false;
-
-		tile.__usedLastFrame = false;
-		tile.__used = false;
-
-		tile.__wasSetVisible = false;
-		tile.__visible = false;
-		tile.__childrenWereVisible = false;
-		tile.__allChildrenLoaded = false;
-
-		tile.__wasSetActive = false;
-		tile.__active = false;
-
-		tile.__loadingState = RequestState.UNLOADED;
-
-		if (parentTile === null) {
-			tile.__depth = 0;
-			tile.__depthFromRenderedParent = (tile.__hasRenderableContent ? 1 : 0);
-			tile.refine = tile.refine || 'REPLACE';
-		} else {
-			// increment the "depth from parent" when we encounter a new tile with content
-			tile.__depth = parentTile.__depth + 1;
-			tile.__depthFromRenderedParent = parentTile.__depthFromRenderedParent + (tile.__hasRenderableContent ? 1 : 0);
-			tile.refine = tile.refine || parentTile.refine;
-		}
-
-		tile.__basePath = tileSetDir;
-
-		tile.__lastFrameVisited = -1;
-
-		tile.__loadIndex = 0; // TODO remove this
-		tile.__loadAbort = null; // TODO remove this
-
-		this.invokeAllPlugins(plugin => {
-			plugin !== this && plugin.preprocessNode && plugin.preprocessNode(tile, tileSetDir, parentTile);
-		});
-
-		// cached
-
-		const transform = new Matrix4();
-		if (tile.transform) {
-			transform.fromArray(tile.transform);
-		}
-
-		if (parentTile) {
-			transform.premultiply(parentTile.cached.transform);
-		}
-
-		const transformInverse = new Matrix4().copy(transform).inverse();
-		const boundingVolume = new TileBoundingVolume();
-		if ('sphere' in tile.boundingVolume) {
-			boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
-		}
-		if ('box' in tile.boundingVolume) {
-			boundingVolume.setOBBData(tile.boundingVolume.box, transform);
-		}
-		if ('region' in tile.boundingVolume) {
-			boundingVolume.setRegionData(this.ellipsoid, ...tile.boundingVolume.region);
-		}
-
-		tile.cached = {
-			transform,
-			transformInverse,
-
-			active: false,
-
-			boundingVolume,
-
-			metadata: null,
-			scene: null,
-			geometry: null,
-			materials: null,
-			textures: null,
-
-			// TODO remove this
-
-			inFrustum: [],
-
-			featureTable: null,
-			batchTable: null
-		};
-	}
-
-	parseTile(buffer, tile, extension) {
-		return this.$modelLoader.loadTileContent(buffer, tile, extension, this)
-			.then(scene => {
-				scene.traverse(c => {
-					c[INITIAL_FRUSTUM_CULLED] = c.frustumCulled; // store initial value
-					c.frustumCulled = c.frustumCulled && !this._autoDisableRendererCulling;
-				});
-
-				this.dispatchEvent({
-					type: 'load-model',
-					scene,
-					tile
-				});
-			});
-	}
-
-	setTileVisible(tile, visible) {
-		const scene = tile.cached.scene;
-		if (!scene) {
-			return;
-		}
-		const visibleTiles = this.visibleTiles;
-		if (visible) {
-			this.add(scene);
-			visibleTiles.add(tile);
-			scene.updateMatrix(true); // TODO: remove this?
-		} else {
-			this.remove(scene);
-			visibleTiles.delete(tile);
-		}
-
-		this.dispatchEvent({
-			type: 'tile-visibility-change',
-			scene,
-			tile,
-			visible
-		});
-	}
-
-	requestTileContents(tile) {
-		// If the tile is already being loaded then don't
-		// start it again.
-		if (tile.__loadingState !== RequestState.UNLOADED) {
-			return;
-		}
-
-		const stats = this.stats;
-		const lruCache = this.lruCache;
-		const downloadQueue = this.downloadQueue;
-		const parseQueue = this.parseQueue;
-
-		const isExternalTileSet = tile.__hasUnrenderableContent;
-
-		lruCache.add(tile, t => {
-			if (t.__loadingState === RequestState.LOADING) {
-				// Stop the load if it's started
-				t.__loadAbort.abort();
-				t.__loadAbort = null;
-			} else if (isExternalTileSet) {
-				t.children.length = 0;
-			} else {
-				this.$disposeTile(t);
-			}
-
-			// Decrement stats
-			if (t.__loadingState === RequestState.LOADING) {
-				stats.downloading--;
-			} else if (t.__loadingState === RequestState.PARSING) {
-				stats.parsing--;
-			}
-
-			t.__loadingState = RequestState.UNLOADED;
-			t.__loadIndex++;
-
-			downloadQueue.remove(t);
-			parseQueue.remove(t);
-		});
-
-		// Track a new load index so we avoid the condition where this load is stopped and
-		// another begins soon after so we don't parse twice.
-		tile.__loadIndex++;
-		const loadIndex = tile.__loadIndex;
-		const controller = new AbortController();
-		const signal = controller.signal;
-
-		stats.downloading++;
-		tile.__loadAbort = controller;
-		tile.__loadingState = RequestState.LOADING;
-
-		const errorCallback = e => {
-			// if it has been unloaded then the tile has been disposed
-			if (tile.__loadIndex !== loadIndex) {
-				return;
-			}
-
-			if (e.name !== 'AbortError') {
-				downloadQueue.remove(tile);
-				parseQueue.remove(tile);
-
-				if (tile.__loadingState === RequestState.PARSING) {
-					stats.parsing--;
-				} else if (tile.__loadingState === RequestState.LOADING) {
-					stats.downloading--;
-				}
-
-				stats.failed++;
-				tile.__loadingState = RequestState.FAILED;
-
-				// Handle fetch bug for switching examples in index.html.
-				// https://stackoverflow.com/questions/12009423/what-does-status-canceled-for-a-resource-mean-in-chrome-developer-tools
-				if (e.message !== 'Failed to fetch') {
-					console.error(`Tiles3D: Failed to load tile at url "${tile.content.uri}".`);
-					console.error(e);
-				}
-			} else {
-				lruCache.remove(tile);
-			}
-		};
-
-		let uri = new URL(tile.content.uri, tile.__basePath + '/').toString();
-		this.invokeAllPlugins(plugin => uri = plugin.preprocessURL ? plugin.preprocessURL(uri, tile) : uri);
-
-		if (isExternalTileSet) {
-			downloadQueue.add(tile, tileCb => {
-				// if it has been unloaded then the tile has been disposed
-				if (tileCb.__loadIndex !== loadIndex) {
-					return Promise.resolve();
-				}
-
-				return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, { ...this.fetchOptions, signal }));
-			}).then(res => {
-				if (res.ok) {
-					return res.json();
-				} else {
-					throw new Error(`Tiles3D: Failed to load tileset "${uri}" with status ${res.status} : ${res.statusText}`);
-				}
-			}).then(json => {
-				this.preprocessTileSet(json, uri, tile);
-				return json;
-			}).then(json => {
-				// if it has been unloaded then the tile has been disposed
-				if (tile.__loadIndex !== loadIndex) {
-					return;
-				}
-
-				stats.downloading--;
-				tile.__loadAbort = null;
-				tile.__loadingState = RequestState.LOADED;
-
-				tile.children.push(json.root);
-
-				this.dispatchEvent({
-					type: 'load-tile-set',
-					tileSet: json,
-					url: uri
-				});
-			}).catch(errorCallback);
-		} else {
-			downloadQueue.add(tile, tileCb => {
-				if (tileCb.__loadIndex !== loadIndex) {
-					return Promise.resolve();
-				}
-
-				return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, { ...this.fetchOptions, signal }));
-			}).then(res => {
-				if (tile.__loadIndex !== loadIndex) {
-					return;
-				}
-
-				if (res.ok) {
-					const extension = getUrlExtension(res.url);
-					if (extension === 'gltf') {
-						return res.json();
-					} else {
-						return res.arrayBuffer();
-					}
-				} else {
-					throw new Error(`Failed to load model with error code ${res.status}`);
-				}
-			}).then(buffer => {
-				// if it has been unloaded then the tile has been disposed
-				if (tile.__loadIndex !== loadIndex) {
-					return;
-				}
-
-				stats.downloading--;
-				stats.parsing++;
-				tile.__loadAbort = null;
-				tile.__loadingState = RequestState.PARSING;
-
-				return parseQueue.add(tile, parseTile => {
-					// if it has been unloaded then the tile has been disposed
-					if (parseTile.__loadIndex !== loadIndex) {
-						return Promise.resolve();
-					}
-
-					const uri = parseTile.content.uri;
-					const extension = getUrlExtension(uri);
-
-					return this.parseTile(buffer, parseTile, extension);
-				});
-			}).then(() => {
-				// if it has been unloaded then the tile has been disposed
-				if (tile.__loadIndex !== loadIndex) {
-					return;
-				}
-
-				stats.parsing--;
-				tile.__loadingState = RequestState.LOADED;
-
-				if (tile.__wasSetVisible) {
-					this.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, true));
-				}
-
-				if (tile.__wasSetActive) {
-					this.$setTileActive(tile, true);
-				}
-			}).catch(errorCallback);
-		}
-	}
-
-	ensureChildrenArePreprocessed(tile, immediate = false) {
-		// TODO
-	}
-
-	$setTileActive(tile, active) {
-		const activeTiles = this.activeTiles;
-		if (active) {
-			activeTiles.add(tile);
-		} else {
-			activeTiles.delete(tile);
-		}
-	}
-
-	$disposeTile(tile) {
-		// This could get called before the tile has finished downloading
-		const cached = tile.cached;
-		if (cached.scene) {
-			const materials = cached.materials;
-			const geometry = cached.geometry;
-			const textures = cached.textures;
-
-			for (let i = 0, l = geometry.length; i < l; i++) {
-				geometry[i].dispose();
-			}
-
-			for (let i = 0, l = materials.length; i < l; i++) {
-				materials[i].dispose();
-			}
-
-			for (let i = 0, l = textures.length; i < l; i++) {
-				const texture = textures[i];
-				texture.dispose();
-			}
-
-			this.dispatchEvent({
-				type: 'dispose-model',
-				scene: cached.scene,
-				tile
-			});
-
-			cached.scene = null;
-			cached.materials = null;
-			cached.textures = null;
-			cached.geometry = null;
-		}
-
-		tile._loadIndex++;
 	}
 
 }
