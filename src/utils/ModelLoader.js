@@ -39,22 +39,17 @@ export class ModelLoader {
 		this._loaders.get('gltf').setKTX2Loader(ktx2Loader);
 	}
 
-	loadTileContent(buffer, tile, extension, tiles3D) {
-		tile._loadIndex = tile._loadIndex || 0;
-		tile._loadIndex++;
-
-		const uri = tile.content.uri;
+	loadTileContent(buffer, tile, extension, tiles3D, uri, abortSignal) {
+		const cached = tile.cached;
 		const uriSplits = uri.split(/[\\\/]/g); // eslint-disable-line no-useless-escape
 		uriSplits.pop();
 		const workingPath = uriSplits.join('/');
 		const fetchOptions = tiles3D.fetchOptions;
 
-		const loadIndex = tile._loadIndex;
 		let promise = null;
 
-		const upAxis = tiles3D.rootTileSet.asset && tiles3D.rootTileSet.asset.gltfUpAxis || 'y';
-		const cached = tile.cached;
 		const cachedTransform = cached.transform;
+		const upAxis = tiles3D.rootTileSet.asset && tiles3D.rootTileSet.asset.gltfUpAxis || 'y';
 
 		switch (upAxis.toLowerCase()) {
 			case 'x':
@@ -90,10 +85,6 @@ export class ModelLoader {
 		return promise.then(resource => {
 			const scene = resource.root;
 
-			if (tile._loadIndex !== loadIndex || !scene) {
-				return;
-			}
-
 			// ensure the matrix is up to date in case the scene has a transform applied
 			scene.updateMatrix();
 
@@ -108,10 +99,6 @@ export class ModelLoader {
 
 			scene.matrix.premultiply(cachedTransform);
 			scene.matrix.decompose(scene.position, scene.quaternion, scene.scale);
-
-			cached.scene = scene;
-			cached.featureTable = resource.featureTable;
-			cached.batchTable = resource.batchTable;
 
 			const materials = [];
 			const geometry = [];
@@ -134,9 +121,30 @@ export class ModelLoader {
 				}
 			});
 
+			// exit early if a new request has already started
+			if (abortSignal.aborted) {
+				// dispose of any image bitmaps that have been opened.
+				// TODO: share this code with the "disposeTile" code below, possibly allow for the tiles
+				// renderer base to trigger a disposal of unneeded data
+				for (let i = 0, l = textures.length; i < l; i++) {
+					const texture = textures[i];
+
+					if (texture.image instanceof ImageBitmap) {
+						texture.image.close();
+					}
+
+					texture.dispose();
+				}
+
+				return;
+			}
+
 			cached.materials = materials;
 			cached.geometry = geometry;
 			cached.textures = textures;
+			cached.scene = scene;
+			cached.featureTable = resource.featureTable;
+			cached.batchTable = resource.batchTable;
 
 			return scene;
 		});

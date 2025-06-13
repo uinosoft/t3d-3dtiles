@@ -4654,19 +4654,15 @@
 			this._loaders.get('cmpt').setKTX2Loader(ktx2Loader);
 			this._loaders.get('gltf').setKTX2Loader(ktx2Loader);
 		}
-		loadTileContent(buffer, tile, extension, tiles3D) {
-			tile._loadIndex = tile._loadIndex || 0;
-			tile._loadIndex++;
-			const uri = tile.content.uri;
+		loadTileContent(buffer, tile, extension, tiles3D, uri, abortSignal) {
+			const cached = tile.cached;
 			const uriSplits = uri.split(/[\\\/]/g); // eslint-disable-line no-useless-escape
 			uriSplits.pop();
 			const workingPath = uriSplits.join('/');
 			const fetchOptions = tiles3D.fetchOptions;
-			const loadIndex = tile._loadIndex;
 			let promise = null;
-			const upAxis = tiles3D.rootTileSet.asset && tiles3D.rootTileSet.asset.gltfUpAxis || 'y';
-			const cached = tile.cached;
 			const cachedTransform = cached.transform;
+			const upAxis = tiles3D.rootTileSet.asset && tiles3D.rootTileSet.asset.gltfUpAxis || 'y';
 			switch (upAxis.toLowerCase()) {
 				case 'x':
 					mat4_1.makeRotationAxis(Y_AXIS, -Math.PI / 2);
@@ -4695,9 +4691,6 @@
 			}
 			return promise.then(resource => {
 				const scene = resource.root;
-				if (tile._loadIndex !== loadIndex || !scene) {
-					return;
-				}
 
 				// ensure the matrix is up to date in case the scene has a transform applied
 				scene.updateMatrix();
@@ -4712,9 +4705,6 @@
 				}
 				scene.matrix.premultiply(cachedTransform);
 				scene.matrix.decompose(scene.position, scene.quaternion, scene.scale);
-				cached.scene = scene;
-				cached.featureTable = resource.featureTable;
-				cached.batchTable = resource.batchTable;
 				const materials = [];
 				const geometry = [];
 				const textures = [];
@@ -4733,9 +4723,27 @@
 						}
 					}
 				});
+
+				// exit early if a new request has already started
+				if (abortSignal.aborted) {
+					// dispose of any image bitmaps that have been opened.
+					// TODO: share this code with the "disposeTile" code below, possibly allow for the tiles
+					// renderer base to trigger a disposal of unneeded data
+					for (let i = 0, l = textures.length; i < l; i++) {
+						const texture = textures[i];
+						if (texture.image instanceof ImageBitmap) {
+							texture.image.close();
+						}
+						texture.dispose();
+					}
+					return;
+				}
 				cached.materials = materials;
 				cached.geometry = geometry;
 				cached.textures = textures;
+				cached.scene = scene;
+				cached.featureTable = resource.featureTable;
+				cached.batchTable = resource.batchTable;
 				return scene;
 			});
 		}
@@ -5494,20 +5502,26 @@
 		fetchData(url, options) {
 			return fetch(url, options);
 		}
-		parseTile(buffer, tile, extension) {
-			return this.$modelLoader.loadTileContent(buffer, tile, extension, this).then(scene => {
+		parseTile(buffer, tile, extension, uri, abortSignal) {
+			return this.$modelLoader.loadTileContent(buffer, tile, extension, this, uri, abortSignal).then(scene => {
+				if (!scene) return;
 				scene.traverse(c => {
 					c[INITIAL_FRUSTUM_CULLED] = c.frustumCulled; // store initial value
 					c.frustumCulled = c.frustumCulled && !this._autoDisableRendererCulling;
 				});
-				this.dispatchEvent({
-					type: 'load-model',
-					scene,
-					tile
-				});
 			});
 		}
 		disposeTile(tile) {
+			// TODO: are these necessary? Are we disposing tiles when they are currently visible?
+			if (tile.__visible) {
+				this.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, false));
+				tile.__visible = false;
+			}
+			if (tile.__active) {
+				this.invokeOnePlugin(plugin => plugin.setTileActive && plugin.setTileActive(tile, false));
+				tile.__active = false;
+			}
+
 			// This could get called before the tile has finished downloading
 			const cached = tile.cached;
 			if (cached.scene) {
@@ -5542,7 +5556,6 @@
 				cached.geometry = null;
 				cached.metadata = null;
 			}
-			tile._loadIndex++;
 		}
 		preprocessNode(tile, tileSetDir, parentTile = null) {
 			if (tile.contents) {
@@ -5607,9 +5620,6 @@
 			}
 			tile.__basePath = tileSetDir;
 			tile.__lastFrameVisited = -1;
-			tile.__loadIndex = 0; // TODO remove this
-			tile.__loadAbort = null; // TODO remove this
-
 			this.invokeAllPlugins(plugin => {
 				plugin !== this && plugin.preprocessNode && plugin.preprocessNode(tile, tileSetDir, parentTile);
 			});
@@ -5811,17 +5821,23 @@
 			if (tile.__loadingState !== UNLOADED) {
 				return;
 			}
+			let isExternalTileSet = false;
+			let externalTileset = null;
+			let uri = new URL(tile.content.uri, tile.__basePath + '/').toString();
+			this.invokeAllPlugins(plugin => uri = plugin.preprocessURL ? plugin.preprocessURL(uri, tile) : uri);
 			const stats = this.stats;
 			const lruCache = this.lruCache;
 			const downloadQueue = this.downloadQueue;
 			const parseQueue = this.parseQueue;
-			const isExternalTileSet = tile.__hasUnrenderableContent;
+			const extension = getUrlExtension(uri);
+
+			// track an abort controller and pass-through the below conditions if aborted
+			const controller = new AbortController();
+			const signal = controller.signal;
 			const addedSuccessfully = lruCache.add(tile, t => {
-				if (t.__loadingState === LOADING) {
-					// Stop the load if it's started
-					t.__loadAbort.abort();
-					t.__loadAbort = null;
-				} else if (isExternalTileSet) {
+				// Stop the load if it's started
+				controller.abort();
+				if (isExternalTileSet) {
 					t.children.length = 0;
 					t.__childrenProcessed = 0;
 				} else {
@@ -5842,7 +5858,6 @@
 					stats.parsing--;
 				}
 				t.__loadingState = UNLOADED;
-				t.__loadIndex++;
 				downloadQueue.remove(t);
 				parseQueue.remove(t);
 			});
@@ -5857,25 +5872,108 @@
 				this.isLoading = true;
 				this.dispatchEvent(_tilesLoadStartEvent);
 			}
-
-			// Track a new load index so we avoid the condition where this load is stopped and
-			// another begins soon after so we don't parse twice.
-			tile.__loadIndex++;
-			const loadIndex = tile.__loadIndex;
-			const controller = new AbortController();
-			const signal = controller.signal;
 			this.cachedSinceLoadComplete.add(tile);
 			stats.inCacheSinceLoad++;
 			stats.inCache++;
 			stats.downloading++;
-			tile.__loadAbort = controller;
 			tile.__loadingState = LOADING;
-			const errorCallback = e => {
-				// if it has been unloaded then the tile has been disposed
-				if (tile.__loadIndex !== loadIndex) {
+			downloadQueue.add(tile, downloadTile => {
+				if (signal.aborted) {
+					return Promise.resolve();
+				}
+				const res = this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, {
+					...this.fetchOptions,
+					signal
+				}));
+				this.dispatchEvent({
+					type: 'tile-download-start',
+					tile
+				});
+				return res;
+			}).then(res => {
+				if (signal.aborted) {
 					return;
 				}
-				if (e.name !== 'AbortError') {
+				if (!(res instanceof Response)) {
+					return res;
+				} else if (res.ok) {
+					return extension === 'json' || extension === 'gltf' ? res.json() : res.arrayBuffer();
+				} else {
+					throw new Error(`Failed to load model with error code ${res.status}`);
+				}
+			}).then(content => {
+				// if it has been unloaded then the tile has been disposed
+				if (signal.aborted) {
+					return;
+				}
+				stats.downloading--;
+				stats.parsing++;
+				tile.__loadingState = PARSING;
+				return parseQueue.add(tile, parseTile => {
+					// if it has been unloaded then the tile has been disposed
+					if (signal.aborted) {
+						return Promise.resolve();
+					}
+					if (extension === 'json' && content.root) {
+						this.preprocessTileSet(content, uri, tile);
+						tile.children.push(content.root);
+						externalTileset = content;
+						isExternalTileSet = true;
+						return Promise.resolve();
+					} else {
+						return this.invokeOnePlugin(plugin => plugin.parseTile && plugin.parseTile(content, parseTile, extension, uri, signal));
+					}
+				});
+			}).then(() => {
+				// if it has been unloaded then the tile has been disposed
+				if (signal.aborted) {
+					return;
+				}
+				stats.parsing--;
+				tile.__loadingState = LOADED;
+				lruCache.setLoaded(tile, true);
+
+				// If the memory of the item hasn't been registered yet then that means the memory usage hasn't
+				// been accounted for by the cache yet so we need to check if it fits or if we should remove it.
+				if (lruCache.getMemoryUsage(tile) === null) {
+					if (lruCache.isFull() && lruCache.computeMemoryUsageCallback(tile) > 0) {
+						// And if the cache is full due to newly loaded memory then lets discard this tile - it will
+						// be loaded again later from the disk cache if needed.
+						lruCache.remove(tile);
+					} else {
+						// Otherwise update the item to the latest known value
+						lruCache.updateMemoryUsage(tile);
+					}
+				}
+
+				// dispatch an event indicating that this model has completed and that a new
+				// call to "update" is needed.
+				this.dispatchEvent({
+					type: 'needs-update'
+				});
+				this.dispatchEvent({
+					type: 'load-content'
+				});
+				if (isExternalTileSet) {
+					this.dispatchEvent({
+						type: 'load-tile-set',
+						tileSet: externalTileset,
+						url: uri
+					});
+				}
+				if (tile.cached.scene) {
+					this.dispatchEvent({
+						type: 'load-model',
+						scene: tile.cached.scene,
+						tile
+					});
+				}
+			}).catch(error => {
+				// if it has been unloaded then the tile has been disposed
+				if (signal.aborted) {
+					return;
+				}
+				if (error.name !== 'AbortError') {
 					downloadQueue.remove(tile);
 					parseQueue.remove(tile);
 					if (tile.__loadingState === PARSING) {
@@ -5884,110 +5982,20 @@
 						stats.downloading--;
 					}
 					stats.failed++;
+					console.error(`Tiles3D: Failed to load tile at url "${tile.content.uri}".`);
+					console.error(error);
 					tile.__loadingState = FAILED;
-
-					// Handle fetch bug for switching examples in index.html.
-					// https://stackoverflow.com/questions/12009423/what-does-status-canceled-for-a-resource-mean-in-chrome-developer-tools
-					if (e.message !== 'Failed to fetch') {
-						console.error(`Tiles3D: Failed to load tile at url "${tile.content.uri}".`);
-						console.error(e);
-					}
+					lruCache.setLoaded(tile, true);
+					this.dispatchEvent({
+						type: 'load-error',
+						tile,
+						error,
+						url: uri
+					});
 				} else {
 					lruCache.remove(tile);
 				}
-			};
-			let uri = new URL(tile.content.uri, tile.__basePath + '/').toString();
-			this.invokeAllPlugins(plugin => uri = plugin.preprocessURL ? plugin.preprocessURL(uri, tile) : uri);
-			if (isExternalTileSet) {
-				downloadQueue.add(tile, tileCb => {
-					// if it has been unloaded then the tile has been disposed
-					if (tileCb.__loadIndex !== loadIndex) {
-						return Promise.resolve();
-					}
-					return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, {
-						...this.fetchOptions,
-						signal
-					}));
-				}).then(res => {
-					if (res.ok) {
-						return res.json();
-					} else {
-						throw new Error(`Tiles3D: Failed to load tileset "${uri}" with status ${res.status} : ${res.statusText}`);
-					}
-				}).then(json => {
-					this.preprocessTileSet(json, uri, tile);
-					return json;
-				}).then(json => {
-					// if it has been unloaded then the tile has been disposed
-					if (tile.__loadIndex !== loadIndex) {
-						return;
-					}
-					stats.downloading--;
-					tile.__loadAbort = null;
-					tile.__loadingState = LOADED;
-					tile.children.push(json.root);
-					this.dispatchEvent({
-						type: 'load-tile-set',
-						tileSet: json,
-						url: uri
-					});
-				}).catch(errorCallback);
-			} else {
-				downloadQueue.add(tile, tileCb => {
-					if (tileCb.__loadIndex !== loadIndex) {
-						return Promise.resolve();
-					}
-					return this.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(uri, {
-						...this.fetchOptions,
-						signal
-					}));
-				}).then(res => {
-					if (tile.__loadIndex !== loadIndex) {
-						return;
-					}
-					if (res.ok) {
-						const extension = getUrlExtension(res.url);
-						if (extension === 'gltf') {
-							return res.json();
-						} else {
-							return res.arrayBuffer();
-						}
-					} else {
-						throw new Error(`Failed to load model with error code ${res.status}`);
-					}
-				}).then(buffer => {
-					// if it has been unloaded then the tile has been disposed
-					if (tile.__loadIndex !== loadIndex) {
-						return;
-					}
-					stats.downloading--;
-					stats.parsing++;
-					tile.__loadAbort = null;
-					tile.__loadingState = PARSING;
-					return parseQueue.add(tile, parseTile => {
-						// if it has been unloaded then the tile has been disposed
-						if (parseTile.__loadIndex !== loadIndex) {
-							return Promise.resolve();
-						}
-						const uri = parseTile.content.uri;
-						const extension = getUrlExtension(uri);
-						return this.parseTile(buffer, parseTile, extension);
-					});
-				}).then(() => {
-					// if it has been unloaded then the tile has been disposed
-					if (tile.__loadIndex !== loadIndex) {
-						return;
-					}
-					stats.parsing--;
-					tile.__loadingState = LOADED;
-					if (tile.__wasSetVisible) {
-						this.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, true));
-					}
-					if (tile.__wasSetActive) {
-						this.setTileActive(tile, true);
-					}
-				}).catch(errorCallback);
-			}
+			});
 		}
 		getAttributions(target = []) {
 			this.invokeAllPlugins(plugin => plugin !== this && plugin.getAttributions && plugin.getAttributions(target));
