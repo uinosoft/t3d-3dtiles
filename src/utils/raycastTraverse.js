@@ -5,11 +5,11 @@ const _vec = new Vector3();
 const _hitArray = [];
 const _mat = new Matrix4();
 
-export const distanceSort = (a, b) => {
+function distanceSort(a, b) {
 	return a.distance - b.distance;
-};
+}
 
-const intersectTileScene = (tile, ray, renderer, intersects) => {
+function intersectTileScene(tile, ray, renderer, intersects) {
 	const { scene } = tile.cached;
 
 	const lengthBefore = intersects.length;
@@ -45,7 +45,7 @@ function isTileInitialized(tile) {
 }
 
 // Returns the closest hit when traversing the tree
-export const raycastTraverseFirstHit = (tile, renderer, ray, localRay = null) => {
+export function raycastTraverseFirstHit(renderer, tile, ray, localRay = null) {
 	const { activeTiles } = renderer;
 
 	// get the ray in the local group frame
@@ -99,7 +99,7 @@ export const raycastTraverseFirstHit = (tile, renderer, ray, localRay = null) =>
 			break;
 		}
 
-		const hit = raycastTraverseFirstHit(tile, renderer, ray, localRay);
+		const hit = raycastTraverseFirstHit(renderer, tile, ray, localRay);
 		if (hit) {
 			const hitDistSq = hit.distance * hit.distance;
 			if (hitDistSq < bestHitDistSq) {
@@ -112,7 +112,7 @@ export const raycastTraverseFirstHit = (tile, renderer, ray, localRay = null) =>
 	return bestHit;
 };
 
-export const raycastTraverse = (tile, renderer, ray, intersects, localRay = null) => {
+export function raycastTraverse(renderer, tile, ray, intersects, localRay = null) {
 	// if the tile has not been asynchronously initialized then there's no point in
 	// traversing the tiles to check intersections.
 	if (!isTileInitialized(tile)) {
@@ -140,6 +140,6 @@ export const raycastTraverse = (tile, renderer, ray, intersects, localRay = null
 
 	const children = tile.children;
 	for (let i = 0, l = children.length; i < l; i++) {
-		raycastTraverse(children[i], renderer, ray, intersects, localRay);
+		raycastTraverse(renderer, children[i], ray, intersects, localRay);
 	}
 };

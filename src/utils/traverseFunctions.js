@@ -20,7 +20,7 @@ function areChildrenProcessed(tile) {
 }
 
 // Resets the frame frame information for the given tile
-const resetFrameState = (tile, renderer) => {
+function resetFrameState(tile, renderer) {
 	if (tile.__lastFrameVisited !== renderer.frameCount) {
 		tile.__lastFrameVisited = renderer.frameCount;
 		tile.__used = false;
@@ -42,7 +42,7 @@ const resetFrameState = (tile, renderer) => {
 };
 
 // Recursively mark tiles used down to the next tile with content
-const recursivelyMarkUsed = (tile, renderer) => {
+function recursivelyMarkUsed(tile, renderer) {
 	renderer.ensureChildrenArePreprocessed(tile);
 
 	resetFrameState(tile, renderer);
@@ -113,7 +113,49 @@ function canTraverse(tile, renderer) {
 	return true;
 }
 
-export const markUsedTiles = (tile, renderer) => {
+// Helper function for traversing a tile set. If `beforeCb` returns `true` then the
+// traversal will end early.
+export function traverseSet(tile, beforeCb = null, afterCb = null) {
+	const stack = [];
+
+	// A stack-based, depth-first traversal, storing
+	// triplets (tile, parent, depth) in the stack array.
+
+	stack.push(tile);
+	stack.push(null);
+	stack.push(0);
+
+	while (stack.length > 0) {
+		const depth = stack.pop();
+		const parent = stack.pop();
+		const tile = stack.pop();
+
+		if (beforeCb && beforeCb(tile, parent, depth)) {
+			if (afterCb) {
+				afterCb(tile, parent, depth);
+			}
+
+			return;
+		}
+
+		const children = tile.children;
+
+		// Children might be undefined if the tile has not been preprocessed yet
+		if (children) {
+			for (let i = children.length - 1; i >= 0; i--) {
+				stack.push(children[i]);
+				stack.push(tile);
+				stack.push(depth + 1);
+			}
+		}
+
+		if (afterCb) {
+			afterCb(tile, parent, depth);
+		}
+	}
+}
+
+export function markUsedTiles(tile, renderer) {
 	// determine frustum set is run first so we can ensure the preprocessing of all the necessary
 	// child tiles has happened here.
 	renderer.ensureChildrenArePreprocessed(tile);
@@ -167,10 +209,10 @@ export const markUsedTiles = (tile, renderer) => {
 			recursivelyMarkUsed(c, renderer);
 		}
 	}
-};
+}
 
 // Traverse and mark the tiles that are at the leaf nodes of the "used" tree.
-export const markUsedSetLeaves = (tile, renderer) => {
+export function markUsedSetLeaves(tile, renderer) {
 	const frameCount = renderer.frameCount;
 	if (!isUsedThisFrame(tile, frameCount)) {
 		return;
@@ -213,7 +255,7 @@ export const markUsedSetLeaves = (tile, renderer) => {
 };
 
 // Skip past tiles we consider unrenderable because they are outside the error threshold.
-export const markVisibleTiles = (tile, renderer) => {
+export function markVisibleTiles(tile, renderer) {
 	const stats = renderer.stats;
 	if (!isUsedThisFrame(tile, renderer.frameCount)) {
 		return;
@@ -333,3 +375,21 @@ export const toggleTiles = (tile, renderer) => {
 		}
 	}
 };
+
+/**
+ * Traverses the ancestry of the tile up to the root tile.
+ */
+export function traverseAncestors(tile, callback = null) {
+	let current = tile;
+
+	while (current) {
+		const depth = current.__depth;
+		const parent = current.parent;
+
+		if (callback) {
+			callback(current, parent, depth);
+		}
+
+		current = parent;
+	}
+}

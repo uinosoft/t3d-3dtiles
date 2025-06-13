@@ -1,12 +1,12 @@
 import { EventDispatcher, LoadingManager, Matrix4, Object3D } from 't3d';
 import { TileBoundingVolume } from './math/TileBoundingVolume.js';
-import { traverseSet, getUrlExtension } from './utils/Utils.js';
-import { raycastTraverse, raycastTraverseFirstHit, distanceSort } from './utils/IntersectionUtils.js';
+import { getUrlExtension } from './utils/urlExtension.js';
+import { raycastTraverse, raycastTraverseFirstHit } from './utils/raycastTraverse.js';
 import { CameraList } from './utils/CameraList.js';
 import { LRUCache } from './utils/LRUCache.js';
 import { PriorityQueue } from './utils/PriorityQueue.js';
 import { ModelLoader } from './utils/ModelLoader.js';
-import { markUsedTiles, markUsedSetLeaves, markVisibleTiles, toggleTiles } from './utils/TilesScheduler.js';
+import { markUsedTiles, markUsedSetLeaves, markVisibleTiles, toggleTiles, traverseSet } from './utils/traverseFunctions.js';
 import { UNLOADED, LOADING, PARSING, LOADED, FAILED } from './constants.js';
 import { WGS84_ELLIPSOID } from './math/GeoConstants.js';
 import { throttle } from './utils/throttle.js';
@@ -603,10 +603,6 @@ export class Tiles3D extends Object3D {
 			materials: null,
 			textures: null,
 
-			// TODO remove this
-
-			inFrustum: [],
-
 			featureTable: null,
 			batchTable: null
 		};
@@ -1082,9 +1078,7 @@ export class Tiles3D extends Object3D {
 			return null;
 		}
 
-		raycastTraverse(this.root, this, ray, intersects);
-
-		intersects.sort(distanceSort);
+		raycastTraverse(this, this.root, ray, intersects);
 	}
 
 	raycastFirst(ray) {
@@ -1092,7 +1086,7 @@ export class Tiles3D extends Object3D {
 			return null;
 		}
 
-		return raycastTraverseFirstHit(this.root, this, ray);
+		return raycastTraverseFirstHit(this, this.root, ray);
 	}
 
 	getBoundingBox(box) {

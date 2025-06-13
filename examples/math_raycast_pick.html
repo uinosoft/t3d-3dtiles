@@ -127,6 +127,10 @@
 		const up = new t3d.Vector3(0, 1, 0);
 		const raycastParams = { onlyFirstHit: true };
 
+		function distanceSort(a, b) {
+			return a.distance - b.distance;
+		}
+
 		let timing = 0;
 		function raycast() {
 			if (new Date().getTime() - timing < 33) return;
@@ -140,6 +144,7 @@
 			} else {
 				intersects.length = 0;
 				tiles3D.raycast(raycaster.ray, intersects);
+				intersects.sort(distanceSort);
 				currentIntersect = intersects[0];
 			}
 		

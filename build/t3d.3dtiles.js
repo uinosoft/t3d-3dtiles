@@ -894,7 +894,7 @@
 	 * @param {string} url
 	 * @returns {string} null if no extension found
 	 */
-	const getUrlExtension = url => {
+	function getUrlExtension(url) {
 		if (!url) {
 			return null;
 		}
@@ -907,68 +907,16 @@
 			return null;
 		}
 		return filename.substring(lastPeriod + 1) || null;
-	};
-
-	// Helper function for traversing a tile set. If `beforeCb` returns `true` then the
-	// traversal will end early.
-	function traverseSet(tile, beforeCb = null, afterCb = null) {
-		const stack = [];
-
-		// A stack-based, depth-first traversal, storing
-		// triplets (tile, parent, depth) in the stack array.
-
-		stack.push(tile);
-		stack.push(null);
-		stack.push(0);
-		while (stack.length > 0) {
-			const depth = stack.pop();
-			const parent = stack.pop();
-			const tile = stack.pop();
-			if (beforeCb && beforeCb(tile, parent, depth)) {
-				if (afterCb) {
-					afterCb(tile, parent, depth);
-				}
-				return;
-			}
-			const children = tile.children;
-
-			// Children might be undefined if the tile has not been preprocessed yet
-			if (children) {
-				for (let i = children.length - 1; i >= 0; i--) {
-					stack.push(children[i]);
-					stack.push(tile);
-					stack.push(depth + 1);
-				}
-			}
-			if (afterCb) {
-				afterCb(tile, parent, depth);
-			}
-		}
-	}
-
-	/**
-	 * Traverses the ancestry of the tile up to the root tile.
-	 */
-	function traverseAncestors(tile, callback = null) {
-		let current = tile;
-		while (current) {
-			const depth = current.__depth;
-			const parent = current.parent;
-			if (callback) {
-				callback(current, parent, depth);
-			}
-			current = parent;
-		}
 	}
 
 	const _localRay = new t3d.Ray();
 	const _vec$4 = new t3d.Vector3();
 	const _hitArray = [];
 	const _mat = new t3d.Matrix4();
-	const distanceSort = (a, b) => {
+	function distanceSort(a, b) {
 		return a.distance - b.distance;
-	};
-	const intersectTileScene = (tile, ray, renderer, intersects) => {
+	}
+	function intersectTileScene(tile, ray, renderer, intersects) {
 		const {
 			scene
 		} = tile.cached;
@@ -988,7 +936,7 @@
 				}
 			}
 		}
-	};
+	}
 	function intersectTileSceneFirstHit(tile, ray, renderer) {
 		intersectTileScene(tile, ray, renderer, _hitArray);
 		_hitArray.sort(distanceSort);
@@ -1001,7 +949,7 @@
 	}
 
 	// Returns the closest hit when traversing the tree
-	const raycastTraverseFirstHit = (tile, renderer, ray, localRay = null) => {
+	function raycastTraverseFirstHit(renderer, tile, ray, localRay = null) {
 		const {
 			activeTiles
 		} = renderer;
@@ -1055,7 +1003,7 @@
 			if (boundingVolumeDistSq > bestHitDistSq) {
 				break;
 			}
-			const hit = raycastTraverseFirstHit(tile, renderer, ray, localRay);
+			const hit = raycastTraverseFirstHit(renderer, tile, ray, localRay);
 			if (hit) {
 				const hitDistSq = hit.distance * hit.distance;
 				if (hitDistSq < bestHitDistSq) {
@@ -1065,8 +1013,8 @@
 			}
 		}
 		return bestHit;
-	};
-	const raycastTraverse = (tile, renderer, ray, intersects, localRay = null) => {
+	}
+	function raycastTraverse(renderer, tile, ray, intersects, localRay = null) {
 		// if the tile has not been asynchronously initialized then there's no point in
 		// traversing the tiles to check intersections.
 		if (!isTileInitialized(tile)) {
@@ -1096,9 +1044,9 @@
 		}
 		const children = tile.children;
 		for (let i = 0, l = children.length; i < l; i++) {
-			raycastTraverse(children[i], renderer, ray, intersects, localRay);
+			raycastTraverse(renderer, children[i], ray, intersects, localRay);
 		}
-	};
+	}
 
 	class FastFrustum extends t3d.Frustum {
 		constructor() {
@@ -4826,7 +4774,7 @@
 	}
 
 	// Resets the frame frame information for the given tile
-	const resetFrameState = (tile, renderer) => {
+	function resetFrameState(tile, renderer) {
 		if (tile.__lastFrameVisited !== renderer.frameCount) {
 			tile.__lastFrameVisited = renderer.frameCount;
 			tile.__used = false;
@@ -4845,10 +4793,10 @@
 			tile.__error = viewErrorTarget$1.error;
 			tile.__distanceFromCamera = viewErrorTarget$1.distance;
 		}
-	};
+	}
 
 	// Recursively mark tiles used down to the next tile with content
-	const recursivelyMarkUsed = (tile, renderer) => {
+	function recursivelyMarkUsed(tile, renderer) {
 		renderer.ensureChildrenArePreprocessed(tile);
 		resetFrameState(tile, renderer);
 		markUsed(tile, renderer);
@@ -4860,7 +4808,7 @@
 				recursivelyMarkUsed(children[i], renderer);
 			}
 		}
-	};
+	}
 
 	// Recursively traverses to the next tiles with unloaded renderable content to load them
 	function recursivelyLoadNextRenderableTiles(tile, renderer) {
@@ -4913,7 +4861,44 @@
 		}
 		return true;
 	}
-	const markUsedTiles = (tile, renderer) => {
+
+	// Helper function for traversing a tile set. If `beforeCb` returns `true` then the
+	// traversal will end early.
+	function traverseSet(tile, beforeCb = null, afterCb = null) {
+		const stack = [];
+
+		// A stack-based, depth-first traversal, storing
+		// triplets (tile, parent, depth) in the stack array.
+
+		stack.push(tile);
+		stack.push(null);
+		stack.push(0);
+		while (stack.length > 0) {
+			const depth = stack.pop();
+			const parent = stack.pop();
+			const tile = stack.pop();
+			if (beforeCb && beforeCb(tile, parent, depth)) {
+				if (afterCb) {
+					afterCb(tile, parent, depth);
+				}
+				return;
+			}
+			const children = tile.children;
+
+			// Children might be undefined if the tile has not been preprocessed yet
+			if (children) {
+				for (let i = children.length - 1; i >= 0; i--) {
+					stack.push(children[i]);
+					stack.push(tile);
+					stack.push(depth + 1);
+				}
+			}
+			if (afterCb) {
+				afterCb(tile, parent, depth);
+			}
+		}
+	}
+	function markUsedTiles(tile, renderer) {
 		// determine frustum set is run first so we can ensure the preprocessing of all the necessary
 		// child tiles has happened here.
 		renderer.ensureChildrenArePreprocessed(tile);
@@ -4964,10 +4949,10 @@
 				recursivelyMarkUsed(c, renderer);
 			}
 		}
-	};
+	}
 
 	// Traverse and mark the tiles that are at the leaf nodes of the "used" tree.
-	const markUsedSetLeaves = (tile, renderer) => {
+	function markUsedSetLeaves(tile, renderer) {
 		const frameCount = renderer.frameCount;
 		if (!isUsedThisFrame(tile, frameCount)) {
 			return;
@@ -5002,10 +4987,10 @@
 			tile.__childrenWereVisible = childrenWereVisible;
 			tile.__allChildrenLoaded = allChildrenLoaded;
 		}
-	};
+	}
 
 	// Skip past tiles we consider unrenderable because they are outside the error threshold.
-	const markVisibleTiles = (tile, renderer) => {
+	function markVisibleTiles(tile, renderer) {
 		const stats = renderer.stats;
 		if (!isUsedThisFrame(tile, renderer.frameCount)) {
 			return;
@@ -5076,7 +5061,7 @@
 				markVisibleTiles(children[i], renderer);
 			}
 		}
-	};
+	}
 
 	// Final traverse to toggle tile visibility.
 	const toggleTiles = (tile, renderer) => {
@@ -5118,6 +5103,21 @@
 			}
 		}
 	};
+
+	/**
+	 * Traverses the ancestry of the tile up to the root tile.
+	 */
+	function traverseAncestors(tile, callback = null) {
+		let current = tile;
+		while (current) {
+			const depth = current.__depth;
+			const parent = current.parent;
+			if (callback) {
+				callback(current, parent, depth);
+			}
+			current = parent;
+		}
+	}
 
 	const WGS84_ELLIPSOID = new Ellipsoid(new t3d.Vector3(WGS84_RADIUS, WGS84_RADIUS, WGS84_HEIGHT));
 	WGS84_ELLIPSOID.name = 'WGS84 Earth';
@@ -5644,9 +5644,6 @@
 				geometry: null,
 				materials: null,
 				textures: null,
-				// TODO remove this
-
-				inFrustum: [],
 				featureTable: null,
 				batchTable: null
 			};
@@ -6074,14 +6071,13 @@
 			if (!this.root) {
 				return null;
 			}
-			raycastTraverse(this.root, this, ray, intersects);
-			intersects.sort(distanceSort);
+			raycastTraverse(this, this.root, ray, intersects);
 		}
 		raycastFirst(ray) {
 			if (!this.root) {
 				return null;
 			}
-			return raycastTraverseFirstHit(this.root, this, ray);
+			return raycastTraverseFirstHit(this, this.root, ray);
 		}
 		getBoundingBox(box) {
 			if (!this.root) {
