@@ -28,28 +28,28 @@
 				* @return {OBB} A reference to this OBB.
 				*/
 		setFromCenterAndAxes(center, axisX, axisY, axisZ) {
-			_vec3_1$4.copy(axisX);
+			_vec3_1$3.copy(axisX);
 			_vec3_2$1.copy(axisY);
 			_vec3_3$1.copy(axisZ);
-			const scaleX = _vec3_1$4.getLength();
+			const scaleX = _vec3_1$3.getLength();
 			const scaleY = _vec3_2$1.getLength();
 			const scaleZ = _vec3_3$1.getLength();
-			_vec3_1$4.normalize();
+			_vec3_1$3.normalize();
 			_vec3_2$1.normalize();
 			_vec3_3$1.normalize();
 
 			// handle the case where the box has a dimension of 0 in one axis
 			if (scaleX === 0) {
-				_vec3_1$4.crossVectors(_vec3_2$1, _vec3_3$1);
+				_vec3_1$3.crossVectors(_vec3_2$1, _vec3_3$1);
 			}
 			if (scaleY === 0) {
-				_vec3_2$1.crossVectors(_vec3_1$4, _vec3_3$1);
+				_vec3_2$1.crossVectors(_vec3_1$3, _vec3_3$1);
 			}
 			if (scaleZ === 0) {
-				_vec3_3$1.crossVectors(_vec3_1$4, _vec3_2$1);
+				_vec3_3$1.crossVectors(_vec3_1$3, _vec3_2$1);
 			}
-			this.rotation.set(_vec3_1$4.x, _vec3_2$1.x, _vec3_3$1.x, _vec3_1$4.y, _vec3_2$1.y, _vec3_3$1.y, _vec3_1$4.z, _vec3_2$1.z, _vec3_3$1.z);
-			const halfSize = _vec3_1$4.set(scaleX, scaleY, scaleZ);
+			this.rotation.set(_vec3_1$3.x, _vec3_2$1.x, _vec3_3$1.x, _vec3_1$3.y, _vec3_2$1.y, _vec3_3$1.y, _vec3_1$3.z, _vec3_2$1.z, _vec3_3$1.z);
+			const halfSize = _vec3_1$3.set(scaleX, scaleY, scaleZ);
 			this.box.min.copy(center).sub(halfSize);
 			this.box.max.copy(center).add(halfSize);
 			return this;
@@ -62,9 +62,9 @@
 				*/
 		applyMatrix4(matrix) {
 			const e = matrix.elements;
-			let sx = _vec3_1$4.set(e[0], e[1], e[2]).getLength();
-			const sy = _vec3_1$4.set(e[4], e[5], e[6]).getLength();
-			const sz = _vec3_1$4.set(e[8], e[9], e[10]).getLength();
+			let sx = _vec3_1$3.set(e[0], e[1], e[2]).getLength();
+			const sy = _vec3_1$3.set(e[4], e[5], e[6]).getLength();
+			const sz = _vec3_1$3.set(e[8], e[9], e[10]).getLength();
 			const det = matrix.determinant();
 			if (det < 0) sx = -sx;
 			_mat3_1$1.setFromMatrix4(matrix);
@@ -81,7 +81,7 @@
 			_mat3_1$1.elements[7] *= invSZ;
 			_mat3_1$1.elements[8] *= invSZ;
 			this.rotation.multiply(_mat3_1$1);
-			const center = this.box.getCenter(_vec3_1$4);
+			const center = this.box.getCenter(_vec3_1$3);
 			const halfSize = this.box.getSize(_vec3_2$1).multiplyScalar(0.5);
 			halfSize.x *= sx;
 			halfSize.y *= sy;
@@ -100,7 +100,7 @@
 				* @return {Vector3[]} The array of points.
 				*/
 		getPoints(points) {
-			const center = this.box.getCenter(_vec3_1$4);
+			const center = this.box.getCenter(_vec3_1$3);
 			const min = _vec3_2$1.subVectors(this.box.min, center);
 			const max = _vec3_3$1.subVectors(this.box.max, center);
 			let index = 0;
@@ -121,29 +121,29 @@
 				* @return {Plane[]} The array of planes.
 				*/
 		getPlanes(planes) {
-			const center = this.box.getCenter(_vec3_1$4);
+			const center = this.box.getCenter(_vec3_1$3);
 			const worldMin = _vec3_2$1.subVectors(this.box.min, center).applyMatrix3(this.rotation).add(center);
 			const worldMax = _vec3_3$1.subVectors(this.box.max, center).applyMatrix3(this.rotation).add(center);
-			_vec3_1$4.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
-			planes[0].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
-			planes[1].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
+			_vec3_1$3.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
+			planes[0].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
+			planes[1].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
 			planes[1].normal.negate();
 			planes[1].constant *= -1;
-			_vec3_1$4.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
-			planes[2].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
-			planes[3].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
+			_vec3_1$3.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
+			planes[2].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
+			planes[3].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
 			planes[3].normal.negate();
 			planes[3].constant *= -1;
-			_vec3_1$4.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
-			planes[4].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
-			planes[5].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
+			_vec3_1$3.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
+			planes[4].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
+			planes[5].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
 			planes[5].normal.negate();
 			planes[5].constant *= -1;
 			return planes;
 		}
 		containsPoint(point) {
 			const obbStruct = getOBBStruct(this, a);
-			const v = _vec3_1$4.subVectors(point, obbStruct.c);
+			const v = _vec3_1$3.subVectors(point, obbStruct.c);
 
 			// project _vec3_4 onto each axis and check if these points lie inside the OBB
 
@@ -156,7 +156,7 @@
 		 */
 		clampPoint(point, result) {
 			const obbStruct = getOBBStruct(this, a);
-			const v = _vec3_1$4.subVectors(point, obbStruct.c);
+			const v = _vec3_1$3.subVectors(point, obbStruct.c);
 
 			// start at the center position of the OBB
 
@@ -194,7 +194,7 @@
 
 			// compute translation vector
 
-			const v1 = _vec3_1$4.subVectors(b.c, a.c);
+			const v1 = _vec3_1$3.subVectors(b.c, a.c);
 
 			// bring translation into a's coordinate frame
 
@@ -296,7 +296,7 @@
 				* @param {Matrix4} transform - The transformation matrix.
 				*/
 		toBoundingBoxWithTransform(box3, transform) {
-			const center = this.box.getCenter(_vec3_1$4);
+			const center = this.box.getCenter(_vec3_1$3);
 			box3.min.copy(this.box.min).sub(center);
 			box3.max.copy(this.box.max).sub(center);
 			const e = this.rotation.elements;
@@ -304,7 +304,7 @@
 		}
 	}
 	const closestPoint = new t3d.Vector3();
-	const _vec3_1$4 = new t3d.Vector3();
+	const _vec3_1$3 = new t3d.Vector3();
 	const _vec3_2$1 = new t3d.Vector3();
 	const _vec3_3$1 = new t3d.Vector3();
 	const _mat3_1$1 = new t3d.Matrix3();
@@ -358,16 +358,16 @@
 			this._originBoxTransformInverse.copy(this._originBoxTransform).inverse();
 		}
 		containsPoint(point) {
-			_vec3_1$3.copy(point).applyMatrix4(this._originBoxTransformInverse);
-			return this.box.containsPoint(_vec3_1$3);
+			_vec3_1$2.copy(point).applyMatrix4(this._originBoxTransformInverse);
+			return this.box.containsPoint(_vec3_1$2);
 		}
 		intersectsRay(ray) {
-			_ray_1$1.copy(ray).applyMatrix4(this._originBoxTransformInverse);
-			return _ray_1$1.intersectsBox(this._originBox);
+			_ray_1.copy(ray).applyMatrix4(this._originBoxTransformInverse);
+			return _ray_1.intersectsBox(this._originBox);
 		}
 		intersectRay(ray, target) {
-			_ray_1$1.copy(ray).applyMatrix4(this._originBoxTransformInverse);
-			if (_ray_1$1.intersectBox(this._originBox, target)) {
+			_ray_1.copy(ray).applyMatrix4(this._originBoxTransformInverse);
+			if (_ray_1.intersectBox(this._originBox, target)) {
 				return target.applyMatrix4(this._originBoxTransform);
 			}
 			return null;
@@ -406,8 +406,8 @@
 		distanceToPoint(point) {
 			// originBoxTransformInverse has no scale,
 			// so we don't need to scale the distance
-			_vec3_1$3.copy(point).applyMatrix4(this._originBoxTransformInverse);
-			return this._originBox.distanceToPoint(_vec3_1$3);
+			_vec3_1$2.copy(point).applyMatrix4(this._originBoxTransformInverse);
+			return this._originBox.distanceToPoint(_vec3_1$2);
 		}
 		getBoundingSphere(target) {
 			return this.box.getBoundingSphere(target);
@@ -416,8 +416,8 @@
 			return target.setFromPoints(this._points);
 		}
 	}
-	const _ray_1$1 = new t3d.Ray();
-	const _vec3_1$3 = new t3d.Vector3();
+	const _ray_1 = new t3d.Ray();
+	const _vec3_1$2 = new t3d.Vector3();
 
 	// Cesium / 3D tiles Spheroid:
 	// - Up is Z at 90 degrees latitude
@@ -508,20 +508,20 @@
 			// https://github.com/CesiumGS/cesium/blob/665ec32e813d5d6fe906ec3e87187f6c38ed5e49/packages/engine/Source/Core/Ellipsoid.js#L396
 			this.getCartographicToNormal(lat, lon, _norm);
 			const radius = this.radius;
-			_vec$4.copy(_norm);
-			_vec$4.x *= radius.x ** 2;
-			_vec$4.y *= radius.y ** 2;
-			_vec$4.z *= radius.z ** 2;
-			const gamma = Math.sqrt(_norm.dot(_vec$4));
-			_vec$4.multiplyScalar(1 / gamma);
-			return target.copy(_vec$4).addScaledVector(_norm, height);
+			_vec$5.copy(_norm);
+			_vec$5.x *= radius.x ** 2;
+			_vec$5.y *= radius.y ** 2;
+			_vec$5.z *= radius.z ** 2;
+			const gamma = Math.sqrt(_norm.dot(_vec$5));
+			_vec$5.multiplyScalar(1 / gamma);
+			return target.copy(_vec$5).addScaledVector(_norm, height);
 		}
 		getPositionToCartographic(pos, target) {
 			// From Cesium function Ellipsoid.cartesianToCartographic
 			// https://github.com/CesiumGS/cesium/blob/665ec32e813d5d6fe906ec3e87187f6c38ed5e49/packages/engine/Source/Core/Ellipsoid.js#L463
-			this.getPositionToSurfacePoint(pos, _vec$4);
+			this.getPositionToSurfacePoint(pos, _vec$5);
 			this.getPositionToNormal(pos, _norm);
-			const heightDelta = _vec2$1.subVectors(pos, _vec$4);
+			const heightDelta = _vec2$1.subVectors(pos, _vec$5);
 			target.lon = Math.atan2(_norm.y, _norm.x);
 			target.lat = Math.asin(_norm.z);
 			target.height = Math.sign(heightDelta.dot(pos)) * heightDelta.getLength();
@@ -560,7 +560,7 @@
 			const ratio = Math.sqrt(1.0 / squaredNorm);
 
 			// As an initial approximation, assume that the radial intersection is the projection point.
-			const intersection = _vec$4.copy(pos).multiplyScalar(ratio);
+			const intersection = _vec$5.copy(pos).multiplyScalar(ratio);
 			if (squaredNorm < CENTER_EPS) {
 				return !isFinite(ratio) ? null : target.copy(intersection);
 			}
@@ -617,8 +617,8 @@
 		}
 		getPositionElevation(pos) {
 			// logic from "getPositionToCartographic"
-			this.getPositionToSurfacePoint(pos, _vec$4);
-			const heightDelta = _vec2$1.subVectors(pos, _vec$4);
+			this.getPositionToSurfacePoint(pos, _vec$5);
+			const heightDelta = _vec2$1.subVectors(pos, _vec$5);
 			return Math.sign(heightDelta.dot(pos)) * heightDelta.getLength();
 		}
 		copy(source) {
@@ -631,7 +631,7 @@
 	}
 	const _spherical = new t3d.Spherical();
 	const _norm = new t3d.Vector3();
-	const _vec$4 = new t3d.Vector3();
+	const _vec$5 = new t3d.Vector3();
 	const _vec2$1 = new t3d.Vector3();
 	const _matrix$1 = new t3d.Matrix4();
 	const _matrix2 = new t3d.Matrix4();
@@ -766,7 +766,7 @@
 		}
 		setOBBData(data, transform) {
 			const obb = new TileOBB();
-			obb.setFromCenterAndAxes(_vec3_4.set(data[0], data[1], data[2]), _vec3_1$2.set(data[3], data[4], data[5]), _vec3_2.set(data[6], data[7], data[8]), _vec3_3.set(data[9], data[10], data[11])).applyMatrix4(transform);
+			obb.setFromCenterAndAxes(_vec3_4.set(data[0], data[1], data[2]), _vec3_1$1.set(data[3], data[4], data[5]), _vec3_2.set(data[6], data[7], data[8]), _vec3_3.set(data[9], data[10], data[11])).applyMatrix4(transform);
 			obb.updateCache();
 			this.obb = obb;
 		}
@@ -810,13 +810,13 @@
 			let sphereDistSq = -Infinity;
 			let obbDistSq = -Infinity;
 			if (sphere) {
-				if (ray.intersectSphere(sphere, _vec3_1$2)) {
-					sphereDistSq = sphere.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$2);
+				if (ray.intersectSphere(sphere, _vec3_1$1)) {
+					sphereDistSq = sphere.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$1);
 				}
 			}
 			if (obb) {
-				if (obb.intersectRay(ray, _vec3_1$2)) {
-					obbDistSq = obb.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$2);
+				if (obb.intersectRay(ray, _vec3_1$1)) {
+					obbDistSq = obb.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$1);
 				}
 			}
 
@@ -884,7 +884,7 @@
 			}
 		}
 	}
-	const _vec3_1$2 = new t3d.Vector3();
+	const _vec3_1$1 = new t3d.Vector3();
 	const _vec3_2 = new t3d.Vector3();
 	const _vec3_3 = new t3d.Vector3();
 	const _vec3_4 = new t3d.Vector3();
@@ -908,21 +908,43 @@
 		}
 		return filename.substring(lastPeriod + 1) || null;
 	};
-	const traverseSet = (tile, beforeCb = null, afterCb = null, parent = null, depth = 0) => {
-		if (beforeCb && beforeCb(tile, parent, depth)) {
+
+	// Helper function for traversing a tile set. If `beforeCb` returns `true` then the
+	// traversal will end early.
+	function traverseSet(tile, beforeCb = null, afterCb = null) {
+		const stack = [];
+
+		// A stack-based, depth-first traversal, storing
+		// triplets (tile, parent, depth) in the stack array.
+
+		stack.push(tile);
+		stack.push(null);
+		stack.push(0);
+		while (stack.length > 0) {
+			const depth = stack.pop();
+			const parent = stack.pop();
+			const tile = stack.pop();
+			if (beforeCb && beforeCb(tile, parent, depth)) {
+				if (afterCb) {
+					afterCb(tile, parent, depth);
+				}
+				return;
+			}
+			const children = tile.children;
+
+			// Children might be undefined if the tile has not been preprocessed yet
+			if (children) {
+				for (let i = children.length - 1; i >= 0; i--) {
+					stack.push(children[i]);
+					stack.push(tile);
+					stack.push(depth + 1);
+				}
+			}
 			if (afterCb) {
 				afterCb(tile, parent, depth);
 			}
-			return;
 		}
-		const children = tile.children;
-		for (let i = 0, l = children.length; i < l; i++) {
-			traverseSet(children[i], beforeCb, afterCb, tile, depth + 1);
-		}
-		if (afterCb) {
-			afterCb(tile, parent, depth);
-		}
-	};
+	}
 
 	/**
 	 * Traverses the ancestry of the tile up to the root tile.
@@ -939,41 +961,55 @@
 		}
 	}
 
-	const raycastTraverse = (tile, tiles3D, ray, intersects, localRay = null) => {
+	const _localRay = new t3d.Ray();
+	const _vec$4 = new t3d.Vector3();
+	const _hitArray = [];
+	const _mat = new t3d.Matrix4();
+	const distanceSort = (a, b) => {
+		return a.distance - b.distance;
+	};
+	const intersectTileScene = (tile, ray, renderer, intersects) => {
 		const {
-			activeTiles
-		} = tiles3D;
-		const boundingVolume = tile.cached.boundingVolume;
+			scene
+		} = tile.cached;
+		const lengthBefore = intersects.length;
+		const didRaycast = renderer.invokeOnePlugin(plugin => plugin.raycastTile && plugin.raycastTile(tile, scene, ray, intersects));
+		if (!didRaycast) {
+			scene.traverse(c => {
+				// We set the default raycast function to empty so t3d.js doesn't automatically cast against it
+				Object.getPrototypeOf(c).raycast.call(c, ray, intersects);
+			});
+			const lengthAfter = intersects.length;
 
-		// reuse the ray when traversing the tree
-		if (localRay === null) {
-			localRay = _ray_1;
-			_mat4_1$1.copy(tiles3D.worldMatrix).inverse();
-			localRay.copy(ray).applyMatrix4(_mat4_1$1);
-		}
-		if (!tile.__used || !boundingVolume.intersectsRay(localRay)) {
-			return;
-		}
-		if (activeTiles.has(tile)) {
-			_intersectTileScene(tile, ray, intersects);
-		}
-		const children = tile.children;
-		for (let i = 0, l = children.length; i < l; i++) {
-			raycastTraverse(children[i], tiles3D, ray, intersects, localRay);
+			// add the tile to intersects
+			if (lengthAfter > lengthBefore) {
+				for (let i = lengthBefore; i < lengthAfter; i++) {
+					intersects[i].tile = tile;
+				}
+			}
 		}
 	};
+	function intersectTileSceneFirstHit(tile, ray, renderer) {
+		intersectTileScene(tile, ray, renderer, _hitArray);
+		_hitArray.sort(distanceSort);
+		const hit = _hitArray[0] || null;
+		_hitArray.length = 0;
+		return hit;
+	}
+	function isTileInitialized(tile) {
+		return '__used' in tile;
+	}
 
 	// Returns the closest hit when traversing the tree
-	const raycastTraverseFirstHit = (tile, tiles3D, ray, localRay = null) => {
+	const raycastTraverseFirstHit = (tile, renderer, ray, localRay = null) => {
 		const {
 			activeTiles
-		} = tiles3D;
+		} = renderer;
 
-		// reuse the ray when traversing the tree
+		// get the ray in the local group frame
 		if (localRay === null) {
-			localRay = _ray_1;
-			_mat4_1$1.copy(tiles3D.worldMatrix).inverse();
-			localRay.copy(ray).applyMatrix4(_mat4_1$1);
+			localRay = _localRay;
+			localRay.copy(ray).applyMatrix4(_mat.copy(renderer.worldMatrix).inverse());
 		}
 
 		// get a set of intersections so we intersect the nearest one first
@@ -981,14 +1017,16 @@
 		const children = tile.children;
 		for (let i = 0, l = children.length; i < l; i++) {
 			const child = children[i];
-			if (!child.__used) {
+			if (!isTileInitialized(child) || !child.__used) {
 				continue;
 			}
+
+			// track the tile and hit distance for sorting
 			const boundingVolume = child.cached.boundingVolume;
-			if (boundingVolume.intersectRay(localRay, _vec3_1$1)) {
-				_vec3_1$1.applyMatrix4(tiles3D.worldMatrix);
+			if (boundingVolume.intersectRay(localRay, _vec$4) !== null) {
+				_vec$4.applyMatrix4(renderer.worldMatrix);
 				array.push({
-					distance: _vec3_1$1.distanceToSquared(ray.origin),
+					distance: _vec$4.distanceToSquared(ray.origin),
 					tile: child
 				});
 			}
@@ -996,18 +1034,13 @@
 
 		// sort them by ascending distance
 		array.sort(distanceSort);
-		let bestHit = null;
-		let bestHitDistSq = Infinity;
 
 		// If the root is active make sure we've checked it
+		let bestHit = null;
+		let bestHitDistSq = Infinity;
 		if (activeTiles.has(tile)) {
-			_intersectTileScene(tile, ray, _hitArray);
-			if (_hitArray.length > 0) {
-				if (_hitArray.length > 1) {
-					_hitArray.sort(distanceSort);
-				}
-				const hit = _hitArray[0];
-				_hitArray.length = 0;
+			const hit = intersectTileSceneFirstHit(tile, ray, renderer);
+			if (hit) {
 				bestHit = hit;
 				bestHitDistSq = hit.distance * hit.distance;
 			}
@@ -1017,12 +1050,12 @@
 		// couldn't possible include a best hit
 		for (let i = 0, l = array.length; i < l; i++) {
 			const data = array[i];
-			const distanceSquared = data.distance;
+			const boundingVolumeDistSq = data.distance;
 			const tile = data.tile;
-			if (distanceSquared > bestHitDistSq) {
+			if (boundingVolumeDistSq > bestHitDistSq) {
 				break;
 			}
-			const hit = raycastTraverseFirstHit(tile, tiles3D, ray, localRay);
+			const hit = raycastTraverseFirstHit(tile, renderer, ray, localRay);
 			if (hit) {
 				const hitDistSq = hit.distance * hit.distance;
 				if (hitDistSq < bestHitDistSq) {
@@ -1033,29 +1066,39 @@
 		}
 		return bestHit;
 	};
-	const distanceSort = (a, b) => {
-		return a.distance - b.distance;
-	};
-	const _intersectTileScene = (tile, ray, intersects) => {
-		const scene = tile.cached.scene;
-		const lengthBefore = intersects.length;
-		scene.traverse(c => {
-			// We set the default raycast function to empty so t3d.js doesn't automatically cast against it
-			Object.getPrototypeOf(c).raycast.call(c, ray, intersects);
-		});
-		const lengthAfter = intersects.length;
+	const raycastTraverse = (tile, renderer, ray, intersects, localRay = null) => {
+		// if the tile has not been asynchronously initialized then there's no point in
+		// traversing the tiles to check intersections.
+		if (!isTileInitialized(tile)) {
+			return;
+		}
+		const {
+			activeTiles
+		} = renderer;
+		const {
+			boundingVolume
+		} = tile.cached;
 
-		// add the tile to intersects
-		if (lengthAfter > lengthBefore) {
-			for (let i = lengthBefore; i < lengthAfter; i++) {
-				intersects[i].tile = tile;
-			}
+		// get the ray in the local group frame
+		if (localRay === null) {
+			localRay = _localRay;
+			localRay.copy(ray).applyMatrix4(_mat.copy(renderer.worldMatrix).inverse());
+		}
+
+		// exit early if the tile isn't used or the bounding volume is not intersected
+		if (!tile.__used || !boundingVolume.intersectsRay(localRay)) {
+			return;
+		}
+
+		// only intersect the tile geometry if it's active
+		if (activeTiles.has(tile)) {
+			intersectTileScene(tile, ray, renderer, intersects);
+		}
+		const children = tile.children;
+		for (let i = 0, l = children.length; i < l; i++) {
+			raycastTraverse(children[i], renderer, ray, intersects, localRay);
 		}
 	};
-	const _mat4_1$1 = new t3d.Matrix4();
-	const _ray_1 = new t3d.Ray();
-	const _vec3_1$1 = new t3d.Vector3();
-	const _hitArray = [];
 
 	class FastFrustum extends t3d.Frustum {
 		constructor() {
@@ -4779,8 +4822,7 @@
 		return tile.__lastFrameVisited === frameCount && tile.__used;
 	}
 	function areChildrenProcessed(tile) {
-		// return tile.__childrenProcessed === tile.children.length;
-		return true; // TODO: implement this
+		return tile.__childrenProcessed === tile.children.length;
 	}
 
 	// Resets the frame frame information for the given tile
@@ -4812,7 +4854,7 @@
 		markUsed(tile, renderer);
 
 		// don't traverse if the children have not been processed, yet
-		if (!tile.__hasRenderableContent && areChildrenProcessed()) {
+		if (!tile.__hasRenderableContent && areChildrenProcessed(tile)) {
 			const children = tile.children;
 			for (let i = 0, l = children.length; i < l; i++) {
 				recursivelyMarkUsed(children[i], renderer);
@@ -4828,9 +4870,9 @@
 		if (isUsedThisFrame(tile, renderer.frameCount)) {
 			// queue this tile to download content
 			if (tile.__hasContent && tile.__loadingState === UNLOADED && !renderer.lruCache.isFull()) {
-				renderer.requestTileContents(tile);
+				renderer.queueTileForDownload(tile);
 			}
-			{
+			if (areChildrenProcessed(tile)) {
 				// queue any used child tiles
 				const children = tile.children;
 				for (let i = 0, l = children.length; i < l; i++) {
@@ -4862,6 +4904,11 @@
 
 		// Early out if we've reached the maximum allowed depth.
 		if (renderer.maxDepth > 0 && tile.__depth + 1 >= renderer.maxDepth) {
+			return false;
+		}
+
+		// Early out if the children haven't been processed, yet
+		if (!areChildrenProcessed(tile)) {
 			return false;
 		}
 		return true;
@@ -4975,7 +5022,7 @@
 				tile.__active = true;
 				stats.active++;
 			} else if (!lruCache.isFull() && tile.__hasContent) {
-				renderer.requestTileContents(tile);
+				renderer.queueTileForDownload(tile);
 			}
 			return;
 		}
@@ -4995,7 +5042,7 @@
 		const allChildrenLoaded = tile.__allChildrenLoaded;
 		const includeTile = meetsSSE || tile.refine === 'ADD';
 		if (includeTile && !loadedContent && !lruCache.isFull() && hasContent) {
-			renderer.requestTileContents(tile);
+			renderer.queueTileForDownload(tile);
 		}
 
 		// Only mark this tile as visible if it meets the screen space error requirements, has loaded content, not
@@ -5075,11 +5122,31 @@
 	const WGS84_ELLIPSOID = new Ellipsoid(new t3d.Vector3(WGS84_RADIUS, WGS84_RADIUS, WGS84_HEIGHT));
 	WGS84_ELLIPSOID.name = 'WGS84 Earth';
 
+	// function that rate limits the amount of time a function can be called to once
+	// per frame, initially queuing a new call for the next frame.
+	function throttle(callback) {
+		let handle = null;
+		return () => {
+			if (handle === null) {
+				handle = requestAnimationFrame(() => {
+					handle = null;
+					callback();
+				});
+			}
+		};
+	}
+
 	const _updateBeforeEvent = {
 		type: 'update-before'
 	};
 	const _updateAfterEvent = {
 		type: 'update-after'
+	};
+	const _tilesLoadStartEvent = {
+		type: 'tiles-load-start'
+	};
+	const _tilesLoadEndEvent = {
+		type: 'tiles-load-end'
 	};
 	const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
 	const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
@@ -5149,6 +5216,15 @@
 			const rootTileSet = this.rootTileSet;
 			return rootTileSet ? rootTileSet.root : null;
 		}
+		get loadProgress() {
+			const {
+				stats,
+				isLoading
+			} = this;
+			const loading = stats.downloading + stats.parsing;
+			const total = stats.inCacheSinceLoad + (isLoading ? 1 : 0);
+			return total === 0 ? 1.0 : 1.0 - loading / total;
+		}
 		constructor(url, manager = new t3d.LoadingManager()) {
 			super();
 			this.ellipsoid = WGS84_ELLIPSOID.clone();
@@ -5175,6 +5251,8 @@
 			// stats
 
 			this.stats = {
+				inCacheSinceLoad: 0,
+				inCache: 0,
 				parsing: 0,
 				downloading: 0,
 				failed: 0,
@@ -5184,6 +5262,13 @@
 				visible: 0
 			};
 			this.frameCount = 0;
+
+			// callbacks
+			this._dispatchNeedsUpdateEvent = throttle(() => {
+				this.dispatchEvent({
+					type: 'needs-update'
+				});
+			});
 			this.activeTiles = new Set();
 			this.visibleTiles = new Set();
 			this.usedSet = new Set();
@@ -5195,6 +5280,9 @@
 			this.rootTileSet = null;
 			this._autoDisableRendererCulling = true;
 			this.plugins = [];
+			this.queuedTiles = [];
+			this.cachedSinceLoadComplete = new Set();
+			this.isLoading = false;
 			const lruCache = new LRUCache();
 			lruCache.unloadPriorityCallback = lruPriorityCallback;
 			const downloadQueue = new PriorityQueue();
@@ -5203,9 +5291,14 @@
 			const parseQueue = new PriorityQueue();
 			parseQueue.maxJobs = 1;
 			parseQueue.priorityCallback = priorityCallback;
+			const processNodeQueue = new PriorityQueue();
+			processNodeQueue.maxJobs = 25;
+			processNodeQueue.priorityCallback = priorityCallback;
+			processNodeQueue.log = true;
 			this.lruCache = lruCache;
 			this.downloadQueue = downloadQueue;
 			this.parseQueue = parseQueue;
+			this.processNodeQueue = processNodeQueue;
 			this.$cameras = new CameraList();
 			this.$modelLoader = new ModelLoader(manager);
 			this.$events = new t3d.EventDispatcher();
@@ -5262,6 +5355,12 @@
 				return beforecb ? beforecb(tile, ...args) : false;
 			}, aftercb);
 		}
+		queueTileForDownload(tile) {
+			if (tile.__loadingState !== UNLOADED) {
+				return;
+			}
+			this.queuedTiles.push(tile);
+		}
 		markTileUsed(tile) {
 			// save the tile in a separate "used set" so we can mark it as unused
 			// before the next tile set traversal
@@ -5275,7 +5374,10 @@
 				lruCache,
 				usedSet,
 				stats,
-				root
+				root,
+				downloadQueue,
+				parseQueue,
+				processNodeQueue
 			} = this;
 			if (this.rootLoadingState === UNLOADED) {
 				this.rootLoadingState = LOADING;
@@ -5319,7 +5421,26 @@
 			markUsedSetLeaves(root, this);
 			markVisibleTiles(root, this);
 			toggleTiles(root, this);
+
+			// TODO: This will only sort for one tile set. We may want to store this queue on the
+			// LRUCache so multiple tile sets can use it at once
+			// start the downloads of the tiles as needed
+			const queuedTiles = this.queuedTiles;
+			queuedTiles.sort(lruCache.unloadPriorityCallback);
+			for (let i = 0, l = queuedTiles.length; i < l && !lruCache.isFull(); i++) {
+				this.requestTileContents(queuedTiles[i]);
+			}
+			queuedTiles.length = 0;
 			this.lruCache.scheduleUnload();
+
+			// if all tasks have finished and we've been marked as actively loading then fire the completion event
+			const runningTasks = downloadQueue.running || parseQueue.running || processNodeQueue.running;
+			if (runningTasks === false && this.isLoading === true) {
+				this.cachedSinceLoadComplete.clear();
+				stats.inCacheSinceLoad = 0;
+				this.dispatchEvent(_tilesLoadEndEvent);
+				this.isLoading = false;
+			}
 			this.dispatchEvent(_updateAfterEvent);
 		}
 		resetFailedTiles() {
@@ -5616,7 +5737,26 @@
 			}
 		}
 		ensureChildrenArePreprocessed(tile, immediate = false) {
-			// TODO
+			const children = tile.children;
+			for (let i = 0, l = children.length; i < l; i++) {
+				const child = children[i];
+				if ('__depth' in child) {
+					// the child has already been processed
+					break;
+				} else if (immediate) {
+					// process the node immediately and make sure we don't double process it
+					this.processNodeQueue.remove(child);
+					this.preprocessNode(child, tile.__basePath, tile);
+				} else {
+					// queue the node for processing if it hasn't been already
+					if (!this.processNodeQueue.has(child)) {
+						this.processNodeQueue.add(child, child => {
+							this.preprocessNode(child, tile.__basePath, tile);
+							this._dispatchNeedsUpdateEvent();
+						});
+					}
+				}
+			}
 		}
 
 		// Private Functions
@@ -5631,7 +5771,7 @@
 			// remove the last file path path-segment from the URL including the trailing slash
 			let basePath = url.replace(/\/[^/]*$/, '');
 			basePath = new URL(basePath, window.location.href).toString();
-			traverseSet(json.root, (node, parent) => this.preprocessNode(node, basePath, parent), null, parent, parent ? parent.__depth : 0);
+			this.preprocessNode(json.root, basePath, parent);
 		}
 		loadRootTileSet() {
 			// transform the url
@@ -5679,18 +5819,26 @@
 			const downloadQueue = this.downloadQueue;
 			const parseQueue = this.parseQueue;
 			const isExternalTileSet = tile.__hasUnrenderableContent;
-			lruCache.add(tile, t => {
+			const addedSuccessfully = lruCache.add(tile, t => {
 				if (t.__loadingState === LOADING) {
 					// Stop the load if it's started
 					t.__loadAbort.abort();
 					t.__loadAbort = null;
 				} else if (isExternalTileSet) {
 					t.children.length = 0;
+					t.__childrenProcessed = 0;
 				} else {
-					this.disposeTile(t);
+					this.invokeAllPlugins(plugin => {
+						plugin.disposeTile && plugin.disposeTile(t);
+					});
 				}
 
 				// Decrement stats
+				stats.inCache--;
+				if (this.cachedSinceLoadComplete.has(tile)) {
+					this.cachedSinceLoadComplete.delete(tile);
+					stats.inCacheSinceLoad--;
+				}
 				if (t.__loadingState === LOADING) {
 					stats.downloading--;
 				} else if (t.__loadingState === PARSING) {
@@ -5702,12 +5850,26 @@
 				parseQueue.remove(t);
 			});
 
+			// if we couldn't add the tile to the lru cache because it's full then skip
+			if (!addedSuccessfully) {
+				return;
+			}
+
+			// check if this is the beginning of a new set of tiles to load and dispatch and event
+			if (!this.isLoading) {
+				this.isLoading = true;
+				this.dispatchEvent(_tilesLoadStartEvent);
+			}
+
 			// Track a new load index so we avoid the condition where this load is stopped and
 			// another begins soon after so we don't parse twice.
 			tile.__loadIndex++;
 			const loadIndex = tile.__loadIndex;
 			const controller = new AbortController();
 			const signal = controller.signal;
+			this.cachedSinceLoadComplete.add(tile);
+			stats.inCacheSinceLoad++;
+			stats.inCache++;
 			stats.downloading++;
 			tile.__loadAbort = controller;
 			tile.__loadingState = LOADING;

@@ -1,39 +1,57 @@
 import { Matrix4, Ray, Vector3 } from 't3d';
 
-export const raycastTraverse = (tile, tiles3D, ray, intersects, localRay = null) => {
-	const { activeTiles } = tiles3D;
-	const boundingVolume = tile.cached.boundingVolume;
+const _localRay = new Ray();
+const _vec = new Vector3();
+const _hitArray = [];
+const _mat = new Matrix4();
 
-	// reuse the ray when traversing the tree
-	if (localRay === null) {
-		localRay = _ray_1;
-		_mat4_1.copy(tiles3D.worldMatrix).inverse();
-		localRay.copy(ray).applyMatrix4(_mat4_1);
-	}
+export const distanceSort = (a, b) => {
+	return a.distance - b.distance;
+};
 
-	if (!tile.__used || !boundingVolume.intersectsRay(localRay)) {
-		return;
-	}
+const intersectTileScene = (tile, ray, renderer, intersects) => {
+	const { scene } = tile.cached;
 
-	if (activeTiles.has(tile)) {
-		_intersectTileScene(tile, ray, intersects);
-	}
+	const lengthBefore = intersects.length;
+	const didRaycast = renderer.invokeOnePlugin(plugin => plugin.raycastTile && plugin.raycastTile(tile, scene, ray, intersects));
+	if (!didRaycast) {
+		scene.traverse(c => {
+			// We set the default raycast function to empty so t3d.js doesn't automatically cast against it
+			Object.getPrototypeOf(c).raycast.call(c, ray, intersects);
+		});
 
-	const children = tile.children;
-	for (let i = 0, l = children.length; i < l; i++) {
-		raycastTraverse(children[i], tiles3D, ray, intersects, localRay);
+		const lengthAfter = intersects.length;
+
+		// add the tile to intersects
+		if (lengthAfter > lengthBefore) {
+			for (let i = lengthBefore; i < lengthAfter; i++) {
+				intersects[i].tile = tile;
+			}
+		}
 	}
 };
 
-// Returns the closest hit when traversing the tree
-export const raycastTraverseFirstHit = (tile, tiles3D, ray, localRay = null) => {
-	const { activeTiles } = tiles3D;
+function intersectTileSceneFirstHit(tile, ray, renderer) {
+	intersectTileScene(tile, ray, renderer, _hitArray);
+	_hitArray.sort(distanceSort);
 
-	// reuse the ray when traversing the tree
+	const hit = _hitArray[0] || null;
+	_hitArray.length = 0;
+	return hit;
+}
+
+function isTileInitialized(tile) {
+	return '__used' in tile;
+}
+
+// Returns the closest hit when traversing the tree
+export const raycastTraverseFirstHit = (tile, renderer, ray, localRay = null) => {
+	const { activeTiles } = renderer;
+
+	// get the ray in the local group frame
 	if (localRay === null) {
-		localRay = _ray_1;
-		_mat4_1.copy(tiles3D.worldMatrix).inverse();
-		localRay.copy(ray).applyMatrix4(_mat4_1);
+		localRay = _localRay;
+		localRay.copy(ray).applyMatrix4(_mat.copy(renderer.worldMatrix).inverse());
 	}
 
 	// get a set of intersections so we intersect the nearest one first
@@ -42,16 +60,16 @@ export const raycastTraverseFirstHit = (tile, tiles3D, ray, localRay = null) => 
 	for (let i = 0, l = children.length; i < l; i++) {
 		const child = children[i];
 
-		if (!child.__used) {
+		if (!isTileInitialized(child) || !child.__used) {
 			continue;
 		}
 
+		// track the tile and hit distance for sorting
 		const boundingVolume = child.cached.boundingVolume;
-
-		if (boundingVolume.intersectRay(localRay, _vec3_1)) {
-			_vec3_1.applyMatrix4(tiles3D.worldMatrix);
+		if (boundingVolume.intersectRay(localRay, _vec) !== null) {
+			_vec.applyMatrix4(renderer.worldMatrix);
 			array.push({
-				distance: _vec3_1.distanceToSquared(ray.origin),
+				distance: _vec.distanceToSquared(ray.origin),
 				tile: child
 			});
 		}
@@ -60,21 +78,12 @@ export const raycastTraverseFirstHit = (tile, tiles3D, ray, localRay = null) => 
 	// sort them by ascending distance
 	array.sort(distanceSort);
 
+	// If the root is active make sure we've checked it
 	let bestHit = null;
 	let bestHitDistSq = Infinity;
-
-	// If the root is active make sure we've checked it
 	if (activeTiles.has(tile)) {
-		_intersectTileScene(tile, ray, _hitArray);
-
-		if (_hitArray.length > 0) {
-			if (_hitArray.length > 1) {
-				_hitArray.sort(distanceSort);
-			}
-
-			const hit = _hitArray[0];
-			_hitArray.length = 0;
-
+		const hit = intersectTileSceneFirstHit(tile, ray, renderer);
+		if (hit) {
 			bestHit = hit;
 			bestHitDistSq = hit.distance * hit.distance;
 		}
@@ -84,15 +93,13 @@ export const raycastTraverseFirstHit = (tile, tiles3D, ray, localRay = null) => 
 	// couldn't possible include a best hit
 	for (let i = 0, l = array.length; i < l; i++) {
 		const data = array[i];
-		const distanceSquared = data.distance;
+		const boundingVolumeDistSq = data.distance;
 		const tile = data.tile;
-
-		if (distanceSquared > bestHitDistSq) {
+		if (boundingVolumeDistSq > bestHitDistSq) {
 			break;
 		}
 
-		const hit = raycastTraverseFirstHit(tile, tiles3D, ray, localRay);
-
+		const hit = raycastTraverseFirstHit(tile, renderer, ray, localRay);
 		if (hit) {
 			const hitDistSq = hit.distance * hit.distance;
 			if (hitDistSq < bestHitDistSq) {
@@ -105,32 +112,34 @@ export const raycastTraverseFirstHit = (tile, tiles3D, ray, localRay = null) => 
 	return bestHit;
 };
 
-export const distanceSort = (a, b) => {
-	return a.distance - b.distance;
-};
+export const raycastTraverse = (tile, renderer, ray, intersects, localRay = null) => {
+	// if the tile has not been asynchronously initialized then there's no point in
+	// traversing the tiles to check intersections.
+	if (!isTileInitialized(tile)) {
+		return;
+	}
 
-const _intersectTileScene = (tile, ray, intersects) => {
-	const scene = tile.cached.scene;
+	const { activeTiles } = renderer;
+	const { boundingVolume } = tile.cached;
 
-	const lengthBefore = intersects.length;
+	// get the ray in the local group frame
+	if (localRay === null) {
+		localRay = _localRay;
+		localRay.copy(ray).applyMatrix4(_mat.copy(renderer.worldMatrix).inverse());
+	}
 
-	scene.traverse(c => {
-		// We set the default raycast function to empty so t3d.js doesn't automatically cast against it
-		Object.getPrototypeOf(c).raycast.call(c, ray, intersects);
-	});
+	// exit early if the tile isn't used or the bounding volume is not intersected
+	if (!tile.__used || !boundingVolume.intersectsRay(localRay)) {
+		return;
+	}
 
-	const lengthAfter = intersects.length;
+	// only intersect the tile geometry if it's active
+	if (activeTiles.has(tile)) {
+		intersectTileScene(tile, ray, renderer, intersects);
+	}
 
-	// add the tile to intersects
-	if (lengthAfter > lengthBefore) {
-		for (let i = lengthBefore; i < lengthAfter; i++) {
-			intersects[i].tile = tile;
-		}
+	const children = tile.children;
+	for (let i = 0, l = children.length; i < l; i++) {
+		raycastTraverse(children[i], renderer, ray, intersects, localRay);
 	}
 };
-
-const _mat4_1 = new Matrix4();
-const _ray_1 = new Ray();
-const _vec3_1 = new Vector3();
-
-const _hitArray = [];

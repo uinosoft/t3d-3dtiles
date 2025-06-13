@@ -9,9 +9,12 @@ import { ModelLoader } from './utils/ModelLoader.js';
 import { markUsedTiles, markUsedSetLeaves, markVisibleTiles, toggleTiles } from './utils/TilesScheduler.js';
 import { UNLOADED, LOADING, PARSING, LOADED, FAILED } from './constants.js';
 import { WGS84_ELLIPSOID } from './math/GeoConstants.js';
+import { throttle } from './utils/throttle.js';
 
 const _updateBeforeEvent = { type: 'update-before' };
 const _updateAfterEvent = { type: 'update-after' };
+const _tilesLoadStartEvent = { type: 'tiles-load-start' };
+const _tilesLoadEndEvent = { type: 'tiles-load-end' };
 
 const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
 
@@ -91,6 +94,13 @@ export class Tiles3D extends Object3D {
 		return rootTileSet ? rootTileSet.root : null;
 	}
 
+	get loadProgress() {
+		const { stats, isLoading } = this;
+		const loading = stats.downloading + stats.parsing;
+		const total = stats.inCacheSinceLoad + (isLoading ? 1 : 0);
+		return total === 0 ? 1.0 : 1.0 - loading / total;
+	}
+
 	constructor(url, manager = new LoadingManager()) {
 		super();
 
@@ -119,6 +129,8 @@ export class Tiles3D extends Object3D {
 		// stats
 
 		this.stats = {
+			inCacheSinceLoad: 0,
+			inCache: 0,
 			parsing: 0,
 			downloading: 0,
 			failed: 0,
@@ -129,6 +141,11 @@ export class Tiles3D extends Object3D {
 		};
 
 		this.frameCount = 0;
+
+		// callbacks
+		this._dispatchNeedsUpdateEvent = throttle(() => {
+			this.dispatchEvent({ type: 'needs-update' });
+		});
 
 		this.activeTiles = new Set();
 		this.visibleTiles = new Set();
@@ -144,6 +161,9 @@ export class Tiles3D extends Object3D {
 		this._autoDisableRendererCulling = true;
 
 		this.plugins = [];
+		this.queuedTiles = [];
+		this.cachedSinceLoadComplete = new Set();
+		this.isLoading = false;
 
 		const lruCache = new LRUCache();
 		lruCache.unloadPriorityCallback = lruPriorityCallback;
@@ -156,9 +176,15 @@ export class Tiles3D extends Object3D {
 		parseQueue.maxJobs = 1;
 		parseQueue.priorityCallback = priorityCallback;
 
+		const processNodeQueue = new PriorityQueue();
+		processNodeQueue.maxJobs = 25;
+		processNodeQueue.priorityCallback = priorityCallback;
+		processNodeQueue.log = true;
+
 		this.lruCache = lruCache;
 		this.downloadQueue = downloadQueue;
 		this.parseQueue = parseQueue;
+		this.processNodeQueue = processNodeQueue;
 
 		this.$cameras = new CameraList();
 		this.$modelLoader = new ModelLoader(manager);
@@ -227,6 +253,14 @@ export class Tiles3D extends Object3D {
 		}, aftercb);
 	}
 
+	queueTileForDownload(tile) {
+		if (tile.__loadingState !== UNLOADED) {
+			return;
+		}
+
+		this.queuedTiles.push(tile);
+	}
+
 	markTileUsed(tile) {
 		// save the tile in a separate "used set" so we can mark it as unused
 		// before the next tile set traversal
@@ -236,7 +270,7 @@ export class Tiles3D extends Object3D {
 
 	// Public API
 	update() {
-		const { lruCache, usedSet, stats, root } = this;
+		const { lruCache, usedSet, stats, root, downloadQueue, parseQueue, processNodeQueue } = this;
 
 		if (this.rootLoadingState === UNLOADED) {
 			this.rootLoadingState = LOADING;
@@ -292,7 +326,28 @@ export class Tiles3D extends Object3D {
 		markVisibleTiles(root, this);
 		toggleTiles(root, this);
 
+		// TODO: This will only sort for one tile set. We may want to store this queue on the
+		// LRUCache so multiple tile sets can use it at once
+		// start the downloads of the tiles as needed
+		const queuedTiles = this.queuedTiles;
+		queuedTiles.sort(lruCache.unloadPriorityCallback);
+		for (let i = 0, l = queuedTiles.length; i < l && !lruCache.isFull(); i++) {
+			this.requestTileContents(queuedTiles[i]);
+		}
+
+		queuedTiles.length = 0;
+
 		this.lruCache.scheduleUnload();
+
+		// if all tasks have finished and we've been marked as actively loading then fire the completion event
+		const runningTasks = downloadQueue.running || parseQueue.running || processNodeQueue.running;
+		if (runningTasks === false && this.isLoading === true) {
+			this.cachedSinceLoadComplete.clear();
+			stats.inCacheSinceLoad = 0;
+
+			this.dispatchEvent(_tilesLoadEndEvent);
+			this.isLoading = false;
+		}
 
 		this.dispatchEvent(_updateAfterEvent);
 	}
@@ -653,7 +708,26 @@ export class Tiles3D extends Object3D {
 	}
 
 	ensureChildrenArePreprocessed(tile, immediate = false) {
-		// TODO
+		const children = tile.children;
+		for (let i = 0, l = children.length; i < l; i++) {
+			const child = children[i];
+			if ('__depth' in child) {
+				// the child has already been processed
+				break;
+			} else if (immediate) {
+				// process the node immediately and make sure we don't double process it
+				this.processNodeQueue.remove(child);
+				this.preprocessNode(child, tile.__basePath, tile);
+			} else {
+				// queue the node for processing if it hasn't been already
+				if (!this.processNodeQueue.has(child)) {
+					this.processNodeQueue.add(child, child => {
+						this.preprocessNode(child, tile.__basePath, tile);
+						this._dispatchNeedsUpdateEvent();
+					});
+				}
+			}
+		}
 	}
 
 	// Private Functions
@@ -672,14 +746,7 @@ export class Tiles3D extends Object3D {
 		// remove the last file path path-segment from the URL including the trailing slash
 		let basePath = url.replace(/\/[^/]*$/, '');
 		basePath = new URL(basePath, window.location.href).toString();
-
-		traverseSet(
-			json.root,
-			(node, parent) => this.preprocessNode(node, basePath, parent),
-			null,
-			parent,
-			parent ? parent.__depth : 0
-		);
+		this.preprocessNode(json.root, basePath, parent);
 	}
 
 	loadRootTileSet() {
@@ -734,18 +801,27 @@ export class Tiles3D extends Object3D {
 
 		const isExternalTileSet = tile.__hasUnrenderableContent;
 
-		lruCache.add(tile, t => {
+		const addedSuccessfully = lruCache.add(tile, t => {
 			if (t.__loadingState === LOADING) {
 				// Stop the load if it's started
 				t.__loadAbort.abort();
 				t.__loadAbort = null;
 			} else if (isExternalTileSet) {
 				t.children.length = 0;
+				t.__childrenProcessed = 0;
 			} else {
-				this.disposeTile(t);
+				this.invokeAllPlugins(plugin => {
+					plugin.disposeTile && plugin.disposeTile(t);
+				});
 			}
 
 			// Decrement stats
+			stats.inCache--;
+			if (this.cachedSinceLoadComplete.has(tile)) {
+				this.cachedSinceLoadComplete.delete(tile);
+				stats.inCacheSinceLoad--;
+			}
+
 			if (t.__loadingState === LOADING) {
 				stats.downloading--;
 			} else if (t.__loadingState === PARSING) {
@@ -759,6 +835,17 @@ export class Tiles3D extends Object3D {
 			parseQueue.remove(t);
 		});
 
+		// if we couldn't add the tile to the lru cache because it's full then skip
+		if (!addedSuccessfully) {
+			return;
+		}
+
+		// check if this is the beginning of a new set of tiles to load and dispatch and event
+		if (!this.isLoading) {
+			this.isLoading = true;
+			this.dispatchEvent(_tilesLoadStartEvent);
+		}
+
 		// Track a new load index so we avoid the condition where this load is stopped and
 		// another begins soon after so we don't parse twice.
 		tile.__loadIndex++;
@@ -766,6 +853,9 @@ export class Tiles3D extends Object3D {
 		const controller = new AbortController();
 		const signal = controller.signal;
 
+		this.cachedSinceLoadComplete.add(tile);
+		stats.inCacheSinceLoad++;
+		stats.inCache++;
 		stats.downloading++;
 		tile.__loadAbort = controller;
 		tile.__loadingState = LOADING;

@@ -16,8 +16,7 @@ function isUsedThisFrame(tile, frameCount) {
 }
 
 function areChildrenProcessed(tile) {
-	// return tile.__childrenProcessed === tile.children.length;
-	return true; // TODO: implement this
+	return tile.__childrenProcessed === tile.children.length;
 }
 
 // Resets the frame frame information for the given tile
@@ -66,7 +65,7 @@ function recursivelyLoadNextRenderableTiles(tile, renderer) {
 	if (isUsedThisFrame(tile, renderer.frameCount)) {
 		// queue this tile to download content
 		if (tile.__hasContent && tile.__loadingState === UNLOADED && !renderer.lruCache.isFull()) {
-			renderer.requestTileContents(tile);
+			renderer.queueTileForDownload(tile);
 		}
 
 		if (areChildrenProcessed(tile)) {
@@ -231,7 +230,7 @@ export const markVisibleTiles = (tile, renderer) => {
 			tile.__active = true;
 			stats.active++;
 		} else if (!lruCache.isFull() && tile.__hasContent) {
-			renderer.requestTileContents(tile);
+			renderer.queueTileForDownload(tile);
 		}
 
 		return;
@@ -253,7 +252,7 @@ export const markVisibleTiles = (tile, renderer) => {
 	const allChildrenLoaded = tile.__allChildrenLoaded;
 	const includeTile = meetsSSE || tile.refine === 'ADD';
 	if (includeTile && !loadedContent && !lruCache.isFull() && hasContent) {
-		renderer.requestTileContents(tile);
+		renderer.queueTileForDownload(tile);
 	}
 
 	// Only mark this tile as visible if it meets the screen space error requirements, has loaded content, not
