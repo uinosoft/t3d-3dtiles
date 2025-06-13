@@ -1,4 +1,5 @@
 import { GLTFUtils } from 't3d/addons/loaders/glTF/GLTFUtils.js';
+import { getUrlExtension } from '../../../utils/Utils.js';
 
 export class IndexParser {
 
@@ -20,5 +21,5 @@ export class IndexParser {
 }
 
 const isGLB = url => {
-	return url.substring(url.lastIndexOf('.') + 1) === 'glb';
+	return getUrlExtension(url) === 'glb';
 };

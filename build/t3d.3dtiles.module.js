@@ -1129,23 +1129,21 @@ const _vec3_4 = new Vector3();
  * @returns {string} null if no extension found
  */
 const getUrlExtension = url => {
-	let parsedUrl;
-	try {
-		parsedUrl = new URL(url, 'http://fakehost.com/');
-	} catch (_) {
-		// Ignore invalid URLs
+	if (!url) {
 		return null;
 	}
 
-	const filename = parsedUrl.pathname.split('/').pop();
-	const dotIndex = filename.lastIndexOf('.');
-	if (dotIndex === -1 || dotIndex === filename.length - 1) {
-		// Has no extension or has trailing . character
+	const filename = url
+		.replace(/[a-z]+:\/\/[^/]+/i, '') 	// remove origin
+		.replace(/\?.*$/i, '') 				// remove query
+		.replace(/.*\//g, ''); 				// remove path
+
+	const lastPeriod = filename.lastIndexOf('.');
+	if (lastPeriod === -1) {
 		return null;
 	}
 
-	const extension = filename.substring(dotIndex + 1);
-	return extension;
+	return filename.substring(lastPeriod + 1) || null;
 };
 
 const traverseSet = (tile, beforeCb = null, afterCb = null, parent = null, depth = 0) => {
@@ -3273,7 +3271,7 @@ class IndexParser {
 }
 
 const isGLB = url => {
-	return url.substring(url.lastIndexOf('.') + 1) === 'glb';
+	return getUrlExtension(url) === 'glb';
 };
 
 /**
