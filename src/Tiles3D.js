@@ -432,7 +432,7 @@ export class Tiles3D extends Object3D {
 		this.frameCount = 0;
 	}
 
-	dispatchEvent(args) {
+	dispatchEvent(...args) {
 		EventDispatcher.prototype.dispatchEvent.call(this, ...args);
 	}
 

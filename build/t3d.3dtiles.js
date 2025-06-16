@@ -5409,7 +5409,7 @@
 			};
 			this.frameCount = 0;
 		}
-		dispatchEvent(args) {
+		dispatchEvent(...args) {
 			t3d.EventDispatcher.prototype.dispatchEvent.call(this, ...args);
 		}
 		fetchData(url, options) {
