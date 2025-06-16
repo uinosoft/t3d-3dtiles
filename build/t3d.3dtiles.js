@@ -1571,6 +1571,398 @@
 		}
 	}
 
+	// FAILED is negative so lru cache priority sorting will unload it first
+	const FAILED = -1;
+	const UNLOADED = 0;
+	const LOADING = 1;
+	const PARSING = 2;
+	const LOADED = 3;
+
+	// https://en.wikipedia.org/wiki/World_Geodetic_System
+	// https://en.wikipedia.org/wiki/Flattening
+	const WGS84_RADIUS = 6378137;
+	const WGS84_HEIGHT = 6356752.314245179;
+
+	const viewErrorTarget$1 = {
+		inView: false,
+		error: Infinity,
+		distance: Infinity
+	};
+	function isDownloadFinished(value) {
+		return value === LOADED || value === FAILED;
+	}
+
+	// Checks whether this tile was last used on the given frame.
+	function isUsedThisFrame(tile, frameCount) {
+		return tile.__lastFrameVisited === frameCount && tile.__used;
+	}
+	function areChildrenProcessed(tile) {
+		return tile.__childrenProcessed === tile.children.length;
+	}
+
+	// Resets the frame frame information for the given tile
+	function resetFrameState(tile, renderer) {
+		if (tile.__lastFrameVisited !== renderer.frameCount) {
+			tile.__lastFrameVisited = renderer.frameCount;
+			tile.__used = false;
+			tile.__inFrustum = false;
+			tile.__isLeaf = false;
+			tile.__visible = false;
+			tile.__active = false;
+			tile.__error = Infinity;
+			tile.__distanceFromCamera = Infinity;
+			tile.__childrenWereVisible = false;
+			tile.__allChildrenLoaded = false;
+
+			// update tile frustum and error state
+			renderer.calculateTileViewError(tile, viewErrorTarget$1);
+			tile.__inFrustum = viewErrorTarget$1.inView;
+			tile.__error = viewErrorTarget$1.error;
+			tile.__distanceFromCamera = viewErrorTarget$1.distance;
+		}
+	}
+
+	// Recursively mark tiles used down to the next tile with content
+	function recursivelyMarkUsed(tile, renderer) {
+		renderer.ensureChildrenArePreprocessed(tile);
+		resetFrameState(tile, renderer);
+		markUsed(tile, renderer);
+
+		// don't traverse if the children have not been processed, yet
+		if (!tile.__hasRenderableContent && areChildrenProcessed(tile)) {
+			const children = tile.children;
+			for (let i = 0, l = children.length; i < l; i++) {
+				recursivelyMarkUsed(children[i], renderer);
+			}
+		}
+	}
+
+	// Recursively traverses to the next tiles with unloaded renderable content to load them
+	function recursivelyLoadNextRenderableTiles(tile, renderer) {
+		renderer.ensureChildrenArePreprocessed(tile);
+
+		// exit the recursion if the tile hasn't been used this frame
+		if (isUsedThisFrame(tile, renderer.frameCount)) {
+			// queue this tile to download content
+			if (tile.__hasContent && tile.__loadingState === UNLOADED && !renderer.lruCache.isFull()) {
+				renderer.queueTileForDownload(tile);
+			}
+			if (areChildrenProcessed(tile)) {
+				// queue any used child tiles
+				const children = tile.children;
+				for (let i = 0, l = children.length; i < l; i++) {
+					recursivelyLoadNextRenderableTiles(children[i], renderer);
+				}
+			}
+		}
+	}
+
+	// Mark a tile as being used by current view
+	function markUsed(tile, renderer) {
+		if (tile.__used) {
+			return;
+		}
+		tile.__used = true;
+		renderer.markTileUsed(tile);
+		renderer.stats.used++;
+		if (tile.__inFrustum === true) {
+			renderer.stats.inFrustum++;
+		}
+	}
+
+	// Returns whether the tile can be traversed to the next layer of children by checking the tile metrics
+	function canTraverse(tile, renderer) {
+		// If we've met the error requirements then don't load further
+		if (tile.__error <= renderer.errorTarget) {
+			return false;
+		}
+
+		// Early out if we've reached the maximum allowed depth.
+		if (renderer.maxDepth > 0 && tile.__depth + 1 >= renderer.maxDepth) {
+			return false;
+		}
+
+		// Early out if the children haven't been processed, yet
+		if (!areChildrenProcessed(tile)) {
+			return false;
+		}
+		return true;
+	}
+
+	// Helper function for traversing a tile set. If `beforeCb` returns `true` then the
+	// traversal will end early.
+	function traverseSet(tile, beforeCb = null, afterCb = null) {
+		const stack = [];
+
+		// A stack-based, depth-first traversal, storing
+		// triplets (tile, parent, depth) in the stack array.
+
+		stack.push(tile);
+		stack.push(null);
+		stack.push(0);
+		while (stack.length > 0) {
+			const depth = stack.pop();
+			const parent = stack.pop();
+			const tile = stack.pop();
+			if (beforeCb && beforeCb(tile, parent, depth)) {
+				if (afterCb) {
+					afterCb(tile, parent, depth);
+				}
+				return;
+			}
+			const children = tile.children;
+
+			// Children might be undefined if the tile has not been preprocessed yet
+			if (children) {
+				for (let i = children.length - 1; i >= 0; i--) {
+					stack.push(children[i]);
+					stack.push(tile);
+					stack.push(depth + 1);
+				}
+			}
+			if (afterCb) {
+				afterCb(tile, parent, depth);
+			}
+		}
+	}
+	function markUsedTiles(tile, renderer) {
+		// determine frustum set is run first so we can ensure the preprocessing of all the necessary
+		// child tiles has happened here.
+		renderer.ensureChildrenArePreprocessed(tile);
+		resetFrameState(tile, renderer);
+		if (!tile.__inFrustum) {
+			return;
+		}
+		if (!canTraverse(tile, renderer)) {
+			markUsed(tile, renderer);
+			return;
+		}
+
+		// Traverse children and see if any children are in view.
+		let anyChildrenUsed = false;
+		let anyChildrenInFrustum = false;
+		const children = tile.children;
+		for (let i = 0, l = children.length; i < l; i++) {
+			const c = children[i];
+			markUsedTiles(c, renderer);
+			anyChildrenUsed = anyChildrenUsed || isUsedThisFrame(c, renderer.frameCount);
+			anyChildrenInFrustum = anyChildrenInFrustum || c.__inFrustum;
+		}
+
+		// Disabled for now because this will cause otherwise unused children to be added to the lru cache
+		// if none of the children are in the frustum then this tile shouldn't be displayed.
+		// Otherwise this can cause load oscillation as parents are traversed and loaded and then determined
+		// to not be used because children aren't visible. See #1165.
+		// if (tile.refine === 'REPLACE' && !anyChildrenInFrustum && children.length !== 0 && !tile.__hasUnrenderableContent) {
+		// 	// TODO: we're not checking tiles with unrenderable content here since external tile sets might look like they're in the frustum,
+		// 	// load the children, then the children indicate that it's not visible, causing it to be unloaded. Then it will be loaded again.
+		// 	// The impact when including external tile set roots in the check is more significant but can't be used unless we keep external tile
+		// 	// sets around even when they're not needed. See issue #741.
+
+		// 	// TODO: what if we mark the tile as not in the frustum but we _do_ mark it as used? Then we can stop frustum traversal and at least
+		// 	// prevent tiles from rendering unless they're needed.
+		// 	console.log('FAILED');
+		// 	tile.__inFrustum = false;
+		// 	return;
+		// }
+
+		markUsed(tile, renderer);
+
+		// If this is a tile that needs children loaded to refine then recursively load child
+		// tiles until error is met
+		if (anyChildrenUsed && tile.refine === 'REPLACE') {
+			for (let i = 0, l = children.length; i < l; i++) {
+				const c = children[i];
+				recursivelyMarkUsed(c, renderer);
+			}
+		}
+	}
+
+	// Traverse and mark the tiles that are at the leaf nodes of the "used" tree.
+	function markUsedSetLeaves(tile, renderer) {
+		const frameCount = renderer.frameCount;
+		if (!isUsedThisFrame(tile, frameCount)) {
+			return;
+		}
+
+		// This tile is a leaf if none of the children had been used.
+		const children = tile.children;
+		let anyChildrenUsed = false;
+		for (let i = 0, l = children.length; i < l; i++) {
+			const c = children[i];
+			anyChildrenUsed = anyChildrenUsed || isUsedThisFrame(c, frameCount);
+		}
+		if (!anyChildrenUsed) {
+			tile.__isLeaf = true;
+		} else {
+			let childrenWereVisible = false;
+			let allChildrenLoaded = true;
+			for (let i = 0, l = children.length; i < l; i++) {
+				const c = children[i];
+				markUsedSetLeaves(c, renderer);
+				childrenWereVisible = childrenWereVisible || c.__wasSetVisible || c.__childrenWereVisible;
+				if (isUsedThisFrame(c, frameCount)) {
+					// consider a child to be loaded if
+					// - the children's children have been loaded
+					// - the tile content has loaded
+					// - the tile is completely empty - ie has no children and no content
+					// - the child tile set has tried to load but failed
+					const childLoaded = c.__allChildrenLoaded || c.__hasRenderableContent && isDownloadFinished(c.__loadingState) || c.__hasUnrenderableContent && c.__loadingState === FAILED;
+					allChildrenLoaded = allChildrenLoaded && childLoaded;
+				}
+			}
+			tile.__childrenWereVisible = childrenWereVisible;
+			tile.__allChildrenLoaded = allChildrenLoaded;
+		}
+	}
+
+	// Skip past tiles we consider unrenderable because they are outside the error threshold.
+	function markVisibleTiles(tile, renderer) {
+		const stats = renderer.stats;
+		if (!isUsedThisFrame(tile, renderer.frameCount)) {
+			return;
+		}
+
+		// Request the tile contents or mark it as visible if we've found a leaf.
+		const lruCache = renderer.lruCache;
+		if (tile.__isLeaf) {
+			if (tile.__loadingState === LOADED) {
+				if (tile.__inFrustum) {
+					tile.__visible = true;
+					stats.visible++;
+				}
+				tile.__active = true;
+				stats.active++;
+			} else if (!lruCache.isFull() && tile.__hasContent) {
+				renderer.queueTileForDownload(tile);
+			}
+			return;
+		}
+		const children = tile.children;
+		const hasContent = tile.__hasContent;
+		const loadedContent = isDownloadFinished(tile.__loadingState) && hasContent;
+		const errorRequirement = (renderer.errorTarget + 1) * renderer.errorThreshold;
+		const meetsSSE = tile.__error <= errorRequirement;
+		const childrenWereVisible = tile.__childrenWereVisible;
+
+		// NOTE: We can "trickle" root tiles in by enabling these lines.
+		// Don't wait for all children tiles to load if this tile set has empty tiles at the root
+		// const emptyRootTile = tile.__depthFromRenderedParent === 0;
+		// const allChildrenLoaded = tile.__allChildrenLoaded || emptyRootTile;
+
+		// If we've met the SSE requirements and we can load content then fire a fetch.
+		const allChildrenLoaded = tile.__allChildrenLoaded;
+		const includeTile = meetsSSE || tile.refine === 'ADD';
+		if (includeTile && !loadedContent && !lruCache.isFull() && hasContent) {
+			renderer.queueTileForDownload(tile);
+		}
+
+		// Only mark this tile as visible if it meets the screen space error requirements, has loaded content, not
+		// all children have loaded yet, and if no children were visible last frame. We want to keep children visible
+		// that _were_ visible to avoid a pop in level of detail as the camera moves around and parent / sibling tiles
+		// load in.
+
+		// Skip the tile entirely if there's no content to load
+		if (meetsSSE && !allChildrenLoaded && !childrenWereVisible && loadedContent || tile.refine === 'ADD' && loadedContent) {
+			if (tile.__inFrustum) {
+				tile.__visible = true;
+				stats.visible++;
+			}
+			tile.__active = true;
+			stats.active++;
+		}
+
+		// If we're additive then don't stop the traversal here because it doesn't matter whether the children load in
+		// at the same rate.
+		if (tile.refine === 'REPLACE' && meetsSSE && !allChildrenLoaded) {
+			// load the child content if we've found that we've been loaded so we can move down to the next tile
+			// layer when the data has loaded.
+			for (let i = 0, l = children.length; i < l; i++) {
+				const c = children[i];
+				if (isUsedThisFrame(c, renderer.frameCount)) {
+					recursivelyLoadNextRenderableTiles(c, renderer);
+				}
+			}
+		} else {
+			for (let i = 0, l = children.length; i < l; i++) {
+				markVisibleTiles(children[i], renderer);
+			}
+		}
+	}
+
+	// Final traverse to toggle tile visibility.
+	const toggleTiles = (tile, renderer) => {
+		const isUsed = isUsedThisFrame(tile, renderer.frameCount);
+		if (isUsed || tile.__usedLastFrame) {
+			let setActive = false;
+			let setVisible = false;
+			if (isUsed) {
+				// enable visibility if active due to shadows
+				setActive = tile.__active;
+				if (renderer.displayActiveTiles) {
+					setVisible = tile.__active || tile.__visible;
+				} else {
+					setVisible = tile.__visible;
+				}
+			} else {
+				// if the tile was used last frame but not this one then there's potential for the tile
+				// to not have been visited during the traversal, meaning it hasn't been reset and has
+				// stale values. This ensures the values are not stale.
+				resetFrameState(tile, renderer);
+			}
+
+			// If the active or visible state changed then call the functions.
+			if (tile.__hasRenderableContent && tile.__loadingState === LOADED) {
+				if (tile.__wasSetActive !== setActive) {
+					renderer.invokeOnePlugin(plugin => plugin.setTileActive && plugin.setTileActive(tile, setActive));
+				}
+				if (tile.__wasSetVisible !== setVisible) {
+					renderer.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, setVisible));
+				}
+			}
+			tile.__wasSetActive = setActive;
+			tile.__wasSetVisible = setVisible;
+			tile.__usedLastFrame = isUsed;
+			const children = tile.children;
+			for (let i = 0, l = children.length; i < l; i++) {
+				const c = children[i];
+				toggleTiles(c, renderer);
+			}
+		}
+	};
+
+	/**
+	 * Traverses the ancestry of the tile up to the root tile.
+	 */
+	function traverseAncestors(tile, callback = null) {
+		let current = tile;
+		while (current) {
+			const depth = current.__depth;
+			const parent = current.parent;
+			if (callback) {
+				callback(current, parent, depth);
+			}
+			current = parent;
+		}
+	}
+
+	const WGS84_ELLIPSOID = new Ellipsoid(new t3d.Vector3(WGS84_RADIUS, WGS84_RADIUS, WGS84_HEIGHT));
+	WGS84_ELLIPSOID.name = 'WGS84 Earth';
+
+	// function that rate limits the amount of time a function can be called to once
+	// per frame, initially queuing a new call for the next frame.
+	function throttle(callback) {
+		let handle = null;
+		return () => {
+			if (handle === null) {
+				handle = requestAnimationFrame(() => {
+					handle = null;
+					callback();
+				});
+			}
+		};
+	}
+
 	class ImageBitmapLoader extends t3d.Loader {
 		constructor(manager) {
 			super(manager);
@@ -4633,515 +5025,24 @@
 		}
 	}
 
-	class ModelLoader {
-		constructor(manager) {
-			const b3dmLoader = new B3DMLoader(manager);
-			const i3dmLoader = new I3DMLoader(manager);
-			const pntsLoader = new PNTSLoader(manager);
-			const cmptLoader = new CMPTLoader(manager);
-			const gltfLoader = new TileGLTFLoader(manager);
-			this._loaders = new Map([['b3dm', b3dmLoader], ['i3dm', i3dmLoader], ['pnts', pntsLoader], ['cmpt', cmptLoader], ['gltf', gltfLoader], ['glb', gltfLoader]]);
+	function readMagicBytes(bufferOrDataView) {
+		if (bufferOrDataView === null || bufferOrDataView.byteLength < 4) {
+			return '';
 		}
-		setDRACOLoader(dracoLoader) {
-			this._loaders.get('b3dm').setDRACOLoader(dracoLoader);
-			this._loaders.get('i3dm').setDRACOLoader(dracoLoader);
-			this._loaders.get('cmpt').setDRACOLoader(dracoLoader);
-			this._loaders.get('gltf').setDRACOLoader(dracoLoader);
-		}
-		setKTX2Loader(ktx2Loader) {
-			this._loaders.get('b3dm').setKTX2Loader(ktx2Loader);
-			this._loaders.get('i3dm').setKTX2Loader(ktx2Loader);
-			this._loaders.get('cmpt').setKTX2Loader(ktx2Loader);
-			this._loaders.get('gltf').setKTX2Loader(ktx2Loader);
-		}
-		loadTileContent(buffer, tile, extension, tiles3D, uri, abortSignal) {
-			const cached = tile.cached;
-			const uriSplits = uri.split(/[\\\/]/g); // eslint-disable-line no-useless-escape
-			uriSplits.pop();
-			const workingPath = uriSplits.join('/');
-			const fetchOptions = tiles3D.fetchOptions;
-			let promise = null;
-			const cachedTransform = cached.transform;
-			const upAxis = tiles3D.rootTileSet.asset && tiles3D.rootTileSet.asset.gltfUpAxis || 'y';
-			switch (upAxis.toLowerCase()) {
-				case 'x':
-					mat4_1.makeRotationAxis(Y_AXIS, -Math.PI / 2);
-					break;
-				case 'y':
-					mat4_1.makeRotationAxis(X_AXIS, Math.PI / 2);
-					break;
-				case 'z':
-					mat4_1.identity();
-					break;
-			}
-			const loader = this._loaders.get(extension);
-			if (loader) {
-				const config = {
-					fetchOptions,
-					path: workingPath,
-					buffer
-				};
-				if (extension === 'b3dm' || extension === 'i3dm' || extension === 'cmpt') {
-					config.adjustmentTransform = mat4_1.clone();
-				}
-				promise = loader.load(uri, config);
-			} else {
-				console.warn(`TilesRenderer: Content type "${extension}" not supported.`);
-				promise = Promise.resolve(null);
-			}
-			return promise.then(resource => {
-				const scene = resource.root;
-
-				// ensure the matrix is up to date in case the scene has a transform applied
-				scene.updateMatrix();
-
-				// apply the local up-axis correction rotation
-				// GLTFLoader seems to never set a transformation on the root scene object so
-				// any transformations applied to it can be assumed to be applied after load
-				// (such as applying RTC_CENTER) meaning they should happen _after_ the z-up
-				// rotation fix which is why "multiply" happens here.
-				if (extension === 'glb' || extension === 'gltf') {
-					scene.matrix.multiply(mat4_1);
-				}
-				scene.matrix.premultiply(cachedTransform);
-				scene.matrix.decompose(scene.position, scene.quaternion, scene.scale);
-				const materials = [];
-				const geometry = [];
-				const textures = [];
-				scene.traverse(c => {
-					if (c.geometry) {
-						geometry.push(c.geometry);
-					}
-					if (c.material) {
-						const material = c.material;
-						materials.push(c.material);
-						for (const key in material) {
-							const value = material[key];
-							if (value && value.isTexture) {
-								textures.push(value);
-							}
-						}
-					}
-				});
-
-				// exit early if a new request has already started
-				if (abortSignal.aborted) {
-					// dispose of any image bitmaps that have been opened.
-					// TODO: share this code with the "disposeTile" code below, possibly allow for the tiles
-					// renderer base to trigger a disposal of unneeded data
-					for (let i = 0, l = textures.length; i < l; i++) {
-						const texture = textures[i];
-						if (texture.image instanceof ImageBitmap) {
-							texture.image.close();
-						}
-						texture.dispose();
-					}
-					return;
-				}
-				cached.materials = materials;
-				cached.geometry = geometry;
-				cached.textures = textures;
-				cached.scene = scene;
-				cached.featureTable = resource.featureTable;
-				cached.batchTable = resource.batchTable;
-				return scene;
-			});
-		}
-	}
-	const mat4_1 = new t3d.Matrix4();
-	const X_AXIS = new t3d.Vector3(1, 0, 0);
-	const Y_AXIS = new t3d.Vector3(0, 1, 0);
-
-	// FAILED is negative so lru cache priority sorting will unload it first
-	const FAILED = -1;
-	const UNLOADED = 0;
-	const LOADING = 1;
-	const PARSING = 2;
-	const LOADED = 3;
-
-	// https://en.wikipedia.org/wiki/World_Geodetic_System
-	// https://en.wikipedia.org/wiki/Flattening
-	const WGS84_RADIUS = 6378137;
-	const WGS84_HEIGHT = 6356752.314245179;
-
-	const viewErrorTarget$1 = {
-		inView: false,
-		error: Infinity,
-		distance: Infinity
-	};
-	function isDownloadFinished(value) {
-		return value === LOADED || value === FAILED;
-	}
-
-	// Checks whether this tile was last used on the given frame.
-	function isUsedThisFrame(tile, frameCount) {
-		return tile.__lastFrameVisited === frameCount && tile.__used;
-	}
-	function areChildrenProcessed(tile) {
-		return tile.__childrenProcessed === tile.children.length;
-	}
-
-	// Resets the frame frame information for the given tile
-	function resetFrameState(tile, renderer) {
-		if (tile.__lastFrameVisited !== renderer.frameCount) {
-			tile.__lastFrameVisited = renderer.frameCount;
-			tile.__used = false;
-			tile.__inFrustum = false;
-			tile.__isLeaf = false;
-			tile.__visible = false;
-			tile.__active = false;
-			tile.__error = Infinity;
-			tile.__distanceFromCamera = Infinity;
-			tile.__childrenWereVisible = false;
-			tile.__allChildrenLoaded = false;
-
-			// update tile frustum and error state
-			renderer.calculateTileViewError(tile, viewErrorTarget$1);
-			tile.__inFrustum = viewErrorTarget$1.inView;
-			tile.__error = viewErrorTarget$1.error;
-			tile.__distanceFromCamera = viewErrorTarget$1.distance;
-		}
-	}
-
-	// Recursively mark tiles used down to the next tile with content
-	function recursivelyMarkUsed(tile, renderer) {
-		renderer.ensureChildrenArePreprocessed(tile);
-		resetFrameState(tile, renderer);
-		markUsed(tile, renderer);
-
-		// don't traverse if the children have not been processed, yet
-		if (!tile.__hasRenderableContent && areChildrenProcessed(tile)) {
-			const children = tile.children;
-			for (let i = 0, l = children.length; i < l; i++) {
-				recursivelyMarkUsed(children[i], renderer);
-			}
-		}
-	}
-
-	// Recursively traverses to the next tiles with unloaded renderable content to load them
-	function recursivelyLoadNextRenderableTiles(tile, renderer) {
-		renderer.ensureChildrenArePreprocessed(tile);
-
-		// exit the recursion if the tile hasn't been used this frame
-		if (isUsedThisFrame(tile, renderer.frameCount)) {
-			// queue this tile to download content
-			if (tile.__hasContent && tile.__loadingState === UNLOADED && !renderer.lruCache.isFull()) {
-				renderer.queueTileForDownload(tile);
-			}
-			if (areChildrenProcessed(tile)) {
-				// queue any used child tiles
-				const children = tile.children;
-				for (let i = 0, l = children.length; i < l; i++) {
-					recursivelyLoadNextRenderableTiles(children[i], renderer);
-				}
-			}
-		}
-	}
-
-	// Mark a tile as being used by current view
-	function markUsed(tile, renderer) {
-		if (tile.__used) {
-			return;
-		}
-		tile.__used = true;
-		renderer.markTileUsed(tile);
-		renderer.stats.used++;
-		if (tile.__inFrustum === true) {
-			renderer.stats.inFrustum++;
-		}
-	}
-
-	// Returns whether the tile can be traversed to the next layer of children by checking the tile metrics
-	function canTraverse(tile, renderer) {
-		// If we've met the error requirements then don't load further
-		if (tile.__error <= renderer.errorTarget) {
-			return false;
-		}
-
-		// Early out if we've reached the maximum allowed depth.
-		if (renderer.maxDepth > 0 && tile.__depth + 1 >= renderer.maxDepth) {
-			return false;
-		}
-
-		// Early out if the children haven't been processed, yet
-		if (!areChildrenProcessed(tile)) {
-			return false;
-		}
-		return true;
-	}
-
-	// Helper function for traversing a tile set. If `beforeCb` returns `true` then the
-	// traversal will end early.
-	function traverseSet(tile, beforeCb = null, afterCb = null) {
-		const stack = [];
-
-		// A stack-based, depth-first traversal, storing
-		// triplets (tile, parent, depth) in the stack array.
-
-		stack.push(tile);
-		stack.push(null);
-		stack.push(0);
-		while (stack.length > 0) {
-			const depth = stack.pop();
-			const parent = stack.pop();
-			const tile = stack.pop();
-			if (beforeCb && beforeCb(tile, parent, depth)) {
-				if (afterCb) {
-					afterCb(tile, parent, depth);
-				}
-				return;
-			}
-			const children = tile.children;
-
-			// Children might be undefined if the tile has not been preprocessed yet
-			if (children) {
-				for (let i = children.length - 1; i >= 0; i--) {
-					stack.push(children[i]);
-					stack.push(tile);
-					stack.push(depth + 1);
-				}
-			}
-			if (afterCb) {
-				afterCb(tile, parent, depth);
-			}
-		}
-	}
-	function markUsedTiles(tile, renderer) {
-		// determine frustum set is run first so we can ensure the preprocessing of all the necessary
-		// child tiles has happened here.
-		renderer.ensureChildrenArePreprocessed(tile);
-		resetFrameState(tile, renderer);
-		if (!tile.__inFrustum) {
-			return;
-		}
-		if (!canTraverse(tile, renderer)) {
-			markUsed(tile, renderer);
-			return;
-		}
-
-		// Traverse children and see if any children are in view.
-		let anyChildrenUsed = false;
-		let anyChildrenInFrustum = false;
-		const children = tile.children;
-		for (let i = 0, l = children.length; i < l; i++) {
-			const c = children[i];
-			markUsedTiles(c, renderer);
-			anyChildrenUsed = anyChildrenUsed || isUsedThisFrame(c, renderer.frameCount);
-			anyChildrenInFrustum = anyChildrenInFrustum || c.__inFrustum;
-		}
-
-		// Disabled for now because this will cause otherwise unused children to be added to the lru cache
-		// if none of the children are in the frustum then this tile shouldn't be displayed.
-		// Otherwise this can cause load oscillation as parents are traversed and loaded and then determined
-		// to not be used because children aren't visible. See #1165.
-		// if (tile.refine === 'REPLACE' && !anyChildrenInFrustum && children.length !== 0 && !tile.__hasUnrenderableContent) {
-		// 	// TODO: we're not checking tiles with unrenderable content here since external tile sets might look like they're in the frustum,
-		// 	// load the children, then the children indicate that it's not visible, causing it to be unloaded. Then it will be loaded again.
-		// 	// The impact when including external tile set roots in the check is more significant but can't be used unless we keep external tile
-		// 	// sets around even when they're not needed. See issue #741.
-
-		// 	// TODO: what if we mark the tile as not in the frustum but we _do_ mark it as used? Then we can stop frustum traversal and at least
-		// 	// prevent tiles from rendering unless they're needed.
-		// 	console.log('FAILED');
-		// 	tile.__inFrustum = false;
-		// 	return;
-		// }
-
-		markUsed(tile, renderer);
-
-		// If this is a tile that needs children loaded to refine then recursively load child
-		// tiles until error is met
-		if (anyChildrenUsed && tile.refine === 'REPLACE') {
-			for (let i = 0, l = children.length; i < l; i++) {
-				const c = children[i];
-				recursivelyMarkUsed(c, renderer);
-			}
-		}
-	}
-
-	// Traverse and mark the tiles that are at the leaf nodes of the "used" tree.
-	function markUsedSetLeaves(tile, renderer) {
-		const frameCount = renderer.frameCount;
-		if (!isUsedThisFrame(tile, frameCount)) {
-			return;
-		}
-
-		// This tile is a leaf if none of the children had been used.
-		const children = tile.children;
-		let anyChildrenUsed = false;
-		for (let i = 0, l = children.length; i < l; i++) {
-			const c = children[i];
-			anyChildrenUsed = anyChildrenUsed || isUsedThisFrame(c, frameCount);
-		}
-		if (!anyChildrenUsed) {
-			tile.__isLeaf = true;
+		let view;
+		if (bufferOrDataView instanceof DataView) {
+			view = bufferOrDataView;
 		} else {
-			let childrenWereVisible = false;
-			let allChildrenLoaded = true;
-			for (let i = 0, l = children.length; i < l; i++) {
-				const c = children[i];
-				markUsedSetLeaves(c, renderer);
-				childrenWereVisible = childrenWereVisible || c.__wasSetVisible || c.__childrenWereVisible;
-				if (isUsedThisFrame(c, frameCount)) {
-					// consider a child to be loaded if
-					// - the children's children have been loaded
-					// - the tile content has loaded
-					// - the tile is completely empty - ie has no children and no content
-					// - the child tile set has tried to load but failed
-					const childLoaded = c.__allChildrenLoaded || c.__hasRenderableContent && isDownloadFinished(c.__loadingState) || c.__hasUnrenderableContent && c.__loadingState === FAILED;
-					allChildrenLoaded = allChildrenLoaded && childLoaded;
-				}
-			}
-			tile.__childrenWereVisible = childrenWereVisible;
-			tile.__allChildrenLoaded = allChildrenLoaded;
+			view = new DataView(bufferOrDataView);
 		}
-	}
-
-	// Skip past tiles we consider unrenderable because they are outside the error threshold.
-	function markVisibleTiles(tile, renderer) {
-		const stats = renderer.stats;
-		if (!isUsedThisFrame(tile, renderer.frameCount)) {
-			return;
+		if (String.fromCharCode(view.getUint8(0)) === '{') {
+			return null;
 		}
-
-		// Request the tile contents or mark it as visible if we've found a leaf.
-		const lruCache = renderer.lruCache;
-		if (tile.__isLeaf) {
-			if (tile.__loadingState === LOADED) {
-				if (tile.__inFrustum) {
-					tile.__visible = true;
-					stats.visible++;
-				}
-				tile.__active = true;
-				stats.active++;
-			} else if (!lruCache.isFull() && tile.__hasContent) {
-				renderer.queueTileForDownload(tile);
-			}
-			return;
+		let magicBytes = '';
+		for (let i = 0; i < 4; i++) {
+			magicBytes += String.fromCharCode(view.getUint8(i));
 		}
-		const children = tile.children;
-		const hasContent = tile.__hasContent;
-		const loadedContent = isDownloadFinished(tile.__loadingState) && hasContent;
-		const errorRequirement = (renderer.errorTarget + 1) * renderer.errorThreshold;
-		const meetsSSE = tile.__error <= errorRequirement;
-		const childrenWereVisible = tile.__childrenWereVisible;
-
-		// NOTE: We can "trickle" root tiles in by enabling these lines.
-		// Don't wait for all children tiles to load if this tile set has empty tiles at the root
-		// const emptyRootTile = tile.__depthFromRenderedParent === 0;
-		// const allChildrenLoaded = tile.__allChildrenLoaded || emptyRootTile;
-
-		// If we've met the SSE requirements and we can load content then fire a fetch.
-		const allChildrenLoaded = tile.__allChildrenLoaded;
-		const includeTile = meetsSSE || tile.refine === 'ADD';
-		if (includeTile && !loadedContent && !lruCache.isFull() && hasContent) {
-			renderer.queueTileForDownload(tile);
-		}
-
-		// Only mark this tile as visible if it meets the screen space error requirements, has loaded content, not
-		// all children have loaded yet, and if no children were visible last frame. We want to keep children visible
-		// that _were_ visible to avoid a pop in level of detail as the camera moves around and parent / sibling tiles
-		// load in.
-
-		// Skip the tile entirely if there's no content to load
-		if (meetsSSE && !allChildrenLoaded && !childrenWereVisible && loadedContent || tile.refine === 'ADD' && loadedContent) {
-			if (tile.__inFrustum) {
-				tile.__visible = true;
-				stats.visible++;
-			}
-			tile.__active = true;
-			stats.active++;
-		}
-
-		// If we're additive then don't stop the traversal here because it doesn't matter whether the children load in
-		// at the same rate.
-		if (tile.refine === 'REPLACE' && meetsSSE && !allChildrenLoaded) {
-			// load the child content if we've found that we've been loaded so we can move down to the next tile
-			// layer when the data has loaded.
-			for (let i = 0, l = children.length; i < l; i++) {
-				const c = children[i];
-				if (isUsedThisFrame(c, renderer.frameCount)) {
-					recursivelyLoadNextRenderableTiles(c, renderer);
-				}
-			}
-		} else {
-			for (let i = 0, l = children.length; i < l; i++) {
-				markVisibleTiles(children[i], renderer);
-			}
-		}
-	}
-
-	// Final traverse to toggle tile visibility.
-	const toggleTiles = (tile, renderer) => {
-		const isUsed = isUsedThisFrame(tile, renderer.frameCount);
-		if (isUsed || tile.__usedLastFrame) {
-			let setActive = false;
-			let setVisible = false;
-			if (isUsed) {
-				// enable visibility if active due to shadows
-				setActive = tile.__active;
-				if (renderer.displayActiveTiles) {
-					setVisible = tile.__active || tile.__visible;
-				} else {
-					setVisible = tile.__visible;
-				}
-			} else {
-				// if the tile was used last frame but not this one then there's potential for the tile
-				// to not have been visited during the traversal, meaning it hasn't been reset and has
-				// stale values. This ensures the values are not stale.
-				resetFrameState(tile, renderer);
-			}
-
-			// If the active or visible state changed then call the functions.
-			if (tile.__hasRenderableContent && tile.__loadingState === LOADED) {
-				if (tile.__wasSetActive !== setActive) {
-					renderer.invokeOnePlugin(plugin => plugin.setTileActive && plugin.setTileActive(tile, setActive));
-				}
-				if (tile.__wasSetVisible !== setVisible) {
-					renderer.invokeOnePlugin(plugin => plugin.setTileVisible && plugin.setTileVisible(tile, setVisible));
-				}
-			}
-			tile.__wasSetActive = setActive;
-			tile.__wasSetVisible = setVisible;
-			tile.__usedLastFrame = isUsed;
-			const children = tile.children;
-			for (let i = 0, l = children.length; i < l; i++) {
-				const c = children[i];
-				toggleTiles(c, renderer);
-			}
-		}
-	};
-
-	/**
-	 * Traverses the ancestry of the tile up to the root tile.
-	 */
-	function traverseAncestors(tile, callback = null) {
-		let current = tile;
-		while (current) {
-			const depth = current.__depth;
-			const parent = current.parent;
-			if (callback) {
-				callback(current, parent, depth);
-			}
-			current = parent;
-		}
-	}
-
-	const WGS84_ELLIPSOID = new Ellipsoid(new t3d.Vector3(WGS84_RADIUS, WGS84_RADIUS, WGS84_HEIGHT));
-	WGS84_ELLIPSOID.name = 'WGS84 Earth';
-
-	// function that rate limits the amount of time a function can be called to once
-	// per frame, initially queuing a new call for the next frame.
-	function throttle(callback) {
-		let handle = null;
-		return () => {
-			if (handle === null) {
-				handle = requestAnimationFrame(() => {
-					handle = null;
-					callback();
-				});
-			}
-		};
+		return magicBytes;
 	}
 
 	const _updateBeforeEvent = {
@@ -5163,6 +5064,13 @@
 		inView: false,
 		error: Infinity
 	};
+	const X_AXIS = new t3d.Vector3(1, 0, 0);
+	const Y_AXIS = new t3d.Vector3(0, 1, 0);
+	function updateFrustumCulled(object, toInitialValue) {
+		object.traverse(c => {
+			c.frustumCulled = c[INITIAL_FRUSTUM_CULLED] && toInitialValue;
+		});
+	}
 	const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
 		const te = matrixA.elements;
 		const me = matrixB.elements;
@@ -5308,9 +5216,14 @@
 			this.parseQueue = parseQueue;
 			this.processNodeQueue = processNodeQueue;
 			this.$cameras = new CameraList();
-			this.$modelLoader = new ModelLoader(manager);
-			this.$events = new t3d.EventDispatcher();
 			this.lruCache.computeMemoryUsageCallback = tile => tile.cached.bytesUsed ?? null;
+			const b3dmLoader = new B3DMLoader(manager);
+			const i3dmLoader = new I3DMLoader(manager);
+			const pntsLoader = new PNTSLoader(manager);
+			const cmptLoader = new CMPTLoader(manager);
+			const gltfLoader = new TileGLTFLoader(manager);
+			this._loaders = new Map([['b3dm', b3dmLoader], ['i3dm', i3dmLoader], ['pnts', pntsLoader], ['cmpt', cmptLoader], ['gltf', gltfLoader]]);
+			this._upRotationMatrix = new t3d.Matrix4();
 		}
 
 		// Plugins
@@ -5496,20 +5409,156 @@
 			};
 			this.frameCount = 0;
 		}
-		dispatchEvent(event) {
-			this.$events.dispatchEvent(event);
+		dispatchEvent(args) {
+			t3d.EventDispatcher.prototype.dispatchEvent.call(this, ...args);
 		}
 		fetchData(url, options) {
 			return fetch(url, options);
 		}
-		parseTile(buffer, tile, extension, uri, abortSignal) {
-			return this.$modelLoader.loadTileContent(buffer, tile, extension, this, uri, abortSignal).then(scene => {
-				if (!scene) return;
-				scene.traverse(c => {
-					c[INITIAL_FRUSTUM_CULLED] = c.frustumCulled; // store initial value
-					c.frustumCulled = c.frustumCulled && !this._autoDisableRendererCulling;
-				});
+		async parseTile(buffer, tile, extension, uri, abortSignal) {
+			const cached = tile.cached;
+			const uriSplits = uri.split(/[\\\/]/g); // eslint-disable-line no-useless-escape
+			uriSplits.pop();
+			const workingPath = uriSplits.join('/');
+			const fetchOptions = this.fetchOptions;
+			let promise = null;
+			const cachedTransform = cached.transform;
+			const upRotationMatrix = this._upRotationMatrix;
+			const fileType = (readMagicBytes(buffer) || extension).toLowerCase();
+			switch (fileType) {
+				case 'b3dm':
+					{
+						promise = this._loaders.get('b3dm').load(uri, {
+							fetchOptions,
+							path: workingPath,
+							buffer,
+							adjustmentTransform: upRotationMatrix.clone()
+						});
+						break;
+					}
+				case 'pnts':
+					{
+						promise = this._loaders.get('pnts').load(uri, {
+							fetchOptions,
+							path: workingPath,
+							buffer
+						});
+						break;
+					}
+				case 'i3dm':
+					{
+						promise = this._loaders.get('i3dm').load(uri, {
+							fetchOptions,
+							path: workingPath,
+							buffer,
+							adjustmentTransform: upRotationMatrix.clone()
+						});
+						break;
+					}
+				case 'cmpt':
+					{
+						promise = this._loaders.get('i3dm').load(uri, {
+							fetchOptions,
+							path: workingPath,
+							buffer,
+							adjustmentTransform: upRotationMatrix.clone()
+						});
+						break;
+					}
+				case 'gltf':
+				case 'glb':
+					{
+						promise = this._loaders.get('gltf').load(uri, {
+							fetchOptions,
+							path: workingPath,
+							buffer
+						}).then(result => {
+							// apply the local up-axis correction rotation
+							// GLTFLoader seems to never set a transformation on the root scene object so
+							// any transformations applied to it can be assumed to be applied after load
+							// (such as applying RTC_CENTER) meaning they should happen _after_ the z-up
+							// rotation fix which is why "multiply" happens here.
+							const {
+								root: scene
+							} = result;
+							scene.matrix.multiply(upRotationMatrix).decompose(scene.position, scene.quaternion, scene.scale);
+							return result;
+						});
+						break;
+					}
+				default:
+					{
+						promise = this.invokeOnePlugin(plugin => plugin.parseToMesh && plugin.parseToMesh(buffer, tile, extension, uri, abortSignal));
+						break;
+					}
+			}
+
+			// wait for the tile to load
+			const result = await promise;
+			if (result === null) {
+				throw new Error(`Tiles3D: Content type "${fileType}" not supported.`);
+			}
+
+			// get the scene data
+			const scene = result.root;
+			const metadata = result;
+
+			// wait for extra processing by plugins if needed
+			await this.invokeAllPlugins(plugin => {
+				return plugin.processTileModel && plugin.processTileModel(scene, tile);
 			});
+
+			// ensure the matrix is up to date in case the scene has a transform applied
+			scene.updateMatrix();
+			scene.matrix.premultiply(cachedTransform);
+			scene.matrix.decompose(scene.position, scene.quaternion, scene.scale);
+			scene.traverse(c => {
+				c[INITIAL_FRUSTUM_CULLED] = c.frustumCulled;
+			});
+			updateFrustumCulled(scene, !this.autoDisableRendererCulling);
+
+			// collect all original geometries, materials, etc to be disposed of later
+			const materials = [];
+			const geometry = [];
+			const textures = [];
+			scene.traverse(c => {
+				if (c.geometry) {
+					geometry.push(c.geometry);
+				}
+				if (c.material) {
+					const material = c.material;
+					materials.push(c.material);
+					for (const key in material) {
+						const value = material[key];
+						if (value && value.isTexture) {
+							textures.push(value);
+						}
+					}
+				}
+			});
+
+			// exit early if a new request has already started
+			if (abortSignal.aborted) {
+				// dispose of any image bitmaps that have been opened.
+				// TODO: share this code with the "disposeTile" code below, possibly allow for the tiles
+				// renderer base to trigger a disposal of unneeded data
+				for (let i = 0, l = textures.length; i < l; i++) {
+					const texture = textures[i];
+					if (texture.image instanceof ImageBitmap) {
+						texture.image.close();
+					}
+					texture.dispose();
+				}
+				return;
+			}
+			cached.materials = materials;
+			cached.geometry = geometry;
+			cached.textures = textures;
+			cached.scene = scene;
+			cached.metadata = metadata;
+			// cached.bytesUsed = estimateBytesUsed(scene);
+			cached.featureTable = result.featureTable;
+			cached.batchTable = result.batchTable;
 		}
 		disposeTile(tile) {
 			// TODO: are these necessary? Are we disposing tiles when they are currently visible?
@@ -5793,9 +5842,23 @@
 					throw new Error(`Tiles3D: Failed to load tileset "${processedUrl}" with status ${res.status} : ${res.statusText}`);
 				}
 			}).then(root => {
+				// cache the gltf tile set rotation matrix
 				const {
+					asset,
 					extensions = {}
 				} = root;
+				const upAxis = asset && asset.gltfUpAxis || 'y';
+				switch (upAxis.toLowerCase()) {
+					case 'x':
+						this._upRotationMatrix.makeRotationAxis(Y_AXIS, -Math.PI / 2);
+						break;
+					case 'y':
+						this._upRotationMatrix.makeRotationAxis(X_AXIS, Math.PI / 2);
+						break;
+					default:
+						this._upRotationMatrix.identity();
+						break;
+				}
 
 				// update the ellipsoid based on the extension
 				if ('3DTILES_ellipsoid' in extensions) {
@@ -6029,28 +6092,32 @@
 		}
 		set autoDisableRendererCulling(value) {
 			if (this._autoDisableRendererCulling !== value) {
-				super._autoDisableRendererCulling = value;
-				this.traverse(tile => {
-					const scene = tile.cached.scene;
-					if (scene) {
-						scene.traverse(c => {
-							c.frustumCulled = c[INITIAL_FRUSTUM_CULLED] && !value;
-						});
-					}
+				this._autoDisableRendererCulling = value;
+				this.forEachLoadedModel(scene => {
+					updateFrustumCulled(scene, !value);
 				});
 			}
 		}
 		setDRACOLoader(dracoLoader) {
-			this.$modelLoader.setDRACOLoader(dracoLoader);
+			this._loaders.get('b3dm').setDRACOLoader(dracoLoader);
+			this._loaders.get('i3dm').setDRACOLoader(dracoLoader);
+			this._loaders.get('cmpt').setDRACOLoader(dracoLoader);
+			this._loaders.get('gltf').setDRACOLoader(dracoLoader);
 		}
 		setKTX2Loader(ktx2Loader) {
-			this.$modelLoader.setKTX2Loader(ktx2Loader);
+			this._loaders.get('b3dm').setKTX2Loader(ktx2Loader);
+			this._loaders.get('i3dm').setKTX2Loader(ktx2Loader);
+			this._loaders.get('cmpt').setKTX2Loader(ktx2Loader);
+			this._loaders.get('gltf').setKTX2Loader(ktx2Loader);
 		}
-		addEventListener(type, listener, thisObject) {
-			this.$events.addEventListener(type, listener, thisObject);
+		addEventListener(...args) {
+			t3d.EventDispatcher.prototype.addEventListener.call(this, ...args);
 		}
-		removeEventListener(type, listener, thisObject) {
-			this.$events.removeEventListener(type, listener, thisObject);
+		hasEventListener(...args) {
+			t3d.EventDispatcher.prototype.hasEventListener.call(this, ...args);
+		}
+		removeEventListener(...args) {
+			t3d.EventDispatcher.prototype.removeEventListener.call(this, ...args);
 		}
 		addCamera(camera) {
 			const success = this.$cameras.add(camera);

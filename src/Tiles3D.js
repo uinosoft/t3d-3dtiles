@@ -1,15 +1,20 @@
-import { EventDispatcher, LoadingManager, Matrix4, Object3D } from 't3d';
+import { EventDispatcher, LoadingManager, Matrix4, Object3D, Vector3 } from 't3d';
 import { TileBoundingVolume } from './math/TileBoundingVolume.js';
 import { getUrlExtension } from './utils/urlExtension.js';
 import { raycastTraverse, raycastTraverseFirstHit } from './utils/raycastTraverse.js';
 import { CameraList } from './utils/CameraList.js';
 import { LRUCache } from './utils/LRUCache.js';
 import { PriorityQueue } from './utils/PriorityQueue.js';
-import { ModelLoader } from './utils/ModelLoader.js';
 import { markUsedTiles, markUsedSetLeaves, markVisibleTiles, toggleTiles, traverseSet } from './utils/traverseFunctions.js';
 import { UNLOADED, LOADING, PARSING, LOADED, FAILED } from './constants.js';
 import { WGS84_ELLIPSOID } from './math/GeoConstants.js';
 import { throttle } from './utils/throttle.js';
+import { B3DMLoader } from './loaders/B3DMLoader.js';
+import { I3DMLoader } from './loaders/I3DMLoader.js';
+import { PNTSLoader } from './loaders/PNTSLoader.js';
+import { CMPTLoader } from './loaders/CMPTLoader.js';
+import { TileGLTFLoader } from './loaders/TileGLTFLoader.js';
+import { readMagicBytes } from './utils/readMagicBytes.js';
 
 const _updateBeforeEvent = { type: 'update-before' };
 const _updateAfterEvent = { type: 'update-after' };
@@ -25,6 +30,15 @@ const viewErrorTarget = {
 	inView: false,
 	error: Infinity
 };
+
+const X_AXIS = new Vector3(1, 0, 0);
+const Y_AXIS = new Vector3(0, 1, 0);
+
+function updateFrustumCulled(object, toInitialValue) {
+	object.traverse(c => {
+		c.frustumCulled = c[INITIAL_FRUSTUM_CULLED] && toInitialValue;
+	});
+}
 
 const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
 	const te = matrixA.elements;
@@ -187,10 +201,24 @@ export class Tiles3D extends Object3D {
 		this.processNodeQueue = processNodeQueue;
 
 		this.$cameras = new CameraList();
-		this.$modelLoader = new ModelLoader(manager);
-		this.$events = new EventDispatcher();
 
 		this.lruCache.computeMemoryUsageCallback = tile => tile.cached.bytesUsed ?? null;
+
+		const b3dmLoader = new B3DMLoader(manager);
+		const i3dmLoader = new I3DMLoader(manager);
+		const pntsLoader = new PNTSLoader(manager);
+		const cmptLoader = new CMPTLoader(manager);
+		const gltfLoader = new TileGLTFLoader(manager);
+
+		this._loaders = new Map([
+			['b3dm', b3dmLoader],
+			['i3dm', i3dmLoader],
+			['pnts', pntsLoader],
+			['cmpt', cmptLoader],
+			['gltf', gltfLoader]
+		]);
+
+		this._upRotationMatrix = new Matrix4();
 	}
 
 	// Plugins
@@ -404,23 +432,161 @@ export class Tiles3D extends Object3D {
 		this.frameCount = 0;
 	}
 
-	dispatchEvent(event) {
-		this.$events.dispatchEvent(event);
+	dispatchEvent(args) {
+		EventDispatcher.prototype.dispatchEvent.call(this, ...args);
 	}
 
 	fetchData(url, options) {
 		return fetch(url, options);
 	}
 
-	parseTile(buffer, tile, extension, uri, abortSignal) {
-		return this.$modelLoader.loadTileContent(buffer, tile, extension, this, uri, abortSignal)
-			.then(scene => {
-				if (!scene) return;
-				scene.traverse(c => {
-					c[INITIAL_FRUSTUM_CULLED] = c.frustumCulled; // store initial value
-					c.frustumCulled = c.frustumCulled && !this._autoDisableRendererCulling;
+	async parseTile(buffer, tile, extension, uri, abortSignal) {
+		const cached = tile.cached;
+		const uriSplits = uri.split(/[\\\/]/g); // eslint-disable-line no-useless-escape
+		uriSplits.pop();
+		const workingPath = uriSplits.join('/');
+		const fetchOptions = this.fetchOptions;
+
+		let promise = null;
+
+		const cachedTransform = cached.transform;
+		const upRotationMatrix = this._upRotationMatrix;
+		const fileType = (readMagicBytes(buffer) || extension).toLowerCase();
+
+		switch (fileType) {
+			case 'b3dm': {
+				promise = this._loaders.get('b3dm').load(uri, {
+					fetchOptions,
+					path: workingPath,
+					buffer,
+					adjustmentTransform: upRotationMatrix.clone()
 				});
-			});
+				break;
+			}
+			case 'pnts': {
+				promise = this._loaders.get('pnts').load(uri, {
+					fetchOptions,
+					path: workingPath,
+					buffer
+				});
+				break;
+			}
+			case 'i3dm': {
+				promise = this._loaders.get('i3dm').load(uri, {
+					fetchOptions,
+					path: workingPath,
+					buffer,
+					adjustmentTransform: upRotationMatrix.clone()
+				});
+				break;
+			}
+			case 'cmpt': {
+				promise = this._loaders.get('i3dm').load(uri, {
+					fetchOptions,
+					path: workingPath,
+					buffer,
+					adjustmentTransform: upRotationMatrix.clone()
+				});
+				break;
+			}
+			case 'gltf':
+			case 'glb': {
+				promise = this._loaders.get('gltf').load(uri, {
+					fetchOptions,
+					path: workingPath,
+					buffer
+				}).then(result => {
+					// apply the local up-axis correction rotation
+					// GLTFLoader seems to never set a transformation on the root scene object so
+					// any transformations applied to it can be assumed to be applied after load
+					// (such as applying RTC_CENTER) meaning they should happen _after_ the z-up
+					// rotation fix which is why "multiply" happens here.
+					const { root: scene } = result;
+					scene.matrix
+						.multiply(upRotationMatrix)
+						.decompose(scene.position, scene.quaternion, scene.scale);
+					return result;
+				});
+				break;
+			}
+			default: {
+				promise = this.invokeOnePlugin(plugin => plugin.parseToMesh && plugin.parseToMesh(buffer, tile, extension, uri, abortSignal));
+				break;
+			}
+		}
+
+		// wait for the tile to load
+		const result = await promise;
+		if (result === null) {
+			throw new Error(`Tiles3D: Content type "${fileType}" not supported.`);
+		}
+
+		// get the scene data
+		const scene = result.root;
+		const metadata = result;
+
+		// wait for extra processing by plugins if needed
+		await this.invokeAllPlugins(plugin => {
+			return plugin.processTileModel && plugin.processTileModel(scene, tile);
+		});
+
+		// ensure the matrix is up to date in case the scene has a transform applied
+		scene.updateMatrix();
+		scene.matrix.premultiply(cachedTransform);
+		scene.matrix.decompose(scene.position, scene.quaternion, scene.scale);
+		scene.traverse(c => {
+			c[INITIAL_FRUSTUM_CULLED] = c.frustumCulled;
+		});
+		updateFrustumCulled(scene, !this.autoDisableRendererCulling);
+
+		// collect all original geometries, materials, etc to be disposed of later
+		const materials = [];
+		const geometry = [];
+		const textures = [];
+		scene.traverse(c => {
+			if (c.geometry) {
+				geometry.push(c.geometry);
+			}
+
+			if (c.material) {
+				const material = c.material;
+				materials.push(c.material);
+
+				for (const key in material) {
+					const value = material[key];
+					if (value && value.isTexture) {
+						textures.push(value);
+					}
+				}
+			}
+		});
+
+		// exit early if a new request has already started
+		if (abortSignal.aborted) {
+			// dispose of any image bitmaps that have been opened.
+			// TODO: share this code with the "disposeTile" code below, possibly allow for the tiles
+			// renderer base to trigger a disposal of unneeded data
+			for (let i = 0, l = textures.length; i < l; i++) {
+				const texture = textures[i];
+
+				if (texture.image instanceof ImageBitmap) {
+					texture.image.close();
+				}
+
+				texture.dispose();
+			}
+
+			return;
+		}
+
+		cached.materials = materials;
+		cached.geometry = geometry;
+		cached.textures = textures;
+		cached.scene = scene;
+		cached.metadata = metadata;
+		// cached.bytesUsed = estimateBytesUsed(scene);
+		cached.featureTable = result.featureTable;
+		cached.batchTable = result.batchTable;
 	}
 
 	disposeTile(tile) {
@@ -762,7 +928,21 @@ export class Tiles3D extends Object3D {
 				}
 			})
 			.then(root => {
-				const { extensions = {} } = root;
+				// cache the gltf tile set rotation matrix
+				const { asset, extensions = {} } = root;
+				const upAxis = asset && asset.gltfUpAxis || 'y';
+				switch (upAxis.toLowerCase()) {
+					case 'x':
+						this._upRotationMatrix.makeRotationAxis(Y_AXIS, -Math.PI / 2);
+						break;
+
+					case 'y':
+						this._upRotationMatrix.makeRotationAxis(X_AXIS, Math.PI / 2);
+						break;
+					default:
+						this._upRotationMatrix.identity();
+						break;
+				}
 
 				// update the ellipsoid based on the extension
 				if ('3DTILES_ellipsoid' in extensions) {
@@ -1017,32 +1197,37 @@ export class Tiles3D extends Object3D {
 
 	set autoDisableRendererCulling(value) {
 		if (this._autoDisableRendererCulling !== value) {
-			super._autoDisableRendererCulling = value;
-			this.traverse(tile => {
-				const scene = tile.cached.scene;
-				if (scene) {
-					scene.traverse(c => {
-						c.frustumCulled = c[INITIAL_FRUSTUM_CULLED] && !value;
-					});
-				}
+			this._autoDisableRendererCulling = value;
+			this.forEachLoadedModel(scene => {
+				updateFrustumCulled(scene, !value);
 			});
 		}
 	}
 
 	setDRACOLoader(dracoLoader) {
-		this.$modelLoader.setDRACOLoader(dracoLoader);
+		this._loaders.get('b3dm').setDRACOLoader(dracoLoader);
+		this._loaders.get('i3dm').setDRACOLoader(dracoLoader);
+		this._loaders.get('cmpt').setDRACOLoader(dracoLoader);
+		this._loaders.get('gltf').setDRACOLoader(dracoLoader);
 	}
 
 	setKTX2Loader(ktx2Loader) {
-		this.$modelLoader.setKTX2Loader(ktx2Loader);
+		this._loaders.get('b3dm').setKTX2Loader(ktx2Loader);
+		this._loaders.get('i3dm').setKTX2Loader(ktx2Loader);
+		this._loaders.get('cmpt').setKTX2Loader(ktx2Loader);
+		this._loaders.get('gltf').setKTX2Loader(ktx2Loader);
 	}
 
-	addEventListener(type, listener, thisObject) {
-		this.$events.addEventListener(type, listener, thisObject);
+	addEventListener(...args) {
+		EventDispatcher.prototype.addEventListener.call(this, ...args);
 	}
 
-	removeEventListener(type, listener, thisObject) {
-		this.$events.removeEventListener(type, listener, thisObject);
+	hasEventListener(...args) {
+		EventDispatcher.prototype.hasEventListener.call(this, ...args);
+	}
+
+	removeEventListener(...args) {
+		EventDispatcher.prototype.removeEventListener.call(this, ...args);
 	}
 
 	addCamera(camera) {
