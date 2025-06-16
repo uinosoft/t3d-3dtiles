@@ -1,4 +1,4 @@
-import { traverseSet } from '../utils/traverseFunctions.js';
+import { traverseSet } from '../utilities/traverseFunctions.js';
 import { GoogleAttributionsManager } from './GoogleAttributionsManager.js';
 
 export class GoogleCloudAuthPlugin {

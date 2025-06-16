@@ -2,7 +2,10 @@
 	"basic": [
 		"basic_house",
 		"basic_discrete_lod",
+		"basic_sparse_implicit_quadtree",
+		"basic_sparse_implicit_octree",
 		"basic_ion",
+		"basic_ion_terrain",
 		"basic_globe",
 		"basic_globe_moon"
 	],

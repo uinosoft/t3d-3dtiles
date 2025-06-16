@@ -1,5 +1,5 @@
 // t3d-3dtiles
-import { Vector3, Matrix3, Box3, Ray, Plane, Matrix4, Spherical, Sphere, Euler, MathUtils, Vector2, Frustum, PBRMaterial, ShaderLib, MATERIAL_TYPE, TEXEL_ENCODING_TYPE, DRAW_SIDE, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Quaternion, Attribute, Buffer, Color3, Mesh, Object3D, LoadingManager, EventDispatcher, PlaneGeometry, ShaderMaterial, DRAW_MODE, Camera } from 't3d';
+import { Vector3, Matrix3, Box3, Ray, Plane, Matrix4, Spherical, Sphere, Euler, MathUtils, Vector2, Frustum, PBRMaterial, ShaderLib, MATERIAL_TYPE, TEXEL_ENCODING_TYPE, DRAW_SIDE, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Quaternion, Attribute, Buffer, Color3, Mesh, Object3D, LoadingManager, EventDispatcher, PlaneGeometry, ShaderMaterial, DefaultLoadingManager, Texture2D, PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER, Triangle, DRAW_MODE, Camera } from 't3d';
 import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
 import { ReferenceParser } from 't3d/addons/loaders/glTF/parsers/ReferenceParser.js';
 import { Validator } from 't3d/addons/loaders/glTF/parsers/Validator.js';
@@ -575,11 +575,11 @@ class Ellipsoid {
 	// Y pointing north
 	// X pointing east
 	getEastNorthUpFrame(lat, lon, target) {
-		this.getEastNorthUpAxes(lat, lon, _vecX, _vecY, _vecZ, _pos$1);
-		return target.makeBasis(_vecX, _vecY, _vecZ).setPosition(_pos$1);
+		this.getEastNorthUpAxes(lat, lon, _vecX, _vecY, _vecZ, _pos$2);
+		return target.makeBasis(_vecX, _vecY, _vecZ).setPosition(_pos$2);
 	}
 
-	getEastNorthUpAxes(lat, lon, vecEast, vecNorth, vecUp, point = _pos$1) {
+	getEastNorthUpAxes(lat, lon, vecEast, vecNorth, vecUp, point = _pos$2) {
 		this.getCartographicToPosition(lat, lon, 0, point);
 		this.getCartographicToNormal(lat, lon, vecUp);		// up
 		vecEast.set(-point.y, point.x, 0).normalize();		// east
@@ -613,30 +613,30 @@ class Ellipsoid {
 	getCartographicToPosition(lat, lon, height, target) {
 		// From Cesium function Ellipsoid.cartographicToCartesian
 		// https://github.com/CesiumGS/cesium/blob/665ec32e813d5d6fe906ec3e87187f6c38ed5e49/packages/engine/Source/Core/Ellipsoid.js#L396
-		this.getCartographicToNormal(lat, lon, _norm);
+		this.getCartographicToNormal(lat, lon, _norm$1);
 
 		const radius = this.radius;
-		_vec$5.copy(_norm);
-		_vec$5.x *= radius.x ** 2;
-		_vec$5.y *= radius.y ** 2;
-		_vec$5.z *= radius.z ** 2;
+		_vec$6.copy(_norm$1);
+		_vec$6.x *= radius.x ** 2;
+		_vec$6.y *= radius.y ** 2;
+		_vec$6.z *= radius.z ** 2;
 
-		const gamma = Math.sqrt(_norm.dot(_vec$5));
-		_vec$5.multiplyScalar(1 / gamma);
+		const gamma = Math.sqrt(_norm$1.dot(_vec$6));
+		_vec$6.multiplyScalar(1 / gamma);
 
-		return target.copy(_vec$5).addScaledVector(_norm, height);
+		return target.copy(_vec$6).addScaledVector(_norm$1, height);
 	}
 
 	getPositionToCartographic(pos, target) {
 		// From Cesium function Ellipsoid.cartesianToCartographic
 		// https://github.com/CesiumGS/cesium/blob/665ec32e813d5d6fe906ec3e87187f6c38ed5e49/packages/engine/Source/Core/Ellipsoid.js#L463
-		this.getPositionToSurfacePoint(pos, _vec$5);
-		this.getPositionToNormal(pos, _norm);
+		this.getPositionToSurfacePoint(pos, _vec$6);
+		this.getPositionToNormal(pos, _norm$1);
 
-		const heightDelta = _vec2$1.subVectors(pos, _vec$5);
+		const heightDelta = _vec2$1.subVectors(pos, _vec$6);
 
-		target.lon = Math.atan2(_norm.y, _norm.x);
-		target.lat = Math.asin(_norm.z);
+		target.lon = Math.atan2(_norm$1.y, _norm$1.x);
+		target.lat = Math.asin(_norm$1.z);
 		target.height = Math.sign(heightDelta.dot(pos)) * heightDelta.getLength();
 		return target;
 	}
@@ -678,7 +678,7 @@ class Ellipsoid {
 		const ratio = Math.sqrt(1.0 / squaredNorm);
 
 		// As an initial approximation, assume that the radial intersection is the projection point.
-		const intersection = _vec$5.copy(pos).multiplyScalar(ratio);
+		const intersection = _vec$6.copy(pos).multiplyScalar(ratio);
 		if (squaredNorm < CENTER_EPS) {
 			return !isFinite(ratio) ? null : target.copy(intersection);
 		}
@@ -758,9 +758,9 @@ class Ellipsoid {
 
 	getPositionElevation(pos) {
 		// logic from "getPositionToCartographic"
-		this.getPositionToSurfacePoint(pos, _vec$5);
+		this.getPositionToSurfacePoint(pos, _vec$6);
 
-		const heightDelta = _vec2$1.subVectors(pos, _vec$5);
+		const heightDelta = _vec2$1.subVectors(pos, _vec$6);
 		return Math.sign(heightDelta.dot(pos)) * heightDelta.getLength();
 	}
 
@@ -776,8 +776,8 @@ class Ellipsoid {
 }
 
 const _spherical = new Spherical();
-const _norm = new Vector3();
-const _vec$5 = new Vector3();
+const _norm$1 = new Vector3();
+const _vec$6 = new Vector3();
 const _vec2$1 = new Vector3();
 const _matrix$1 = new Matrix4();
 const _matrix2 = new Matrix4();
@@ -787,7 +787,7 @@ const _euler = new Euler();
 const _vecX = new Vector3();
 const _vecY = new Vector3();
 const _vecZ = new Vector3();
-const _pos$1 = new Vector3();
+const _pos$2 = new Vector3();
 
 const _ray$3 = new Ray();
 
@@ -1147,7 +1147,7 @@ function getUrlExtension(url) {
 }
 
 const _localRay = new Ray();
-const _vec$4 = new Vector3();
+const _vec$5 = new Vector3();
 const _hitArray = [];
 const _mat = new Matrix4();
 
@@ -1211,10 +1211,10 @@ function raycastTraverseFirstHit(renderer, tile, ray, localRay = null) {
 
 		// track the tile and hit distance for sorting
 		const boundingVolume = child.cached.boundingVolume;
-		if (boundingVolume.intersectRay(localRay, _vec$4) !== null) {
-			_vec$4.applyMatrix4(renderer.worldMatrix);
+		if (boundingVolume.intersectRay(localRay, _vec$5) !== null) {
+			_vec$5.applyMatrix4(renderer.worldMatrix);
 			array.push({
-				distance: _vec$4.distanceToSquared(ray.origin),
+				distance: _vec$5.distanceToSquared(ray.origin),
 				tile: child
 			});
 		}
@@ -4207,8 +4207,15 @@ class Tiles3D extends Object3D {
 		}
 
 		// get the scene data
-		const scene = result.root;
-		const metadata = result;
+		let scene;
+		let metadata;
+		if (result.isObject3D) {
+			scene = result;
+			metadata = null;
+		} else {
+			scene = result.root;
+			metadata = result;
+		}
 
 		// wait for extra processing by plugins if needed
 		await this.invokeAllPlugins(plugin => {
@@ -5115,7 +5122,7 @@ const pivotShader = {
 	`
 };
 
-const _vec$3 = new Vector2();
+const _vec$4 = new Vector2();
 const _vec2 = new Vector2();
 
 class PointerTracker {
@@ -5255,10 +5262,10 @@ class PointerTracker {
 	}
 
 	getMoveDistance() {
-		this.getCenterPoint(_vec$3);
+		this.getCenterPoint(_vec$4);
 		this.getPreviousCenterPoint(_vec2);
 
-		return _vec$3.sub(_vec2).getLength();
+		return _vec$4.sub(_vec2).getLength();
 	}
 
 	getTouchPointerDistance(pointerPositions = this.pointerPositions) {
@@ -5308,7 +5315,7 @@ class PointerTracker {
 
 const _matrix = new Matrix4();
 const _ray$2 = new Ray();
-const _vec$2 = new Vector3();
+const _vec$3 = new Vector3();
 
 // helper function for constructing a matrix for rotating around a point
 function makeRotateAroundPoint(point, quat, target) {
@@ -5342,8 +5349,8 @@ function closestRayEllipsoidSurfacePointEstimate(ray, ellipsoid, target) {
 		_matrix.makeScale(...ellipsoid.radius).invert();
 		_ray$2.copy(ray).applyMatrix4(_matrix);
 
-		_vec$2.set(0, 0, 0);
-		_ray$2.closestPointToPoint(_vec$2, target).normalize();
+		_vec$3.set(0, 0, 0);
+		_ray$2.closestPointToPoint(_vec$3, target).normalize();
 
 		_matrix.makeScale(...ellipsoid.radius);
 		return target.applyMatrix4(_matrix);
@@ -5364,7 +5371,7 @@ function closestRaySpherePointFromRotation(ray, radius, target) {
 		.normalize();
 
 	// get the normal of the plane the ray and origin lie in
-	const rotationVec = _vec$2
+	const rotationVec = _vec$3
 		.crossVectors(target, ray.direction)
 		.normalize();
 
@@ -5408,7 +5415,7 @@ const DRAG_UP_THRESHOLD = 0.025;
 
 const _rotMatrix$1 = /* @__PURE__ */ new Matrix4();
 const _delta = /* @__PURE__ */ new Vector3();
-const _vec$1 = /* @__PURE__ */ new Vector3();
+const _vec$2 = /* @__PURE__ */ new Vector3();
 const _forward$1 = /* @__PURE__ */ new Vector3();
 const _right$1 = /* @__PURE__ */ new Vector3();
 const _rotationAxis = /* @__PURE__ */ new Vector3();
@@ -5846,8 +5853,8 @@ class EnvironmentControls extends EventDispatcher {
 		// If the last used point is outside the camera view then skip it
 		const { camera, raycaster } = this;
 		if (result !== null) {
-			_vec$1.copy(result).project(camera);
-			if (_vec$1.x < -1 || _vec$1.x > 1 || _vec$1.y < -1 || _vec$1.y > 1) {
+			_vec$2.copy(result).project(camera);
+			if (_vec$2.x < -1 || _vec$2.x > 1 || _vec$2.y < -1 || _vec$2.y > 1) {
 				result = null;
 			}
 		}
@@ -5942,7 +5949,7 @@ class EnvironmentControls extends EventDispatcher {
 
 			if (state === DRAG || state === ROTATE) {
 				_forward$1.set(0, 0, -1).transformDirection(camera.worldMatrix);
-				this.inertiaTargetDistance = _vec$1.copy(this.pivotPoint).sub(camera.position).dot(_forward$1);
+				this.inertiaTargetDistance = _vec$2.copy(this.pivotPoint).sub(camera.position).dot(_forward$1);
 			} else if (state === NONE$1) {
 				this._updateInertia(deltaTime);
 			}
@@ -6044,11 +6051,11 @@ class EnvironmentControls extends EventDispatcher {
 		if (rotationInertia.getLengthSquared() > 0) {
 			// calculate two screen points at 1 pixel apart in our notional resolution so we can stop when the delta is ~ 1 pixel
 			// projected into world space
-			setRaycasterFromCamera(_ray$1, _vec$1.set(0, 0, -1), camera);
+			setRaycasterFromCamera(_ray$1, _vec$2.set(0, 0, -1), camera);
 			_ray$1.applyMatrix4(camera.viewMatrix);
 			_ray$1.direction.normalize();
-			_ray$1.recast(-_ray$1.direction.dot(_ray$1.origin)).at(stableDistance / _ray$1.direction.z, _vec$1);
-			_vec$1.applyMatrix4(camera.worldMatrix);
+			_ray$1.recast(-_ray$1.direction.dot(_ray$1.origin)).at(stableDistance / _ray$1.direction.z, _vec$2);
+			_vec$2.applyMatrix4(camera.worldMatrix);
 
 			setRaycasterFromCamera(_ray$1, _delta.set(pixelThreshold, pixelThreshold, -1), camera);
 			_ray$1.applyMatrix4(camera.viewMatrix);
@@ -6057,11 +6064,11 @@ class EnvironmentControls extends EventDispatcher {
 			_delta.applyMatrix4(camera.worldMatrix);
 
 			// get implied angle
-			_vec$1.sub(pivotPoint).normalize();
+			_vec$2.sub(pivotPoint).normalize();
 			_delta.sub(pivotPoint).normalize();
 
 			// calculate the rotation threshold
-			const threshold = _vec$1.angleTo(_delta) / deltaTime;
+			const threshold = _vec$2.angleTo(_delta) / deltaTime;
 			rotationInertia.multiplyScalar(factor);
 			if (rotationInertia.getLengthSquared() < threshold ** 2 || !enableDamping) {
 				rotationInertia.set(0, 0);
@@ -6072,11 +6079,11 @@ class EnvironmentControls extends EventDispatcher {
 		if (dragInertia.getLengthSquared() > 0) {
 			// calculate two screen points at 1 pixel apart in our notional resolution so we can stop when the delta is ~ 1 pixel
 			// projected into world space
-			setRaycasterFromCamera(_ray$1, _vec$1.set(0, 0, -1), camera);
+			setRaycasterFromCamera(_ray$1, _vec$2.set(0, 0, -1), camera);
 			_ray$1.applyMatrix4(camera.viewMatrix);
 			_ray$1.direction.normalize();
-			_ray$1.recast(-_ray$1.direction.dot(_ray$1.origin)).at(stableDistance / _ray$1.direction.z, _vec$1);
-			_vec$1.applyMatrix4(camera.worldMatrix);
+			_ray$1.recast(-_ray$1.direction.dot(_ray$1.origin)).at(stableDistance / _ray$1.direction.z, _vec$2);
+			_vec$2.applyMatrix4(camera.worldMatrix);
 
 			setRaycasterFromCamera(_ray$1, _delta.set(pixelThreshold, pixelThreshold, -1), camera);
 			_ray$1.applyMatrix4(camera.viewMatrix);
@@ -6085,7 +6092,7 @@ class EnvironmentControls extends EventDispatcher {
 			_delta.applyMatrix4(camera.worldMatrix);
 
 			// calculate movement threshold
-			const threshold = _vec$1.distanceTo(_delta) / deltaTime;
+			const threshold = _vec$2.distanceTo(_delta) / deltaTime;
 			dragInertia.multiplyScalar(factor);
 			if (dragInertia.getLengthSquared() < threshold ** 2 || !enableDamping) {
 				dragInertia.set(0, 0, 0);
@@ -6179,7 +6186,7 @@ class EnvironmentControls extends EventDispatcher {
 			this._updateZoomDirection();
 
 			// track the zoom direction we're going to use
-			const finalZoomDirection = _vec$1.copy(zoomDirection);
+			const finalZoomDirection = _vec$2.copy(zoomDirection);
 
 			if (this.zoomPointSet || this._updateZoomPoint()) {
 				const dist = zoomPoint.distanceTo(camera.position);
@@ -6338,8 +6345,8 @@ class EnvironmentControls extends EventDispatcher {
 			}
 
 			// find the point on the plane that we should drag to
-			if (raycaster.ray.intersectPlane(_plane, _vec$1)) {
-				_delta.subVectors(pivotPoint, _vec$1);
+			if (raycaster.ray.intersectPlane(_plane, _vec$2)) {
+				_delta.subVectors(pivotPoint, _vec$2);
 				camera.position.add(_delta);
 				camera.updateMatrix();
 
@@ -6404,9 +6411,9 @@ class EnvironmentControls extends EventDispatcher {
 		this.getUpDirection(pivotPoint, _localUp);
 
 		// get the signed angle relative to the top down view
-		_vec$1.crossVectors(_localUp, _forward$1).normalize();
+		_vec$2.crossVectors(_localUp, _forward$1).normalize();
 		_right$1.set(1, 0, 0).transformDirection(camera.worldMatrix).normalize();
-		const sign = Math.sign(_vec$1.dot(_right$1));
+		const sign = Math.sign(_vec$2.dot(_right$1));
 		const angle = sign * _localUp.angleTo(_forward$1);
 
 		// clamp the rotation to be within the provided limits
@@ -6432,7 +6439,7 @@ class EnvironmentControls extends EventDispatcher {
 		camera.worldMatrix.premultiply(_rotMatrix$1);
 
 		// update the transform members
-		camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec$1);
+		camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec$2);
 	}
 
 	// sets the "up" axis for the current surface of the tile set
@@ -6456,10 +6463,10 @@ class EnvironmentControls extends EventDispatcher {
 		// If we're zooming then reorient around the zoom point
 		const action = state;
 		if (zoomDirectionSet && (zoomPointSet || this._updateZoomPoint())) {
-			this.getUpDirection(zoomPoint, _vec$1);
+			this.getUpDirection(zoomPoint, _vec$2);
 
 			if (scaleZoomOrientationAtEdges) {
-				let amt = Math.max(_vec$1.dot(up) - 0.6, 0) / 0.4;
+				let amt = Math.max(_vec$2.dot(up) - 0.6, 0) / 0.4;
 				amt = MathUtils.mapLinear(amt, 0, 0.5, 0, 1);
 				amt = Math.min(amt, 1);
 
@@ -6475,7 +6482,7 @@ class EnvironmentControls extends EventDispatcher {
 			// rotates the camera position around the point being zoomed in to
 			makeRotateAroundPoint(zoomPoint, _quaternion$2, _rotMatrix$1);
 			camera.worldMatrix.premultiply(_rotMatrix$1);
-			camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec$1);
+			camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec$2);
 
 			// recompute the zoom direction after updating rotation to align with frame
 			this.zoomDirectionSet = false;
@@ -6490,7 +6497,7 @@ class EnvironmentControls extends EventDispatcher {
 				// perform a simple realignment by rotating the camera around the pivot
 				makeRotateAroundPoint(pivot, _quaternion$2, _rotMatrix$1);
 				camera.worldMatrix.premultiply(_rotMatrix$1);
-				camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec$1);
+				camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec$2);
 			}
 		}
 
@@ -6507,10 +6514,10 @@ class EnvironmentControls extends EventDispatcher {
 			// if we don't hit any geometry then try to intersect the fallback
 			// plane so the camera can still be manipulated
 			const plane = fallbackPlane;
-			if (raycaster.ray.intersectPlane(plane, _vec$1)) {
+			if (raycaster.ray.intersectPlane(plane, _vec$2)) {
 				const planeHit = {
-					point: _vec$1.clone(),
-					distance: raycaster.ray.origin.distanceTo(_vec$1)
+					point: _vec$2.clone(),
+					distance: raycaster.ray.origin.distanceTo(_vec$2)
 				};
 
 				return planeHit;
@@ -6524,8 +6531,8 @@ class EnvironmentControls extends EventDispatcher {
 
 const _invMatrix = /* @__PURE__ */ new Matrix4();
 const _rotMatrix = /* @__PURE__ */ new Matrix4();
-const _pos = /* @__PURE__ */ new Vector3();
-const _vec = /* @__PURE__ */ new Vector3();
+const _pos$1 = /* @__PURE__ */ new Vector3();
+const _vec$1 = /* @__PURE__ */ new Vector3();
 const _center = /* @__PURE__ */ new Vector3();
 const _forward = /* @__PURE__ */ new Vector3();
 const _right = /* @__PURE__ */ new Vector3();
@@ -6592,15 +6599,15 @@ class GlobeControls extends EnvironmentControls {
 		_ray.applyMatrix4(_invMatrix);
 
 		// get the estimated closest point
-		closestRayEllipsoidSurfacePointEstimate(_ray, ellipsoid, _vec);
-		_vec.applyMatrix4(tilesGroup.worldMatrix);
+		closestRayEllipsoidSurfacePointEstimate(_ray, ellipsoid, _vec$1);
+		_vec$1.applyMatrix4(tilesGroup.worldMatrix);
 
 		// use the closest point if no pivot was provided or it's closer
 		if (
 			super.getPivotPoint(target) === null ||
-			target.distanceTo(_ray.origin) > _vec.distanceTo(_ray.origin)
+			target.distanceTo(_ray.origin) > _vec$1.distanceTo(_ray.origin)
 		) {
-			target.copy(_vec);
+			target.copy(_vec$1);
 		}
 
 		return target;
@@ -6617,7 +6624,7 @@ class GlobeControls extends EnvironmentControls {
 	// get the distance to the center of the globe
 	getDistanceToCenter() {
 		return this
-			.getVectorToCenter(_vec)
+			.getVectorToCenter(_vec$1)
 			.getLength();
 	}
 
@@ -6625,21 +6632,21 @@ class GlobeControls extends EnvironmentControls {
 		// get the "up" direction based on the wgs84 ellipsoid
 		const { tilesGroup, ellipsoid } = this;
 		_invMatrix.copy(tilesGroup.worldMatrix).invert();
-		_vec.copy(point).applyMatrix4(_invMatrix);
+		_vec$1.copy(point).applyMatrix4(_invMatrix);
 
-		ellipsoid.getPositionToNormal(_vec, target);
+		ellipsoid.getPositionToNormal(_vec$1, target);
 		target.transformDirection(tilesGroup.worldMatrix);
 	}
 
 	getCameraUpDirection(target) {
 		const { tilesGroup, ellipsoid, camera } = this;
 		if (camera.isOrthographicCamera) {
-			this._getVirtualOrthoCameraPosition(_vec);
+			this._getVirtualOrthoCameraPosition(_vec$1);
 
 			_invMatrix.copy(tilesGroup.worldMatrix).invert();
-			_vec.applyMatrix4(_invMatrix);
+			_vec$1.applyMatrix4(_invMatrix);
 
-			ellipsoid.getPositionToNormal(_vec, target);
+			ellipsoid.getPositionToNormal(_vec$1, target);
 			target.transformDirection(tilesGroup.worldMatrix);
 		} else {
 			this.getUpDirection(camera.position, target);
@@ -6680,7 +6687,7 @@ class GlobeControls extends EnvironmentControls {
 		const maxRadius = Math.max(ellipsoid.radius.x, ellipsoid.radius.y, ellipsoid.radius.z);
 		if (camera.isPerspectiveCamera) {
 			// adjust the clip planes
-			const distanceToCenter = _vec
+			const distanceToCenter = _vec$1
 				.setFromMatrixPosition(tilesGroup.worldMatrix)
 				.sub(camera.position).getLength();
 
@@ -6694,12 +6701,12 @@ class GlobeControls extends EnvironmentControls {
 
 			// update the far plane to the horizon distance
 			_invMatrix.copy(tilesGroup.worldMatrix).invert();
-			_pos.copy(camera.position).applyMatrix4(_invMatrix);
-			ellipsoid.getPositionToCartographic(_pos, _latLon);
+			_pos$1.copy(camera.position).applyMatrix4(_invMatrix);
+			ellipsoid.getPositionToCartographic(_pos$1, _latLon);
 
 			// use a minimum elevation for computing the horizon distance to avoid the far clip
 			// plane approaching zero as the camera goes to or below sea level.
-			const elevation = Math.max(ellipsoid.getPositionElevation(_pos), MIN_ELEVATION);
+			const elevation = Math.max(ellipsoid.getPositionElevation(_pos$1), MIN_ELEVATION);
 			const horizonDistance = ellipsoid.calculateHorizonDistance(_latLon.lat, elevation);
 
 			// extend the horizon distance by 2.5 to handle cases where geometry extends above the horizon
@@ -6710,9 +6717,9 @@ class GlobeControls extends EnvironmentControls {
 			camera.updateMatrix();
 
 			_invMatrix.copy(camera.worldMatrix).invert();
-			_vec.setFromMatrixPosition(tilesGroup.worldMatrix).applyMatrix4(_invMatrix);
+			_vec$1.setFromMatrixPosition(tilesGroup.worldMatrix).applyMatrix4(_invMatrix);
 
-			const distanceToCenter = -_vec.z;
+			const distanceToCenter = -_vec$1.z;
 			camera.near = distanceToCenter - maxRadius * (1 + nearMargin);
 			camera.far = distanceToCenter + 0.1 + maxRadius * farMargin;
 
@@ -6764,24 +6771,24 @@ class GlobeControls extends EnvironmentControls {
 		if (this.globeInertiaFactor !== 0) {
 			// calculate two screen points at 1 pixel apart in our notional resolution so we can stop when the delta is ~ 1 pixel
 			// projected into world space
-			setRaycasterFromCamera(_ray, _vec.set(0, 0, -1), camera);
+			setRaycasterFromCamera(_ray, _vec$1.set(0, 0, -1), camera);
 			_ray.applyMatrix4(camera.viewMatrix);
 			_ray.direction.normalize();
-			_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _vec);
-			_vec.applyMatrix4(camera.worldMatrix);
+			_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _vec$1);
+			_vec$1.applyMatrix4(camera.worldMatrix);
 
-			setRaycasterFromCamera(_ray, _pos.set(pixelThreshold, pixelThreshold, -1), camera);
+			setRaycasterFromCamera(_ray, _pos$1.set(pixelThreshold, pixelThreshold, -1), camera);
 			_ray.applyMatrix4(camera.viewMatrix);
 			_ray.direction.normalize();
-			_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _pos);
-			_pos.applyMatrix4(camera.worldMatrix);
+			_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _pos$1);
+			_pos$1.applyMatrix4(camera.worldMatrix);
 
 			// get implied angle
-			_vec.sub(_center).normalize();
-			_pos.sub(_center).normalize();
+			_vec$1.sub(_center).normalize();
+			_pos$1.sub(_center).normalize();
 
 			this.globeInertiaFactor *= factor;
-			const threshold = _vec.angleTo(_pos) / deltaTime;
+			const threshold = _vec$1.angleTo(_pos$1) / deltaTime;
 			const globeAngle = 2 * Math.acos(globeInertia.w) * this.globeInertiaFactor;
 			if (globeAngle < threshold || !enableDamping) {
 				this.globeInertiaFactor = 0;
@@ -6809,7 +6816,7 @@ class GlobeControls extends EnvironmentControls {
 
 			// apply the rotation
 			camera.worldMatrix.premultiply(_rotMatrix);
-			camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec);
+			camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec$1);
 		}
 	}
 
@@ -6834,7 +6841,7 @@ class GlobeControls extends EnvironmentControls {
 			} = this;
 
 			// reuse cache variables
-			const pivotDir = _pos;
+			const pivotDir = _pos$1;
 			const newPivotDir = _targetRight;
 
 			// get the pointer and ray
@@ -6849,23 +6856,23 @@ class GlobeControls extends EnvironmentControls {
 
 			// construct an ellipsoid that matches a sphere with the radius of the globe so
 			// the drag position matches where the initial click was
-			const pivotRadius = _vec.copy(pivotPoint).applyMatrix4(_invMatrix).getLength();
+			const pivotRadius = _vec$1.copy(pivotPoint).applyMatrix4(_invMatrix).getLength();
 			_ellipsoid.radius.setScalar(pivotRadius);
 
 			// find the hit point and use the closest point on the horizon if we miss
 			if (camera.isPerspectiveCamera) {
-				if (!_ellipsoid.intersectRay(raycaster.ray, _vec)) {
-					closestRaySpherePointFromRotation(raycaster.ray, pivotRadius, _vec);
+				if (!_ellipsoid.intersectRay(raycaster.ray, _vec$1)) {
+					closestRaySpherePointFromRotation(raycaster.ray, pivotRadius, _vec$1);
 				}
 			} else {
-				closestRayEllipsoidSurfacePointEstimate(raycaster.ray, _ellipsoid, _vec);
+				closestRayEllipsoidSurfacePointEstimate(raycaster.ray, _ellipsoid, _vec$1);
 			}
-			_vec.applyMatrix4(tilesGroup.worldMatrix);
+			_vec$1.applyMatrix4(tilesGroup.worldMatrix);
 
 			// get the point directions
 			_center.setFromMatrixPosition(tilesGroup.worldMatrix);
 			pivotDir.subVectors(pivotPoint, _center).normalize();
-			newPivotDir.subVectors(_vec, _center).normalize();
+			newPivotDir.subVectors(_vec$1, _center).normalize();
 
 			// construct the rotation
 			_quaternion$1.setFromUnitVectors(newPivotDir, pivotDir);
@@ -6873,7 +6880,7 @@ class GlobeControls extends EnvironmentControls {
 
 			// apply the rotation
 			camera.worldMatrix.premultiply(_rotMatrix);
-			camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec);
+			camera.worldMatrix.decompose(camera.position, camera.quaternion, _vec$1);
 
 			if (pointerTracker.getMoveDistance() / deltaTime < 2 * window.devicePixelRatio) {
 				this.inertiaStableFrames++;
@@ -6963,8 +6970,8 @@ class GlobeControls extends EnvironmentControls {
 			const clampedScale = Math.max(scale, Math.min(this.getDistanceToCenter() - maxDistance, 0));
 
 			// zoom out directly from the globe center
-			this.getVectorToCenter(_vec).normalize();
-			this.camera.position.addScaledVector(_vec, clampedScale);
+			this.getVectorToCenter(_vec$1).normalize();
+			this.camera.position.addScaledVector(_vec$1, clampedScale);
 			this.camera.updateMatrix();
 
 			this.zoomDelta = 0;
@@ -7027,10 +7034,10 @@ class GlobeControls extends EnvironmentControls {
 		} = this;
 
 		_forward.set(0, 0, -1).transformDirection(camera.worldMatrix).normalize();
-		_vec.setFromMatrixPosition(tilesGroup.worldMatrix).sub(camera.position).normalize();
-		_vec.lerp(_forward, 1 - alpha).normalize();
+		_vec$1.setFromMatrixPosition(tilesGroup.worldMatrix).sub(camera.position).normalize();
+		_vec$1.lerp(_forward, 1 - alpha).normalize();
 
-		_quaternion$1.setFromUnitVectors(_forward, _vec);
+		_quaternion$1.setFromUnitVectors(_forward, _vec$1);
 		camera.quaternion.premultiply(_quaternion$1);
 		camera.updateMatrix();
 	}
@@ -7115,8 +7122,8 @@ class GlobeControls extends EnvironmentControls {
 		_ray.applyMatrix4(_invMatrix);
 
 		// get the closest point to the ray on the globe in the global coordinate frame
-		closestRayEllipsoidSurfacePointEstimate(_ray, ellipsoid, _pos);
-		_pos.applyMatrix4(tilesGroup.worldMatrix);
+		closestRayEllipsoidSurfacePointEstimate(_ray, ellipsoid, _pos$1);
+		_pos$1.applyMatrix4(tilesGroup.worldMatrix);
 
 		// get ortho camera info
 		const orthoHeight = (camera.top - camera.bottom);
@@ -7126,7 +7133,7 @@ class GlobeControls extends EnvironmentControls {
 
 		// ensure we move the camera exactly along the forward vector to avoid shifting
 		// the camera in other directions due to floating point error
-		const dist = _pos.sub(camera.position).dot(_forward);
+		const dist = _pos$1.sub(camera.position).dot(_forward);
 		target.copy(camera.position).addScaledVector(_forward, dist - orthoSize * 4);
 	}
 
@@ -7147,7 +7154,7 @@ class GlobeControls extends EnvironmentControls {
 			_invMatrix.copy(tilesGroup.worldMatrix).invert();
 			_ray.copy(raycaster.ray).applyMatrix4(_invMatrix);
 
-			const point = ellipsoid.intersectRay(_ray, _vec);
+			const point = ellipsoid.intersectRay(_ray, _vec$1);
 			if (point !== null) {
 				return {
 					point: point.clone().applyMatrix4(tilesGroup.worldMatrix)
@@ -7157,6 +7164,848 @@ class GlobeControls extends EnvironmentControls {
 			}
 		} else {
 			return result;
+		}
+	}
+
+}
+
+class LoaderBase {
+
+	constructor() {
+		this.fetchOptions = {};
+		this.workingPath = '';
+	}
+
+	load(...args) {
+		console.warn('Loader: "load" function has been deprecated in favor of "loadAsync".');
+		return this.loadAsync(...args);
+	}
+
+	loadAsync(url) {
+		return fetch(url, this.fetchOptions)
+			.then(res => {
+				if (!res.ok) {
+					throw new Error(`Failed to load file "${url}" with status ${res.status} : ${res.statusText}`);
+				}
+				return res.arrayBuffer();
+			})
+			.then(buffer => {
+				if (this.workingPath === '') {
+					this.workingPath = this.workingPathForURL(url);
+				}
+
+				return this.parse(buffer);
+			});
+	}
+
+	resolveExternalURL(url) {
+		if (/^[^\\/]/.test(url) && !/^http/.test(url)) {
+			return this.workingPath + '/' + url;
+		} else {
+			return url;
+		}
+	}
+
+	workingPathForURL(url) {
+		const splits = url.split(/[\\/]/g);
+		splits.pop();
+		const workingPath = splits.join('/');
+		return workingPath + '/';
+	}
+
+	parse(buffer) {
+		throw new Error('LoaderBase: Parse not implemented.');
+	}
+
+}
+
+const utf8decoder = new TextDecoder();
+
+function arrayToString(array) {
+	return utf8decoder.decode(array);
+}
+
+/**
+ * Structure almost identical to Cesium, also the comments and the names are kept
+ * https://github.com/CesiumGS/cesium/blob/0a69f67b393ba194eefb7254600811c4b712ddc0/packages/engine/Source/Scene/Implicit3DTileContent.js
+ */
+
+function isOctreeSubdivision(tile) {
+	return tile.__implicitRoot.implicitTiling.subdivisionScheme === 'OCTREE';
+}
+
+function getBoundsDivider(tile) {
+	return isOctreeSubdivision(tile) ? 8 : 4;
+}
+
+function getSubtreeCoordinates(tile, parentTile) {
+	if (!parentTile) {
+		return [0, 0, 0];
+	}
+	const x = 2 * parentTile.__x + (tile.__subtreeIdx % 2);
+	const y = 2 * parentTile.__y + (Math.floor(tile.__subtreeIdx / 2) % 2);
+	const z = isOctreeSubdivision(tile) ?
+		2 * parentTile.__z + (Math.floor(tile.__subtreeIdx / 4) % 2) : 0;
+	return [x, y, z];
+}
+
+class SubtreeTile {
+
+	constructor(parentTile, childMortonIndex) {
+		this.parent = parentTile;
+		this.children = [];
+		this.__level = parentTile.__level + 1;
+		this.__implicitRoot = parentTile.__implicitRoot;
+		// Index inside the tree
+		this.__subtreeIdx = childMortonIndex;
+		[this.__x, this.__y, this.__z] = getSubtreeCoordinates(this, parentTile);
+	}
+
+	static copy(tile) {
+		const copyTile = {};
+		copyTile.children = [];
+		copyTile.__level = tile.__level;
+		copyTile.__implicitRoot = tile.__implicitRoot;
+		// Index inside the tree
+		copyTile.__subtreeIdx = tile.__subtreeIdx;
+		[copyTile.__x, copyTile.__y, copyTile.__z] = [tile.__x, tile.__y, tile.__z];
+		copyTile.boundingVolume = tile.boundingVolume;
+		copyTile.geometricError = tile.geometricError;
+		return copyTile;
+	}
+
+}
+
+class SUBTREELoader extends LoaderBase {
+
+	constructor(tile) {
+		super();
+		this.tile = tile;
+		this.rootTile = tile.__implicitRoot;	// The implicit root tile
+		this.workingPath = null;
+	}
+
+	/**
+	 * A helper object for storing the two parts of the subtree binary
+	 *
+	 * @typedef {object} Subtree
+	 * @property {number} version
+	 * @property {JSON} subtreeJson
+	 * @property {ArrayBuffer} subtreeByte
+	 * @private
+	 */
+
+	/**
+	 *
+	 * @param buffer
+	 * @return {Subtree}
+	 */
+	parseBuffer(buffer) {
+		const dataView = new DataView(buffer);
+		let offset = 0;
+		// 16-byte header
+		// 4 bytes
+		const magic = readMagicBytes(dataView);
+		console.assert(magic === 'subt', 'SUBTREELoader: The magic bytes equal "subt".');
+		offset += 4;
+		// 4 bytes
+		const version = dataView.getUint32(offset, true);
+		console.assert(version === 1, 'SUBTREELoader: The version listed in the header is "1".');
+		offset += 4;
+		// From Cesium
+		// Read the bottom 32 bits of the 64-bit byte length.
+		// This is ok for now because:
+		// 1) not all browsers have native 64-bit operations
+		// 2) the data is well under 4GB
+		// 8 bytes
+		const jsonLength = dataView.getUint32(offset, true);
+		offset += 8;
+		// 8 bytes
+		const byteLength = dataView.getUint32(offset, true);
+		offset += 8;
+		const subtreeJson = JSON.parse(arrayToString(new Uint8Array(buffer, offset, jsonLength)));
+		offset += jsonLength;
+		const subtreeByte = buffer.slice(offset, offset + byteLength);
+		return {
+			version,
+			subtreeJson,
+			subtreeByte
+		};
+	}
+
+
+	async parse(buffer) {
+		// todo here : handle json
+		const subtree = this.parseBuffer(buffer);
+		const subtreeJson = subtree.subtreeJson;
+
+		// TODO Handle metadata
+		/*
+		 const subtreeMetadata = subtreeJson.subtreeMetadata;
+		 subtree._metadata = subtreeMetadata;
+		*/
+
+		/*
+			Tile availability indicates which tiles exist within the subtree
+			Content availability indicates which tiles have associated content resources
+			Child subtree availability indicates what subtrees are reachable from this subtree
+		*/
+
+		// After identifying how availability is stored, put the results in this new array for consistent processing later
+		subtreeJson.contentAvailabilityHeaders = [].concat(subtreeJson.contentAvailability);
+		const bufferHeaders = this.preprocessBuffers(subtreeJson.buffers);
+		const bufferViewHeaders = this.preprocessBufferViews(
+			subtreeJson.bufferViews,
+			bufferHeaders
+		);
+
+		// Buffers and buffer views are inactive until explicitly marked active.
+		// This way we can avoid fetching buffers that will not be used.
+		this.markActiveBufferViews(subtreeJson, bufferViewHeaders);
+
+		// Await the active buffers. If a buffer is external (isExternal === true),
+		// fetch it from its URI.
+		const buffersU8 = await this.requestActiveBuffers(
+			bufferHeaders,
+			subtree.subtreeByte
+		);
+		const bufferViewsU8 = this.parseActiveBufferViews(bufferViewHeaders, buffersU8);
+		this.parseAvailability(subtree, subtreeJson, bufferViewsU8);
+		this.expandSubtree(this.tile, subtree);
+	}
+
+	/**
+	 * Determine which buffer views need to be loaded into memory. This includes:
+	 *
+	 * <ul>
+	 * <li>The tile availability bitstream (if a bitstream is defined)</li>
+	 * <li>The content availability bitstream(s) (if a bitstream is defined)</li>
+	 * <li>The child subtree availability bitstream (if a bitstream is defined)</li>
+	 * </ul>
+	 *
+	 * <p>
+	 * This function modifies the buffer view headers' isActive flags in place.
+	 * </p>
+	 *
+	 * @param {JSON} subtreeJson The JSON chunk from the subtree
+	 * @param {BufferViewHeader[]} bufferViewHeaders The preprocessed buffer view headers
+	 * @private
+	 */
+	markActiveBufferViews(subtreeJson, bufferViewHeaders) {
+		let header;
+		const tileAvailabilityHeader = subtreeJson.tileAvailability;
+		// Check for bitstream first, which is part of the current schema.
+		// bufferView is the name of the bitstream from an older schema.
+		if (!isNaN(tileAvailabilityHeader.bitstream)) {
+			header = bufferViewHeaders[tileAvailabilityHeader.bitstream];
+		} else if (!isNaN(tileAvailabilityHeader.bufferView)) {
+			header = bufferViewHeaders[tileAvailabilityHeader.bufferView];
+		}
+		if (header) {
+			header.isActive = true;
+			header.bufferHeader.isActive = true;
+		}
+		const contentAvailabilityHeaders = subtreeJson.contentAvailabilityHeaders;
+		for (let i = 0; i < contentAvailabilityHeaders.length; i++) {
+			header = undefined;
+			if (!isNaN(contentAvailabilityHeaders[i].bitstream)) {
+				header = bufferViewHeaders[contentAvailabilityHeaders[i].bitstream];
+			} else if (!isNaN(contentAvailabilityHeaders[i].bufferView)) {
+				header = bufferViewHeaders[contentAvailabilityHeaders[i].bufferView];
+			}
+			if (header) {
+				header.isActive = true;
+				header.bufferHeader.isActive = true;
+			}
+		}
+		header = undefined;
+		const childSubtreeAvailabilityHeader = subtreeJson.childSubtreeAvailability;
+		if (!isNaN(childSubtreeAvailabilityHeader.bitstream)) {
+			header = bufferViewHeaders[childSubtreeAvailabilityHeader.bitstream];
+		} else if (!isNaN(childSubtreeAvailabilityHeader.bufferView)) {
+			header = bufferViewHeaders[childSubtreeAvailabilityHeader.bufferView];
+		}
+		if (header) {
+			header.isActive = true;
+			header.bufferHeader.isActive = true;
+		}
+	}
+
+	/**
+	 * Go through the list of buffers and gather all the active ones into
+	 * a dictionary.
+	 * <p>
+	 * The results are put into a dictionary object. The keys are indices of
+	 * buffers, and the values are Uint8Arrays of the contents. Only buffers
+	 * marked with the isActive flag are fetched.
+	 * </p>
+	 * <p>
+	 * The internal buffer (the subtree's binary chunk) is also stored in this
+	 * dictionary if it is marked active.
+	 * </p>
+	 * @param {BufferHeader[]} bufferHeaders The preprocessed buffer headers
+	 * @param {ArrayBuffer} internalBuffer The binary chunk of the subtree file
+	 * @returns {object} buffersU8 A dictionary of buffer index to a Uint8Array of its contents.
+	 * @private
+	 */
+	async requestActiveBuffers(bufferHeaders, internalBuffer) {
+		const promises = [];
+		for (let i = 0; i < bufferHeaders.length; i++) {
+			const bufferHeader = bufferHeaders[i];
+			// If the buffer is not active, resolve with undefined.
+			if (!bufferHeader.isActive) {
+				promises.push(Promise.resolve());
+			} else if (bufferHeader.isExternal) {
+				// Get the absolute URI of the external buffer.
+				const url = this.parseImplicitURIBuffer(
+					this.tile,
+					this.rootTile.implicitTiling.subtrees.uri,
+					bufferHeader.uri
+				);
+
+				const fetchPromise = fetch(url, this.fetchOptions)
+					.then(response => {
+						if (!response.ok) {
+							throw new Error(`SUBTREELoader: Failed to load external buffer from ${bufferHeader.uri} with error code ${response.status}.`);
+						}
+						return response.arrayBuffer();
+					})
+					.then(arrayBuffer => new Uint8Array(arrayBuffer));
+
+				promises.push(fetchPromise);
+			} else {
+				promises.push(Promise.resolve(new Uint8Array(internalBuffer)));
+			}
+		}
+		const bufferResults = await Promise.all(promises);
+		const buffersU8 = {};
+		for (let i = 0; i < bufferResults.length; i++) {
+			const result = bufferResults[i];
+			if (result) {
+				buffersU8[i] = result;
+			}
+		}
+		return buffersU8;
+	}
+
+	/**
+	 * Go through the list of buffer views, and if they are marked as active,
+	 * extract a subarray from one of the active buffers.
+	 *
+	 * @param {BufferViewHeader[]} bufferViewHeaders
+	 * @param {object} buffersU8 A dictionary of buffer index to a Uint8Array of its contents.
+	 * @returns {object} A dictionary of buffer view index to a Uint8Array of its contents.
+	 * @private
+	 */
+	parseActiveBufferViews(bufferViewHeaders, buffersU8) {
+		const bufferViewsU8 = {};
+		for (let i = 0; i < bufferViewHeaders.length; i++) {
+			const bufferViewHeader = bufferViewHeaders[i];
+			if (!bufferViewHeader.isActive) {
+				continue;
+			}
+			const start = bufferViewHeader.byteOffset;
+			const end = start + bufferViewHeader.byteLength;
+			const buffer = buffersU8[bufferViewHeader.buffer];
+			bufferViewsU8[i] = buffer.slice(start, end);
+		}
+		return bufferViewsU8;
+	}
+
+	/**
+	 * A buffer header is the JSON header from the subtree JSON chunk plus
+	 * a couple extra boolean flags for easy reference.
+	 *
+	 * Buffers are assumed inactive until explicitly marked active. This is used
+	 * to avoid fetching unneeded buffers.
+	 *
+	 * @typedef {object} BufferHeader
+	 * @property {boolean} isActive Whether this buffer is currently used.
+	 * @property {string} [uri] The URI of the buffer (external buffers only)
+	 * @property {number} byteLength The byte length of the buffer, including any padding contained within.
+	 * @private
+	 */
+
+	/**
+	 * Iterate over the list of buffers from the subtree JSON and add the isActive field for easier parsing later.
+	 * This modifies the objects in place.
+	 * @param {Object[]} [bufferHeaders=[]] The JSON from subtreeJson.buffers.
+	 * @returns {BufferHeader[]} The same array of headers with additional fields.
+	 * @private
+	 */
+	preprocessBuffers(bufferHeaders = []) {
+		for (let i = 0; i < bufferHeaders.length; i++) {
+			const bufferHeader = bufferHeaders[i];
+			bufferHeader.isActive = false;
+			bufferHeader.isExternal = !!bufferHeader.uri;
+		}
+		return bufferHeaders;
+	}
+
+	/**
+	 * A buffer view header is the JSON header from the subtree JSON chunk plus
+	 * the isActive flag and a reference to the header for the underlying buffer.
+	 *
+	 * @typedef {object} BufferViewHeader
+	 * @property {BufferHeader} bufferHeader A reference to the header for the underlying buffer
+	 * @property {boolean} isActive Whether this bufferView is currently used.
+	 * @property {number} buffer The index of the underlying buffer.
+	 * @property {number} byteOffset The start byte of the bufferView within the buffer.
+	 * @property {number} byteLength The length of the bufferView. No padding is included in this length.
+	 * @private
+	 */
+
+	/**
+	 * Iterate the list of buffer views from the subtree JSON and add the
+	 * isActive flag. Also save a reference to the bufferHeader.
+	 *
+	 * @param {Object[]} [bufferViewHeaders=[]] The JSON from subtree.bufferViews.
+	 * @param {BufferHeader[]} bufferHeaders The preprocessed buffer headers.
+	 * @returns {BufferViewHeader[]} The same array of bufferView headers with additional fields.
+	 * @private
+	 */
+	preprocessBufferViews(bufferViewHeaders = [], bufferHeaders) {
+		for (let i = 0; i < bufferViewHeaders.length; i++) {
+			const bufferViewHeader = bufferViewHeaders[i];
+			bufferViewHeader.bufferHeader = bufferHeaders[bufferViewHeader.buffer];
+			bufferViewHeader.isActive = false;
+			// Keep the external flag for potential use in requestActiveBuffers
+			bufferViewHeader.isExternal = bufferViewHeader.bufferHeader.isExternal;
+		}
+		return bufferViewHeaders;
+	}
+
+	/**
+	 * Parse the three availability bitstreams and store them in the subtree.
+	 *
+	 * @param {Subtree} subtree The subtree to modify.
+	 * @param {Object} subtreeJson The subtree JSON.
+	 * @param {Object} bufferViewsU8 A dictionary of buffer view index to a Uint8Array of its contents.
+	 * @private
+	 */
+	parseAvailability(subtree, subtreeJson, bufferViewsU8) {
+		const branchingFactor = getBoundsDivider(this.rootTile);
+		const subtreeLevels = this.rootTile.implicitTiling.subtreeLevels;
+		const tileAvailabilityBits =
+			(Math.pow(branchingFactor, subtreeLevels) - 1) / (branchingFactor - 1);
+		const childSubtreeBits = Math.pow(branchingFactor, subtreeLevels);
+		subtree._tileAvailability = this.parseAvailabilityBitstream(
+			subtreeJson.tileAvailability,
+			bufferViewsU8,
+			tileAvailabilityBits
+		);
+		subtree._contentAvailabilityBitstreams = [];
+		for (let i = 0; i < subtreeJson.contentAvailabilityHeaders.length; i++) {
+			const bitstream = this.parseAvailabilityBitstream(
+				subtreeJson.contentAvailabilityHeaders[i],
+				bufferViewsU8,
+				// content availability has the same length as tile availability.
+				tileAvailabilityBits
+			);
+			subtree._contentAvailabilityBitstreams.push(bitstream);
+		}
+		subtree._childSubtreeAvailability = this.parseAvailabilityBitstream(
+			subtreeJson.childSubtreeAvailability,
+			bufferViewsU8,
+			childSubtreeBits
+		);
+	}
+
+	/**
+	 * Given the JSON describing an availability bitstream, turn it into an
+	 * in-memory representation using an object. This handles bitstreams from a bufferView.
+	 *
+	 * @param {Object} availabilityJson A JSON object representing the availability.
+	 * @param {Object} bufferViewsU8 A dictionary of buffer view index to its Uint8Array contents.
+	 * @param {number} lengthBits The length of the availability bitstream in bits.
+	 * @returns {object}
+	 * @private
+	 */
+	parseAvailabilityBitstream(
+		availabilityJson,
+		bufferViewsU8,
+		lengthBits
+	) {
+		if (!isNaN(availabilityJson.constant)) {
+			return {
+				constant: Boolean(availabilityJson.constant),
+				lengthBits: lengthBits
+			};
+		}
+		let bufferView;
+		// Check for bitstream first, which is part of the current schema.
+		// bufferView is the name of the bitstream from an older schema.
+		if (!isNaN(availabilityJson.bitstream)) {
+			bufferView = bufferViewsU8[availabilityJson.bitstream];
+		} else if (!isNaN(availabilityJson.bufferView)) {
+			bufferView = bufferViewsU8[availabilityJson.bufferView];
+		}
+		return {
+			bitstream: bufferView,
+			lengthBits: lengthBits
+		};
+	}
+
+	/**
+	 * Expand a single subtree tile. This transcodes the subtree into
+	 * a tree of {@link SubtreeTile}. The root of this tree is stored in
+	 * the placeholder tile's children array. This method also creates
+	 * tiles for the child subtrees to be lazily expanded as needed.
+	 *
+	 * @param {Object | SubtreeTile} subtreeRoot The first node of the subtree.
+	 * @param {Subtree} subtree The parsed subtree.
+	 * @private
+	 */
+	expandSubtree(subtreeRoot, subtree) {
+		// TODO If multiple contents were supported then this tile could contain both renderable and un renderable content.
+		const contentTile = SubtreeTile.copy(subtreeRoot);
+		// If the subtree root tile has content, then create a placeholder child with cloned parameters
+		// Todo Multiple contents not handled, keep the first content found
+		for (let i = 0; subtree && i < subtree._contentAvailabilityBitstreams.length; i++) {
+			if (subtree && this.getBit(subtree._contentAvailabilityBitstreams[i], 0)) {
+				// Create a child holding the content uri, this child is similar to its parent and doesn't have any children.
+				contentTile.content = { uri: this.parseImplicitURI(subtreeRoot, this.rootTile.content.uri) };
+				break;
+			}
+		}
+		subtreeRoot.children.push(contentTile);
+		// Creating each leaf inside the current subtree.
+		const bottomRow = this.transcodeSubtreeTiles(
+			contentTile,
+			subtree
+		);
+		// For each child subtree, create a tile containing the uri of the next subtree to fetch.
+		const childSubtrees = this.listChildSubtrees(subtree, bottomRow);
+		for (let i = 0; i < childSubtrees.length; i++) {
+			const subtreeLocator = childSubtrees[i];
+			const leafTile = subtreeLocator.tile;
+			const subtreeTile = this.deriveChildTile(
+				null,
+				leafTile,
+				null,
+				subtreeLocator.childMortonIndex
+			);
+			// Assign subtree uri as content.
+			subtreeTile.content = { uri: this.parseImplicitURI(subtreeTile, this.rootTile.implicitTiling.subtrees.uri) };
+			leafTile.children.push(subtreeTile);
+		}
+	}
+
+	/**
+	 * Transcode the implicitly defined tiles within this subtree and generate
+	 * explicit {@link SubtreeTile} objects. This function only transcodes tiles,
+	 * child subtrees are handled separately.
+	 *
+	 * @param {Object | SubtreeTile} subtreeRoot The root of the current subtree.
+	 * @param {Subtree} subtree The subtree to get availability information.
+	 * @returns {Array} The bottom row of transcoded tiles. This is helpful for processing child subtrees.
+	 * @private
+	 */
+	transcodeSubtreeTiles(subtreeRoot, subtree) {
+		// Sliding window over the levels of the tree.
+		// Each row is branchingFactor * length of previous row.
+		// Tiles within a row are ordered by Morton index.
+		let parentRow = [subtreeRoot];
+		let currentRow = [];
+		for (let level = 1; level < this.rootTile.implicitTiling.subtreeLevels; level++) {
+			const branchingFactor = getBoundsDivider(this.rootTile);
+			const levelOffset = (Math.pow(branchingFactor, level) - 1) / (branchingFactor - 1);
+			const numberOfChildren = branchingFactor * parentRow.length;
+			for (let childMortonIndex = 0; childMortonIndex < numberOfChildren; childMortonIndex++) {
+				const childBitIndex = levelOffset + childMortonIndex;
+				const parentMortonIndex = childMortonIndex >> Math.log2(branchingFactor);
+				const parentTile = parentRow[parentMortonIndex];
+				// Check if tile is available.
+				if (!this.getBit(subtree._tileAvailability, childBitIndex)) {
+					currentRow.push(undefined);
+					continue;
+				}
+				// Create a tile and add it as a child.
+				const childTile = this.deriveChildTile(
+					subtree,
+					parentTile,
+					childBitIndex,
+					childMortonIndex
+				);
+				parentTile.children.push(childTile);
+				currentRow.push(childTile);
+			}
+			parentRow = currentRow;
+			currentRow = [];
+		}
+		return parentRow;
+	}
+
+	/**
+	 * Given a parent tile and information about which child to create, derive
+	 * the properties of the child tile implicitly.
+	 * <p>
+	 * This creates a real tile for rendering.
+	 * </p>
+	 *
+	 * @param {Subtree} subtree The subtree the child tile belongs to.
+	 * @param {Object | SubtreeTile} parentTile The parent of the new child tile.
+	 * @param {number} childBitIndex The index of the child tile within the tile's availability information.
+	 * @param {number} childMortonIndex The morton index of the child tile relative to its parent.
+	 * @returns {SubtreeTile} The new child tile.
+	 * @private
+	 */
+	deriveChildTile(
+		subtree,
+		parentTile,
+		childBitIndex,
+		childMortonIndex
+	) {
+		const subtreeTile = new SubtreeTile(parentTile, childMortonIndex);
+		subtreeTile.boundingVolume = this.getTileBoundingVolume(subtreeTile);
+		subtreeTile.geometricError = this.getGeometricError(subtreeTile);
+		// Todo Multiple contents not handled, keep the first found content.
+		for (let i = 0; subtree && i < subtree._contentAvailabilityBitstreams.length; i++) {
+			if (subtree && this.getBit(subtree._contentAvailabilityBitstreams[i], childBitIndex)) {
+				subtreeTile.content = { uri: this.parseImplicitURI(subtreeTile, this.rootTile.content.uri) };
+				break;
+			}
+		}
+		return subtreeTile;
+	}
+
+	/**
+	 * Get a bit from the bitstream as a Boolean. If the bitstream
+	 * is a constant, the constant value is returned instead.
+	 *
+	 * @param {ParsedBitstream} object
+	 * @param {number} index The integer index of the bit.
+	 * @returns {boolean} The value of the bit.
+	 * @private
+	 */
+	getBit(object, index) {
+		if (index < 0 || index >= object.lengthBits) {
+			throw new Error('Bit index out of bounds.');
+		}
+		if (object.constant !== undefined) {
+			return object.constant;
+		}
+		// byteIndex is floor(index / 8)
+		const byteIndex = index >> 3;
+		const bitIndex = index % 8;
+		return ((new Uint8Array(object.bitstream)[byteIndex] >> bitIndex) & 1) === 1;
+	}
+
+	/**
+	 * //TODO Adapt for Sphere
+	 * To maintain numerical stability during this subdivision process,
+	 * the actual bounding volumes should not be computed progressively by subdividing a non-root tile volume.
+	 * Instead, the exact bounding volumes are computed directly for a given level.
+	 * @param {Object | SubtreeTile} tile
+	 * @return {Object} object containing the bounding volume.
+	 */
+	getTileBoundingVolume(tile) {
+		const boundingVolume = {};
+		if (this.rootTile.boundingVolume.region) {
+			const region = [...this.rootTile.boundingVolume.region];
+			const minX = region[0];
+			const maxX = region[2];
+			const minY = region[1];
+			const maxY = region[3];
+			const sizeX = (maxX - minX) / Math.pow(2, tile.__level);
+			const sizeY = (maxY - minY) / Math.pow(2, tile.__level);
+			region[0] = minX + sizeX * tile.__x;	// west
+			region[2] = minX + sizeX * (tile.__x + 1);	// east
+			region[1] = minY + sizeY * tile.__y;	// south
+			region[3] = minY + sizeY * (tile.__y + 1);	// north
+			for (let k = 0; k < 4; k++) {
+				const coord = region[k];
+				if (coord < -Math.PI) {
+					region[k] += 2 * Math.PI;
+				} else if (coord > Math.PI) {
+					region[k] -= 2 * Math.PI;
+				}
+			}
+			// Also divide the height in the case of octree.
+			if (isOctreeSubdivision(tile)) {
+				const minZ = region[4];
+				const maxZ = region[5];
+				const sizeZ = (maxZ - minZ) / Math.pow(2, tile.__level);
+				region[4] = minZ + sizeZ * tile.__z;	// minimum height
+				region[5] = minZ + sizeZ * (tile.__z + 1);	// maximum height
+			}
+			boundingVolume.region = region;
+		}
+		if (this.rootTile.boundingVolume.box) {
+			// 0-2: center of the box
+			// 3-5: x axis direction and half length
+			// 6-8: y axis direction and half length
+			// 9-11: z axis direction and half length
+			const box = [...this.rootTile.boundingVolume.box];
+			const cellSteps = 2 ** tile.__level - 1;
+			const scale = Math.pow(2, -tile.__level);
+			const axisNumber = isOctreeSubdivision(tile) ? 3 : 2;
+			for (let i = 0; i < axisNumber; i++) {
+				// scale the bounds axes
+				box[3 + i * 3 + 0] *= scale;
+				box[3 + i * 3 + 1] *= scale;
+				box[3 + i * 3 + 2] *= scale;
+				// axis vector
+				const x = box[3 + i * 3 + 0];
+				const y = box[3 + i * 3 + 1];
+				const z = box[3 + i * 3 + 2];
+				// adjust the center by the x, y and z axes
+				const axisOffset = i === 0 ? tile.__x : (i === 1 ? tile.__y : tile.__z);
+				box[0] += 2 * x * (-0.5 * cellSteps + axisOffset);
+				box[1] += 2 * y * (-0.5 * cellSteps + axisOffset);
+				box[2] += 2 * z * (-0.5 * cellSteps + axisOffset);
+			}
+			boundingVolume.box = box;
+		}
+		return boundingVolume;
+	}
+
+	/**
+	 * Each child’s geometricError is half of its parent’s geometricError.
+	 * @param {Object | SubtreeTile} tile
+	 * @return {number}
+	 */
+	getGeometricError(tile) {
+		return this.rootTile.geometricError / Math.pow(2, tile.__level);
+	}
+
+	/**
+	 * Determine what child subtrees exist and return a list of information.
+	 *
+	 * @param {Object} subtree The subtree for looking up availability.
+	 * @param {Array} bottomRow The bottom row of tiles in a transcoded subtree.
+	 * @returns {[]} A list of identifiers for the child subtrees.
+	 * @private
+	 */
+	listChildSubtrees(subtree, bottomRow) {
+		const results = [];
+		const branchingFactor = getBoundsDivider(this.rootTile);
+		for (let i = 0; i < bottomRow.length; i++) {
+			const leafTile = bottomRow[i];
+			if (leafTile === undefined) {
+				continue;
+			}
+			for (let j = 0; j < branchingFactor; j++) {
+				const index = i * branchingFactor + j;
+				if (this.getBit(subtree._childSubtreeAvailability, index)) {
+					results.push({
+						tile: leafTile,
+						childMortonIndex: index
+					});
+				}
+			}
+		}
+		return results;
+	}
+	/**
+	 * Replaces placeholder tokens in a URI template with the corresponding tile properties.
+	 *
+	 * The URI template should contain the tokens:
+	 * - `{level}` for the tile's subdivision level.
+	 * - `{x}` for the tile's x-coordinate.
+	 * - `{y}` for the tile's y-coordinate.
+	 * - `{z}` for the tile's z-coordinate.
+	 *
+	 * @param {Object} tile - The tile object containing properties __level, __x, __y, and __z.
+	 * @param {string} uri - The URI template string with placeholders.
+	 * @returns {string} The URI with placeholders replaced by the tile's properties.
+	 */
+	parseImplicitURI(tile, uri) {
+		uri = uri.replace('{level}', tile.__level);
+		uri = uri.replace('{x}', tile.__x);
+		uri = uri.replace('{y}', tile.__y);
+		uri = uri.replace('{z}', tile.__z);
+		return uri;
+	}
+
+	/**
+	 * Generates the full external buffer URI for a tile by combining an implicit URI with a buffer URI.
+	 *
+	 * First, it parses the implicit URI using the tile properties and the provided template. Then, it creates a new URL
+	 * relative to the tile's base path, removes the last path segment, and appends the buffer URI.
+	 *
+	 * @param {Object} tile - The tile object that contains properties:
+	 *   - __level: the subdivision level,
+	 *   - __x, __y, __z: the tile coordinates,
+	 * @param {string} uri - The URI template string with placeholders for the tile (e.g., `{level}`, `{x}`, `{y}`, `{z}`).
+	 * @param {string} bufUri - The buffer file name to append (e.g., "0_1.bin").
+	 * @returns {string} The full external buffer URI.
+	 */
+	parseImplicitURIBuffer(tile, uri, bufUri) {
+		// Generate the base tile URI by replacing placeholders
+		const subUri = this.parseImplicitURI(tile, uri);
+
+		// Create a URL object relative to the tile's base path
+		const url = new URL(subUri, this.workingPath + '/');
+
+		// Remove the last path segment
+		url.pathname = url.pathname.substring(0, url.pathname.lastIndexOf('/'));
+
+		// Construct the final URL with the buffer URI appended
+		return new URL(url.pathname + '/' + bufUri, this.workingPath + '/').toString();
+	}
+
+}
+
+class ImplicitTilingPlugin {
+
+	constructor() {
+		this.name = 'IMPLICIT_TILING_PLUGIN';
+	}
+
+	init(tiles) {
+		this.tiles = tiles;
+	}
+
+	preprocessNode(tile, tileSetDir, parentTile) {
+		if (tile.implicitTiling) {
+			tile.__hasUnrenderableContent = true;
+			tile.__hasRenderableContent = false;
+
+			// Declare some properties
+			tile.__subtreeIdx = 0;	// Idx of the tile in its subtree
+			tile.__implicitRoot = tile;	// Keep this tile as an Implicit Root Tile
+
+			// Coords of the tile
+			tile.__x = 0;
+			tile.__y = 0;
+			tile.__z = 0;
+			tile.__level = 0;
+		} else if (/.subtree$/i.test(tile.content?.uri)) {
+			// Handling content uri pointing to a subtree file
+			tile.__hasUnrenderableContent = true;
+			tile.__hasRenderableContent = false;
+		}
+	}
+
+	parseTile(buffer, tile, extension) {
+		if (/^subtree$/i.test(extension)) {
+			const loader = new SUBTREELoader(tile);
+			loader.workingPath = tile.__basePath;
+			loader.fetchOptions = this.tiles.fetchOptions;
+			return loader.parse(buffer);
+		}
+	}
+
+	preprocessURL(url, tile) {
+		if (tile && tile.implicitTiling) {
+			const implicitUri = tile.implicitTiling.subtrees.uri
+				.replace('{level}', tile.__level)
+				.replace('{x}', tile.__x)
+				.replace('{y}', tile.__y)
+				.replace('{z}', tile.__z);
+
+			return new URL(implicitUri, tile.__basePath + '/').toString();
+		}
+
+		return url;
+	}
+
+	disposeTile(tile) {
+		if (/.subtree$/i.test(tile.content?.uri)) {
+			// TODO: ideally the plugin doesn't need to know about children being processed
+			tile.children.length = 0;
+			tile.__childrenProcessed = 0;
 		}
 	}
 
@@ -7970,6 +8819,1597 @@ function getSessionToken(root) {
 	return sessionToken;
 }
 
+function zigZagDecode(value) {
+	return (value >> 1) ^ (-(value & 1));
+}
+
+class QuantizedMeshLoaderBase extends LoaderBase {
+
+	constructor(...args) {
+		super(...args);
+
+		this.fetchOptions.header = {
+			Accept: 'application/vnd.quantized-mesh,application/octet-stream;q=0.9'
+		};
+	}
+
+	loadAsync(...args) {
+		const { fetchOptions } = this;
+		fetchOptions.header = fetchOptions.header || {};
+		fetchOptions.header['Accept'] = 'application/vnd.quantized-mesh,application/octet-stream;q=0.9';
+		fetchOptions.header['Accept'] += ';extensions=octvertexnormals-watermask-metadata';
+
+		return super.loadAsync(...args);
+	}
+
+	parse(buffer) {
+		let pointer = 0;
+		const view = new DataView(buffer);
+		const readFloat64 = () => {
+			const result = view.getFloat64(pointer, true);
+			pointer += 8;
+			return result;
+		};
+
+		const readFloat32 = () => {
+			const result = view.getFloat32(pointer, true);
+			pointer += 4;
+			return result;
+		};
+
+		const readInt = () => {
+			const result = view.getUint32(pointer, true);
+			pointer += 4;
+			return result;
+		};
+
+		const readByte = () => {
+			const result = view.getUint8(pointer);
+			pointer += 1;
+			return result;
+		};
+
+		const readBuffer = (count, type) => {
+			const result = new type(buffer, pointer, count); // eslint-disable-line new-cap
+			pointer += count * type.BYTES_PER_ELEMENT;
+			return result;
+		};
+
+		// extract header
+		const header = {
+			center: [readFloat64(), readFloat64(), readFloat64()],
+			minHeight: readFloat32(),
+			maxHeight: readFloat32(),
+			sphereCenter: [readFloat64(), readFloat64(), readFloat64()],
+			sphereRadius: readFloat64(),
+			horizonOcclusionPoint: [readFloat64(), readFloat64(), readFloat64()]
+		};
+
+		// extract vertex data
+		const vertexCount = readInt();
+		const uBuffer = readBuffer(vertexCount, Uint16Array);
+		const vBuffer = readBuffer(vertexCount, Uint16Array);
+		const hBuffer = readBuffer(vertexCount, Uint16Array);
+
+		const uResult = new Float32Array(vertexCount);
+		const vResult = new Float32Array(vertexCount);
+		const hResult = new Float32Array(vertexCount);
+
+		// decode vertex data
+		let u = 0;
+		let v = 0;
+		let h = 0;
+		const MAX_VALUE = 32767;
+		for (let i = 0; i < vertexCount; ++i) {
+			u += zigZagDecode(uBuffer[i]);
+			v += zigZagDecode(vBuffer[i]);
+			h += zigZagDecode(hBuffer[i]);
+
+			uResult[i] = u / MAX_VALUE;
+			vResult[i] = v / MAX_VALUE;
+			hResult[i] = h / MAX_VALUE;
+		}
+
+		// align pointer for index data
+		const is32 = vertexCount > 65536;
+		const bufferType = is32 ? Uint32Array : Uint16Array;
+		if (is32) {
+			pointer = Math.ceil(pointer / 4) * 4;
+		} else {
+			pointer = Math.ceil(pointer / 2) * 2;
+		}
+
+		// extract index data
+		const triangleCount = readInt();
+		const indices = readBuffer(triangleCount * 3, bufferType);
+
+		// decode the index data
+		let highest = 0;
+		for (let i = 0; i < indices.length; ++i) {
+			const code = indices[i];
+			indices[i] = highest - code;
+			if (code === 0) {
+				++highest;
+			}
+		}
+
+		// sort functions for the edges since they are not pre-sorted
+		const vSort = (a, b) => vResult[b] - vResult[a];
+		const vSortReverse = (a, b) => -vSort(a, b);
+
+		const uSort = (a, b) => uResult[a] - uResult[b];
+		const uSortReverse = (a, b) => -uSort(a, b);
+
+		// get edge indices
+		const westVertexCount = readInt();
+		const westIndices = readBuffer(westVertexCount, bufferType);
+		westIndices.sort(vSort);
+
+		const southVertexCount = readInt();
+		const southIndices = readBuffer(southVertexCount, bufferType);
+		southIndices.sort(uSort);
+
+		const eastVertexCount = readInt();
+		const eastIndices = readBuffer(eastVertexCount, bufferType);
+		eastIndices.sort(vSortReverse);
+
+		const northVertexCount = readInt();
+		const northIndices = readBuffer(northVertexCount, bufferType);
+		northIndices.sort(uSortReverse);
+
+		const edgeIndices = {
+			westIndices,
+			southIndices,
+			eastIndices,
+			northIndices
+		};
+
+		// parse extensions
+		const extensions = {};
+		while (pointer < view.byteLength) {
+			const extensionId = readByte();
+			const extensionLength = readInt();
+
+			if (extensionId === 1) {
+				// oct encoded normals
+				const xy = readBuffer(vertexCount * 2, Uint8Array);
+				const normals = new Float32Array(vertexCount * 3);
+
+				// https://github.com/CesiumGS/cesium/blob/baaabaa49058067c855ad050be73a9cdfe9b6ac7/packages/engine/Source/Core/AttributeCompression.js#L119-L140
+				for (let i = 0; i < vertexCount; i++) {
+					let x = (xy[2 * i + 0] / 255) * 2 - 1;
+					let y = (xy[2 * i + 1] / 255) * 2 - 1;
+					const z = 1.0 - (Math.abs(x) + Math.abs(y));
+
+					if (z < 0.0) {
+						const oldVX = x;
+						x = (1.0 - Math.abs(y)) * signNotZero(oldVX);
+						y = (1.0 - Math.abs(oldVX)) * signNotZero(y);
+					}
+
+					const len = Math.sqrt(x * x + y * y + z * z);
+					normals[3 * i + 0] = x / len;
+					normals[3 * i + 1] = y / len;
+					normals[3 * i + 2] = z / len;
+				}
+
+				extensions['octvertexnormals'] = {
+					extensionId,
+					normals
+				};
+			} else if (extensionId === 2) {
+				// water mask
+				const size = extensionLength === 1 ? 1 : 256;
+				const mask = readBuffer(size * size, Uint8Array);
+				extensions['watermask'] = {
+					extensionId,
+					mask,
+					size
+				};
+			} else if (extensionId === 4) {
+				// metadata
+				const jsonLength = readInt();
+				const jsonBuffer = readBuffer(jsonLength, Uint8Array);
+				const json = new TextDecoder().decode(jsonBuffer);
+				extensions['metadata'] = {
+					extensionId,
+					json: JSON.parse(json)
+				};
+			}
+		}
+
+		return {
+			header,
+			indices,
+			vertexData: {
+				u: uResult,
+				v: vResult,
+				height: hResult
+			},
+			edgeIndices,
+			extensions
+		};
+	}
+
+}
+
+function signNotZero(v) {
+	return v < 0.0 ? -1 : 1.0;
+}
+
+const _norm = /* @__PURE__ */ new Vector3();
+const _tri = /* @__PURE__ */ new Triangle();
+const _uvh = /* @__PURE__ */ new Vector3();
+const _pos = /* @__PURE__ */ new Vector3();
+
+class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
+
+	constructor(manager = DefaultLoadingManager) {
+		super();
+		this.manager = manager;
+		this.ellipsoid = new Ellipsoid();
+		this.skirtLength = 1000;
+		this.smoothSkirtNormals = true;
+		this.solid = false;
+
+		// set the range of the tile
+		this.minLat = -Math.PI / 2;
+		this.maxLat = Math.PI / 2;
+		this.minLon = -Math.PI;
+		this.maxLon = Math.PI;
+	}
+
+	parse(buffer) {
+		const {
+			ellipsoid,
+			solid,
+			skirtLength,
+			smoothSkirtNormals,
+
+			minLat,
+			maxLat,
+			minLon,
+			maxLon
+		} = this;
+
+		const {
+			header,
+			indices,
+			vertexData,
+			edgeIndices,
+			extensions
+		} = super.parse(buffer);
+
+		const geometry = new Geometry();
+		const material = new PBRMaterial();
+		material.roughness = 1.0;
+		material.metalness = 0.0;
+		const mesh = new Mesh(geometry, material);
+		mesh.position.set(...header.center);
+
+		const includeNormals = 'octvertexnormals' in extensions;
+		const vertexCount = vertexData.u.length;
+		const positions = [];
+		const uvs = [];
+		const indexArr = [];
+		const normals = [];
+		let groupOffset = 0;
+		let materialIndex = 0;
+
+		// construct terrain
+		for (let i = 0; i < vertexCount; i++) {
+			readUVHeight(i, _uvh);
+			readPosition(_uvh.x, _uvh.y, _uvh.z, _pos);
+
+			uvs.push(_uvh.x, _uvh.y);
+			positions.push(..._pos);
+		}
+
+		for (let i = 0, l = indices.length; i < l; i++) {
+			indexArr.push(indices[i]);
+		}
+
+		if (includeNormals) {
+			const extNormals = extensions['octvertexnormals'].normals;
+			for (let i = 0, l = extNormals.length; i < l; i++) {
+				normals.push(extNormals[i]);
+			}
+		}
+
+		// add material group
+		geometry.addGroup(groupOffset, indices.length, materialIndex);
+		groupOffset += indices.length;
+		materialIndex++;
+
+		// create a lower cap
+		if (solid) {
+			const indexOffset = positions.length / 3;
+			for (let i = 0; i < vertexCount; i++) {
+				readUVHeight(i, _uvh);
+				readPosition(_uvh.x, _uvh.y, _uvh.z, _pos, -skirtLength);
+
+				uvs.push(_uvh.x, _uvh.y);
+				positions.push(..._pos);
+			}
+
+			for (let i = indices.length - 1; i >= 0; i--) {
+				indexArr.push(indices[i] + indexOffset);
+			}
+
+			if (includeNormals) {
+				const extNormals = extensions['octvertexnormals'].normals;
+				for (let i = 0, l = extNormals.length; i < l; i++) {
+					normals.push(-extNormals[i]);
+				}
+			}
+
+
+			// add material group
+			geometry.addGroup(groupOffset, indices.length, materialIndex);
+			groupOffset += indices.length;
+			materialIndex++;
+		}
+
+		// construct skirts
+		if (skirtLength > 0) {
+			const {
+				westIndices,
+				eastIndices,
+				southIndices,
+				northIndices
+			} = edgeIndices;
+
+			// construct the indices
+			let offset;
+
+			// west
+			const westStrip = constructEdgeStrip(westIndices);
+			offset = positions.length / 3;
+			uvs.push(...westStrip.uv);
+			positions.push(...westStrip.positions);
+			for (let i = 0, l = westStrip.indices.length; i < l; i++) {
+				indexArr.push(westStrip.indices[i] + offset);
+			}
+
+			// east
+			const eastStrip = constructEdgeStrip(eastIndices);
+			offset = positions.length / 3;
+			uvs.push(...eastStrip.uv);
+			positions.push(...eastStrip.positions);
+			for (let i = 0, l = eastStrip.indices.length; i < l; i++) {
+				indexArr.push(eastStrip.indices[i] + offset);
+			}
+
+			// south
+			const southStrip = constructEdgeStrip(southIndices);
+			offset = positions.length / 3;
+			uvs.push(...southStrip.uv);
+			positions.push(...southStrip.positions);
+			for (let i = 0, l = southStrip.indices.length; i < l; i++) {
+				indexArr.push(southStrip.indices[i] + offset);
+			}
+
+			// north
+			const northStrip = constructEdgeStrip(northIndices);
+			offset = positions.length / 3;
+			uvs.push(...northStrip.uv);
+			positions.push(...northStrip.positions);
+			for (let i = 0, l = northStrip.indices.length; i < l; i++) {
+				indexArr.push(northStrip.indices[i] + offset);
+			}
+
+			// add the normals
+			if (includeNormals) {
+				normals.push(...westStrip.normals);
+				normals.push(...eastStrip.normals);
+				normals.push(...southStrip.normals);
+				normals.push(...northStrip.normals);
+			}
+
+			// add material group
+			geometry.addGroup(groupOffset, indices.length, materialIndex);
+			groupOffset += indices.length;
+			materialIndex++;
+		}
+
+		// shift the positions by the center of the tile
+		for (let i = 0, l = positions.length; i < l; i += 3) {
+			positions[i + 0] -= header.center[0];
+			positions[i + 1] -= header.center[1];
+			positions[i + 2] -= header.center[2];
+		}
+
+		// generate geometry and mesh
+		const indexBuffer = positions.length / 3 > 65535 ? new Uint32Array(indexArr) : new Uint16Array(indexArr);
+		geometry.setIndex(new Attribute(new Buffer(indexBuffer, 1)));
+		geometry.addAttribute('a_Position', new Attribute(new Buffer(new Float32Array(positions), 3)));
+		geometry.addAttribute('a_Uv', new Attribute(new Buffer(new Float32Array(uvs), 2)));
+		if (includeNormals) {
+			geometry.addAttribute('a_Normal', new Attribute(new Buffer(new Float32Array(normals), 3)));
+		}
+
+		// generate the water texture
+		if ('watermask' in extensions) {
+			// invert the mask data
+			// TODO: this inversion step can be a bit slow
+			const { mask, size } = extensions['watermask'];
+			const maskBuffer = new Uint8Array(2 * size * size);
+			for (let i = 0, l = mask.length; i < l; i++) {
+				const v = mask[i] === 255 ? 0 : 255;
+				maskBuffer[2 * i + 0] = v;
+				maskBuffer[2 * i + 1] = v;
+			}
+
+			const map = new Texture2D();
+			map.image = { data: maskBuffer, width: size, height: size };
+			map.flipY = true;
+			map.format = PIXEL_FORMAT.RG;
+			map.type = PIXEL_TYPE.UNSIGNED_BYTE;
+			map.minFilter = TEXTURE_FILTER.LINEAR_MIPMAP_LINEAR;
+			map.magFilter = TEXTURE_FILTER.LINEAR;
+			map.version++;
+
+			material.roughnessMap = map;
+		}
+
+		// set metadata
+		mesh.userData.minHeight = header.minHeight;
+		mesh.userData.maxHeight = header.maxHeight;
+
+		if ('metadata' in extensions) {
+			mesh.userData.metadata = extensions['metadata'].json;
+		}
+
+		return mesh;
+
+		function readUVHeight(index, target) {
+			target.x = vertexData.u[index];
+			target.y = vertexData.v[index];
+			target.z = vertexData.height[index];
+			return target;
+		}
+
+		function readPosition(u, v, h, target, heightOffset = 0) {
+			const height = MathUtils.lerp(header.minHeight, header.maxHeight, h);
+			const lon = MathUtils.lerp(minLon, maxLon, u);
+			const lat = MathUtils.lerp(minLat, maxLat, v);
+
+			ellipsoid.getCartographicToPosition(lat, lon, height + heightOffset, target);
+
+			return target;
+		}
+
+		function constructEdgeStrip(indices) {
+			const topUvs = [];
+			const topPos = [];
+			const botUvs = [];
+			const botPos = [];
+			const sideIndices = [];
+			for (let i = 0, l = indices.length; i < l; i++) {
+				readUVHeight(indices[i], _uvh);
+				topUvs.push(_uvh.x, _uvh.y);
+				botUvs.push(_uvh.x, _uvh.y);
+
+				readPosition(_uvh.x, _uvh.y, _uvh.z, _pos);
+				topPos.push(..._pos);
+
+				readPosition(_uvh.x, _uvh.y, _uvh.z, _pos, -skirtLength);
+				botPos.push(..._pos);
+			}
+
+			const triCount = (indices.length - 1);
+			for (let i = 0; i < triCount; i++) {
+				const t0 = i;
+				const t1 = i + 1;
+				const b0 = i + indices.length;
+				const b1 = i + indices.length + 1;
+
+				sideIndices.push(t0, b0, t1);
+				sideIndices.push(t1, b0, b1);
+			}
+
+			let normals = null;
+			if (includeNormals) {
+				const total = (topPos.length + botPos.length) / 3;
+
+				if (smoothSkirtNormals) {
+					normals = new Array(total * 3);
+
+					const extNormals = extensions['octvertexnormals'].normals;
+					const botOffset = normals.length / 2;
+					for (let i = 0, l = total / 2; i < l; i++) {
+						const index = indices[i];
+						const i3 = 3 * i;
+						const nx = extNormals[3 * index + 0];
+						const ny = extNormals[3 * index + 1];
+						const nz = extNormals[3 * index + 2];
+
+						normals[i3 + 0] = nx;
+						normals[i3 + 1] = ny;
+						normals[i3 + 2] = nz;
+
+						normals[botOffset + i3 + 0] = nx;
+						normals[botOffset + i3 + 1] = ny;
+						normals[botOffset + i3 + 2] = nz;
+					}
+				} else {
+					normals = [];
+					_tri.a.fromArray(topPos, 0);
+					_tri.b.fromArray(botPos, 0);
+					_tri.c.fromArray(topPos, 3);
+					_tri.getNormal(_norm);
+
+					for (let i = 0; i < total; i++) {
+						normals.push(..._norm);
+					}
+				}
+			}
+
+			return {
+				uv: [...topUvs, ...botUvs],
+				positions: [...topPos, ...botPos],
+				indices: sideIndices,
+				normals
+			};
+		}
+	}
+
+	// generates a child mesh in the given quadrant using the same settings as the loader
+	clipToQuadrant(mesh, left, bottom) {
+		// scratch vectors
+		const _uv0 = new Vector3();
+		const _uv1 = new Vector3();
+
+		const _pos0 = new Vector3();
+		const _pos1 = new Vector3();
+		const _pos2 = new Vector3();
+		const _pos3 = new Vector3();
+
+		const _temp = new Vector3();
+		const _temp2 = new Vector3();
+		const _cart = {};
+
+		// helper variables
+		const SPLIT_VALUE = 0.5;
+		const triPool = new TrianglePool();
+		const vertNames = ['a', 'b', 'c'];
+		const { ellipsoid, skirtLength, solid, smoothSkirtNormals } = this;
+
+		// source geometry
+		const sourceGeometry = mesh.geometry;
+		const normal = sourceGeometry.attributes.a_Normal;
+		const index = sourceGeometry.index;
+
+		// geometry data
+		let nextIndex = 0;
+		const vertToNewIndexMap = {};
+		const newPosition = [];
+		const newNormal = normal ? [] : null;
+		const newUv = [];
+		const newIndex = [];
+
+		// uv offsets
+		const xUvOffset = left ? 0 : -0.5;
+		const yUvOffset = bottom ? 0 : -0.5;
+
+		// iterate over each group separately to retain the group information
+		const geometry = new Geometry();
+		const capGroup = sourceGeometry.groups[0];
+
+		// construct the cap geometry
+		let newStart = newIndex.length;
+		let materialIndex = 0;
+		for (let i = capGroup.start / 3; i < (capGroup.start + capGroup.count) / 3; i++) {
+			const i0 = index.getX(i * 3 + 0);
+			const i1 = index.getX(i * 3 + 1);
+			const i2 = index.getX(i * 3 + 2);
+			const tri = triPool.get();
+			tri.setFromAttributeAndIndices(sourceGeometry, i0, i1, i2);
+
+			// split the triangle by the first axis
+			const xResult = [];
+			splitTriangle(tri, 'x', left, xResult);
+
+			// split the triangles by the second axis
+			const yResult = [];
+			for (let t = 0, l = xResult.length; t < l; t++) {
+				splitTriangle(xResult[t], 'y', bottom, yResult);
+			}
+
+			// save the geometry
+			const { minLat, maxLat, minLon, maxLon, ellipsoid } = this;
+			for (let t = 0, l = yResult.length; t < l; t++) {
+				const tri = yResult[t];
+				vertNames.forEach(n => {
+					const uv = tri.uv[n];
+					if (uv.x !== SPLIT_VALUE && uv.y !== SPLIT_VALUE) {
+						return;
+					}
+
+					const point = tri.position[n];
+					const lat = MathUtils.lerp(minLat, maxLat, uv.y);
+					const lon = MathUtils.lerp(minLon, maxLon, uv.x);
+
+					point.add(mesh.position);
+					ellipsoid.getPositionToCartographic(point, _cart);
+					ellipsoid.getCartographicToPosition(lat, lon, _cart.height, point);
+					point.sub(mesh.position);
+				});
+
+				pushVertex(tri.position.a, tri.uv.a, tri.normal.a);
+				pushVertex(tri.position.b, tri.uv.b, tri.normal.b);
+				pushVertex(tri.position.c, tri.uv.c, tri.normal.c);
+			}
+
+			triPool.reset();
+		}
+
+		geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
+		materialIndex++;
+
+		// construct bottom cap
+		const capTriangles = newIndex.length / 3;
+		if (solid) {
+			newStart = newIndex.length;
+			for (let i = capTriangles * 3 - 1; i >= 0; i--) {
+				const index = newIndex[i];
+				_temp.fromArray(newPosition, index * 3).add(mesh.position);
+				ellipsoid.getPositionToNormal(_temp, _temp);
+
+				_pos0.fromArray(newPosition, index * 3).addScaledVector(_temp, -skirtLength);
+				_uv0.fromArray(newUv, index * 2);
+				_temp.fromArray(newNormal, index * 3);
+
+				pushVertex(_pos0, _uv0, _temp);
+			}
+
+			geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
+			materialIndex++;
+		}
+
+		// construct the skirt
+		if (skirtLength > 0) {
+			// TODO: this seems to have some problematic cases at the root tiles near the poles
+			newStart = newIndex.length;
+			for (let i = 0; i < capTriangles; i++) {
+				const triOffset = 3 * i;
+				for (let e = 0; e < 3; e++) {
+					const ne = (e + 1) % 3;
+					const i0 = newIndex[triOffset + e];
+					const i1 = newIndex[triOffset + ne];
+
+					_uv0.fromArray(newUv, i0 * 2);
+					_uv1.fromArray(newUv, i1 * 2);
+
+					// find the vertices that lie on the edge
+					if (
+						_uv0.x === _uv1.x && (_uv0.x === 0 || _uv0.x === SPLIT_VALUE || _uv0.x === 1.0) ||
+						_uv0.y === _uv1.y && (_uv0.y === 0 || _uv0.y === SPLIT_VALUE || _uv0.y === 1.0)
+					) {
+						_pos0.fromArray(newPosition, i0 * 3);
+						_pos1.fromArray(newPosition, i1 * 3);
+
+						const u0 = _pos0;
+						const u1 = _pos1;
+
+						const b0 = _pos2.copy(_pos0);
+						const b1 = _pos3.copy(_pos1);
+
+						_temp.copy(b0).add(mesh.position);
+						ellipsoid.getPositionToNormal(_temp, _temp);
+						b0.addScaledVector(_temp, -skirtLength);
+
+						_temp.copy(b1).add(mesh.position);
+						ellipsoid.getPositionToNormal(_temp, _temp);
+						b1.addScaledVector(_temp, -skirtLength);
+
+						if (smoothSkirtNormals && newNormal) {
+							_temp.fromArray(newNormal, i0 * 3);
+							_temp2.fromArray(newNormal, i1 * 3);
+						} else {
+							_temp.subVectors(u0, u1);
+							_temp2.subVectors(u0, b0).cross(_temp).normalize();
+							_temp.copy(_temp2);
+						}
+
+						pushVertex(u1, _uv1, _temp2);
+						pushVertex(u0, _uv0, _temp);
+						pushVertex(b0, _uv0, _temp);
+
+						pushVertex(u1, _uv1, _temp2);
+						pushVertex(b0, _uv0, _temp);
+						pushVertex(b1, _uv1, _temp2);
+					}
+				}
+			}
+
+			geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
+			materialIndex++;
+		}
+
+		// offset the uvs
+		for (let i = 0, l = newUv.length; i < l; i += 2) {
+			newUv[i] = (newUv[i] + xUvOffset) * 2.0;
+			newUv[i + 1] = (newUv[i + 1] + yUvOffset) * 2.0;
+		}
+
+		// new geometry
+		const indexBuffer = newPosition.length / 3 > 65535 ? new Uint32Array(newIndex) : new Uint16Array(newIndex);
+		geometry.setIndex(new Attribute(new Buffer(indexBuffer, 1)));
+		geometry.setAttribute('a_Position', new Attribute(new Buffer(new Float32Array(newPosition), 3)));
+		geometry.setAttribute('a_Uv', new Attribute(new Buffer(new Float32Array(newUv), 2)));
+		if (normal) {
+			geometry.setAttribute('a_Normal', new Attribute(new Buffer(new Float32Array(newNormal), 3)));
+		}
+
+		// new mesh
+		const result = new Mesh(geometry, mesh.material.clone());
+		result.position.copy(mesh.position);
+		result.quaternion.copy(mesh.quaternion);
+		result.scale.copy(mesh.scale);
+		result.userData.minHeight = mesh.userData.minHeight;
+		result.userData.maxHeight = mesh.userData.maxHeight;
+
+		return result;
+
+		function splitTriangle(tri, axis, negativeSide, target) {
+			// TODO: clean up, add scratch variables, optimize
+			const edgeIndices = [];
+			const edges = [];
+			const lerpValues = [];
+
+			for (let i = 0; i < 3; i++) {
+				const v = vertNames[i];
+				const nv = vertNames[(i + 1) % 3];
+
+				const p = tri.uv[v];
+				const np = tri.uv[nv];
+
+				const pValue = p[axis];
+				const npValue = np[axis];
+
+				// if the uv values span across the halfway divide
+				if ((pValue < SPLIT_VALUE) !== (npValue < SPLIT_VALUE) || pValue === SPLIT_VALUE) {
+					edgeIndices.push(i);
+					edges.push([v, nv]);
+					lerpValues.push(MathUtils.mapLinear(SPLIT_VALUE, pValue, npValue, 0, 1));
+				}
+			}
+
+			if (edgeIndices.length !== 2) {
+				const minBound = Math.min(
+					tri.uv.a[axis],
+					tri.uv.b[axis],
+					tri.uv.c[axis]
+				);
+
+				if ((minBound < SPLIT_VALUE) === negativeSide) {
+					target.push(tri);
+				}
+			} else if (edgeIndices.length === 2) {
+				// TODO: how can we determine which triangles actually need to be added here ahead of time
+				const tri0 = triPool.get();
+				const tri1 = triPool.get();
+				const tri2 = triPool.get();
+
+				const sequential = ((edgeIndices[0] + 1) % 3) === edgeIndices[1];
+				if (sequential) {
+					tri0.lerpVertex(tri, edges[0][0], edges[0][1], lerpValues[0], 'a');
+					tri0.copyVertex(tri, edges[0][1], 'b');
+					tri0.lerpVertex(tri, edges[1][0], edges[1][1], lerpValues[1], 'c');
+					tri0.uv.a[axis] = SPLIT_VALUE;
+					tri0.uv.c[axis] = SPLIT_VALUE;
+
+					tri1.lerpVertex(tri, edges[0][0], edges[0][1], lerpValues[0], 'a');
+					tri1.copyVertex(tri, edges[1][1], 'b');
+					tri1.copyVertex(tri, edges[0][0], 'c');
+					tri1.uv.a[axis] = SPLIT_VALUE;
+
+					tri2.lerpVertex(tri, edges[0][0], edges[0][1], lerpValues[0], 'a');
+					tri2.lerpVertex(tri, edges[1][0], edges[1][1], lerpValues[1], 'b');
+					tri2.copyVertex(tri, edges[1][1], 'c');
+					tri2.uv.a[axis] = SPLIT_VALUE;
+					tri2.uv.b[axis] = SPLIT_VALUE;
+				} else {
+					tri0.lerpVertex(tri, edges[0][0], edges[0][1], lerpValues[0], 'a');
+					tri0.lerpVertex(tri, edges[1][0], edges[1][1], lerpValues[1], 'b');
+					tri0.copyVertex(tri, edges[0][0], 'c');
+					tri0.uv.a[axis] = SPLIT_VALUE;
+					tri0.uv.b[axis] = SPLIT_VALUE;
+
+					tri1.lerpVertex(tri, edges[0][0], edges[0][1], lerpValues[0], 'a');
+					tri1.copyVertex(tri, edges[0][1], 'b');
+					tri1.lerpVertex(tri, edges[1][0], edges[1][1], lerpValues[1], 'c');
+					tri1.uv.a[axis] = SPLIT_VALUE;
+					tri1.uv.c[axis] = SPLIT_VALUE;
+
+					tri2.copyVertex(tri, edges[0][1], 'a');
+					tri2.copyVertex(tri, edges[1][0], 'b');
+					tri2.lerpVertex(tri, edges[1][0], edges[1][1], lerpValues[1], 'c');
+					tri2.uv.c[axis] = SPLIT_VALUE;
+				}
+
+				let minBound;
+				minBound = Math.min(tri0.uv.a[axis], tri0.uv.b[axis], tri0.uv.c[axis]);
+				if ((minBound < SPLIT_VALUE) === negativeSide) {
+					target.push(tri0);
+				}
+
+				minBound = Math.min(tri1.uv.a[axis], tri1.uv.b[axis], tri1.uv.c[axis]);
+				if ((minBound < SPLIT_VALUE) === negativeSide) {
+					target.push(tri1);
+				}
+
+				minBound = Math.min(tri2.uv.a[axis], tri2.uv.b[axis], tri2.uv.c[axis]);
+				if ((minBound < SPLIT_VALUE) === negativeSide) {
+					target.push(tri2);
+				}
+			}
+		}
+
+		// hash the vertex for index generation
+		function hashVertex(x, y, z) {
+			const scalar = 1e5;
+			const additive = 0.5;
+			const hx = ~~(x * scalar + additive);
+			const hy = ~~(y * scalar + additive);
+			const hz = ~~(z * scalar + additive);
+			return `${hx}_${hy}_${hz}`;
+		}
+
+		// add the vertex to the geometry
+		function pushVertex(pos, uv, norm) {
+			let hash = hashVertex(pos.x, pos.y, pos.z);
+			if (newNormal) {
+				hash += `_${hashVertex(norm.x, norm.y, norm.z)}`;
+			}
+
+			if (!(hash in vertToNewIndexMap)) {
+				vertToNewIndexMap[hash] = nextIndex;
+				nextIndex++;
+
+				newPosition.push(pos.x, pos.y, pos.z);
+				newUv.push(uv.x, uv.y);
+				if (newNormal) {
+					newNormal.push(norm.x, norm.y, norm.z);
+				}
+			}
+
+			const index = vertToNewIndexMap[hash];
+			newIndex.push(index);
+			return index;
+		}
+	}
+
+}
+
+// Pool of reusable triangles
+class TrianglePool {
+
+	constructor() {
+		this.pool = [];
+		this.index = 0;
+	}
+
+	get() {
+		if (this.index >= this.pool.length) {
+			const tri = new AttributeTriangle();
+			this.pool.push(tri);
+		}
+
+		const res = this.pool[this.index];
+		this.index++;
+		return res;
+	}
+
+	reset() {
+		this.index = 0;
+	}
+
+}
+
+// Set of triangle definitions for quantized mesh attributes
+class AttributeTriangle {
+
+	constructor() {
+		this.position = new Triangle();
+		this.uv = new Triangle();
+		this.normal = new Triangle();
+	}
+
+	setFromAttributeAndIndices(geometry, i0, i1, i2) {
+		this.position.setFromAttributeAndIndices(geometry.attributes.a_Position, i0, i1, i2);
+		this.uv.setFromAttributeAndIndices(geometry.attributes.a_Uv, i0, i1, i2);
+		if (geometry.attributes.a_Normal) {
+			this.normal.setFromAttributeAndIndices(geometry.attributes.a_Normal, i0, i1, i2);
+		}
+	}
+
+	lerpVertex(other, e0, e1, alpha, targetVertex) {
+		this.position[targetVertex].lerpVectors(other.position[e0], other.position[e1], alpha);
+		this.uv[targetVertex].lerpVectors(other.uv[e0], other.uv[e1], alpha);
+		this.normal[targetVertex].lerpVectors(other.normal[e0], other.normal[e1], alpha);
+	}
+
+	copyVertex(other, fromVertex, targetVertex) {
+		this.position[targetVertex].copy(other.position[fromVertex]);
+		this.uv[targetVertex].copy(other.uv[fromVertex]);
+		this.normal[targetVertex].copy(other.normal[fromVertex]);
+	}
+
+}
+
+// Class for storing and querying a tiling scheme including a bounds, origin, and negative tile indices.
+// Assumes that tiles are split into four child tiles at each level.
+function clamp(x, min, max) {
+	return Math.min(Math.max(x, min), max);
+}
+
+class TilingScheme {
+
+	get levelCount() {
+		return this._levels.length;
+	}
+
+	get maxLevel() {
+		return this.levelCount - 1;
+	}
+
+	get minLevel() {
+		const levels = this._levels;
+		for (let i = 0; i < levels.length; i++) {
+			if (levels[i] !== null) {
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	// prioritize user-set bounds over projection bounds if present
+	get rootBounds() {
+		return this._rootBounds ?? this.projection?.getBounds() ?? [0, 0, 1, 1];
+	}
+
+	get rootOrigin() {
+		const bounds = this.rootBounds;
+		return this._rootOrigin ?? [bounds[0], bounds[1]];
+	}
+
+	constructor() {
+		this.flipY = false;
+		this.pixelOverlap = 0;
+
+		// The origin and bounds
+		this._rootBounds = null;
+		this._rootOrigin = null;
+		this.projection = null;
+
+		this._levels = [];
+	}
+
+	// build the zoom levels
+	setLevel(level, options = {}) {
+		const levels = this._levels;
+		while (levels.length < level) {
+			levels.push(null);
+		}
+
+		const {
+			tilePixelWidth = 256,
+			tilePixelHeight = 256,
+			tileCountX = 2 ** level,
+			tileCountY = 2 ** level
+		} = options;
+
+		const {
+			pixelWidth = tilePixelWidth * tileCountX,
+			pixelHeight = tilePixelHeight * tileCountY
+		} = options;
+
+		levels[level] = {
+			tilePixelWidth,
+			tilePixelHeight,
+			pixelWidth,
+			pixelHeight,
+			tileCountX,
+			tileCountY
+		};
+	}
+
+	generateLevels(levels, rootTileX, rootTileY, options = {}) {
+		const {
+			minLevel = 0,
+			tilePixelWidth = 256,
+			tilePixelHeight = 256
+		} = options;
+
+		const maxLevel = levels - 1;
+		const {
+			pixelWidth = tilePixelWidth * rootTileX * (2 ** maxLevel),
+			pixelHeight = tilePixelHeight * rootTileY * (2 ** maxLevel)
+		} = options;
+		for (let level = minLevel; level < levels; level++) {
+			const invLevel = levels - level - 1;
+			const levelPixelWidth = Math.ceil(pixelWidth * (2 ** -invLevel));
+			const levelPixelHeight = Math.ceil(pixelHeight * (2 ** -invLevel));
+			const tileCountX = Math.ceil(levelPixelWidth / tilePixelWidth);
+			const tileCountY = Math.ceil(levelPixelHeight / tilePixelHeight);
+
+			this.setLevel(level, {
+				tilePixelWidth,
+				tilePixelHeight,
+				pixelWidth: levelPixelWidth,
+				pixelHeight: levelPixelHeight,
+				tileCountX,
+				tileCountY
+			});
+		}
+	}
+
+	getLevel(level) {
+		return this._levels[level];
+	}
+
+	// bounds setters
+	setOrigin(x, y) {
+		this._rootOrigin = [x, y];
+	}
+
+	setBounds(minX, minY, maxX, maxY) {
+		this._rootBounds = [minX, minY, maxX, maxY];
+	}
+
+	setProjection(projection) {
+		this.projection = projection;
+	}
+
+	// query functions
+	getTileAtPoint(bx, by, level, normalized = false, clampTiles = true) {
+		const { projection, flipY } = this;
+		const { tileCountX, tileCountY } = this.getLevel(level);
+		const xStride = 1 / tileCountX;
+		const yStride = 1 / tileCountY;
+
+		if (projection && !normalized) {
+			bx = projection.convertLongitudeToProjection(bx);
+			by = projection.convertLatitudeToProjection(by);
+		}
+
+		if (clampTiles) {
+			bx = clamp(bx, 0, 1);
+			by = clamp(by, 0, 1);
+		}
+
+		let tx = Math.floor(bx / xStride);
+		let ty = Math.floor(by / yStride);
+
+		if (flipY) {
+			ty = tileCountY - 1 - ty;
+		}
+
+		if (clampTiles) {
+			tx = clamp(tx, 0, tileCountX - 1);
+			ty = clamp(ty, 0, tileCountY - 1);
+		}
+
+		return [tx, ty];
+	}
+
+	getTilesInRange(minX, minY, maxX, maxY, level, normalized = false, clampTiles = true) {
+		const minTile = this.getTileAtPoint(minX, minY, level, normalized, clampTiles);
+		const maxTile = this.getTileAtPoint(maxX, maxY, level, normalized, clampTiles);
+
+		if (this.flipY) {
+			[minTile[1], maxTile[1]] = [maxTile[1], minTile[1]];
+		}
+
+		return [...minTile, ...maxTile];
+	}
+
+	getTileExists(x, y, level, LOG) {
+		const [rminx, rminy, rmaxx, rmaxy] = this.rootBounds;
+		const [tminx, tminy, tmaxx, tmaxy] = this.getTileBounds(x, y, level, LOG);
+		const isDegenerate = tminx >= tmaxx || tminy >= tmaxy;
+
+		return !isDegenerate && tminx <= rmaxx && tminy <= rmaxy && tmaxx >= rminx && tmaxy >= rminy;
+	}
+
+	getFullBounds(normalized = false) {
+		const { projection } = this;
+		const bounds = [...this.rootBounds];
+		if (projection && normalized) {
+			bounds[0] = projection.convertLongitudeToProjection(bounds[0]);
+			bounds[1] = projection.convertLatitudeToProjection(bounds[1]);
+			bounds[2] = projection.convertLongitudeToProjection(bounds[2]);
+			bounds[3] = projection.convertLatitudeToProjection(bounds[3]);
+		}
+
+		return bounds;
+	}
+
+	getTileBounds(x, y, level, normalized = false) {
+		const { flipY, pixelOverlap, projection } = this;
+		const { tilePixelWidth, tilePixelHeight, pixelWidth, pixelHeight } = this.getLevel(level);
+
+		let tileLeft = tilePixelWidth * x - pixelOverlap;
+		let tileTop = tilePixelHeight * y - pixelOverlap;
+		let tileRight = tileLeft + tilePixelWidth + pixelOverlap * 2;
+		let tileBottom = tileTop + tilePixelHeight + pixelOverlap * 2;
+
+		// clamp
+		tileLeft = Math.max(tileLeft, 0);
+		tileTop = Math.max(tileTop, 0);
+		tileRight = Math.min(tileRight, pixelWidth);
+		tileBottom = Math.min(tileBottom, pixelHeight);
+
+		// normalized
+		tileLeft = tileLeft / pixelWidth;
+		tileRight = tileRight / pixelWidth;
+		tileTop = tileTop / pixelHeight;
+		tileBottom = tileBottom / pixelHeight;
+
+		// invert y
+		if (flipY) {
+			const extents = (tileBottom - tileTop) / 2;
+			const centerY = (tileTop + tileBottom) / 2;
+			const invCenterY = 1.0 - centerY;
+
+			tileTop = invCenterY - extents;
+			tileBottom = invCenterY + extents;
+		}
+
+		const bounds = [tileLeft, tileTop, tileRight, tileBottom];
+		if (projection && !normalized) {
+			bounds[0] = projection.convertProjectionToLongitude(bounds[0]);
+			bounds[1] = projection.convertProjectionToLatitude(bounds[1]);
+			bounds[2] = projection.convertProjectionToLongitude(bounds[2]);
+			bounds[3] = projection.convertProjectionToLatitude(bounds[3]);
+		}
+
+		return bounds;
+	}
+
+}
+
+// Class for storing and querying a certain projection scheme for an image and converting
+// between the [0, 1] image range to cartographic longitude / latitude values.
+class ProjectionScheme {
+
+	get isMercator() {
+		return this.scheme === 'EPSG:3857';
+	}
+
+	constructor(scheme = 'EPSG:4326') {
+		this.scheme = scheme;
+		this.tileCountX = 1;
+		this.tileCountY = 1;
+
+		this.setScheme(scheme);
+	}
+
+	setScheme(scheme) {
+		this.scheme = scheme;
+		switch (scheme) {
+			// equirect
+			case 'EPSG:4326':
+				this.tileCountX = 2;
+				this.tileCountY = 1;
+				break;
+
+			// mercator
+			case 'EPSG:3857':
+				this.tileCountX = 1;
+				this.tileCountY = 1;
+				break;
+
+			default:
+				throw new Error();
+		}
+	}
+
+	convertProjectionToLatitude(v) {
+		if (this.isMercator) {
+			// https://gis.stackexchange.com/questions/447421/convert-a-point-on-a-flat-2d-web-mercator-map-image-to-a-coordinate
+			const ratio = MathUtils.mapLinear(v, 0, 1, -1, 1);
+			return 2 * Math.atan(Math.exp(ratio * Math.PI)) - Math.PI / 2;
+		} else {
+			return MathUtils.mapLinear(v, 0, 1, -Math.PI / 2, Math.PI / 2);
+		}
+	}
+
+	convertProjectionToLongitude(v) {
+		return MathUtils.mapLinear(v, 0, 1, -Math.PI, Math.PI);
+	}
+
+	convertLatitudeToProjection(lat) {
+		if (this.isMercator) {
+			// https://stackoverflow.com/questions/14329691/convert-latitude-longitude-point-to-a-pixels-x-y-on-mercator-projection
+			const mercatorN = Math.log(Math.tan((Math.PI / 4) + (lat / 2)));
+			return (1 / 2) + (1 * mercatorN / (2 * Math.PI));
+		} else {
+			return MathUtils.mapLinear(lat, -Math.PI / 2, Math.PI / 2, 0, 1);
+		}
+	}
+
+	convertLongitudeToProjection(lon) {
+		return (lon + Math.PI) / (2 * Math.PI);
+	}
+
+	getLongitudeDerivativeAtValue(value) {
+		return 2 * Math.PI;
+	}
+
+	getLatitudeDerivativeAtValue(value) {
+		const EPS = 1e-5;
+		let yp = value - EPS;
+		if (yp < 0) {
+			yp = value + EPS;
+		}
+
+		if (this.isMercator) {
+			// TODO: why is this 2 * Math.PI rather than Math.PI?
+			return Math.abs(this.convertProjectionToLatitude(value) - this.convertProjectionToLatitude(yp)) / EPS;
+		} else {
+			return Math.PI;
+		}
+	}
+
+	getBounds() {
+		return [
+			this.convertProjectionToLongitude(0), this.convertProjectionToLatitude(0),
+			this.convertProjectionToLongitude(1), this.convertProjectionToLatitude(1)
+		];
+	}
+
+}
+
+const TILE_X = Symbol('TILE_X');
+const TILE_Y = Symbol('TILE_Y');
+const TILE_LEVEL = Symbol('TILE_LEVEL');
+const TILE_AVAILABLE = Symbol('TILE_AVAILABLE');
+
+// We don't know the height ranges for the tile set on load so assume a large range and
+// adjust it once the tiles have actually loaded based on the min and max height
+const INITIAL_HEIGHT_RANGE = 1e4;
+const _vec = /* @__PURE__ */ new Vector3();
+
+// Checks if the given tile is available
+function isTileAvailable(available, level, x, y) {
+	if (level < available.length) {
+		// TODO: consider a binary search
+		const availableSet = available[level];
+		for (let i = 0, l = availableSet.length; i < l; i++) {
+			const { startX, startY, endX, endY } = availableSet[i];
+			if (x >= startX && x <= endX && y >= startY && y <= endY) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+// Calculates the max level that can be loaded.
+function getMaxLevel(layer) {
+	const { available = null, maxzoom = null } = layer;
+	return maxzoom === null ? available.length - 1 : maxzoom;
+}
+
+// Calculates whether metadata availability is present - returns -1 if not.
+function getMetadataAvailability(layer) {
+	const { metadataAvailability = -1 } = layer;
+	return metadataAvailability;
+}
+
+// Calculates whether the given tile should have metadata availability
+function getTileHasMetadata(tile, layer) {
+	const level = tile[TILE_LEVEL];
+	const metadataAvailability = getMetadataAvailability(layer);
+	const maxLevel = getMaxLevel(layer);
+
+	return level < maxLevel && metadataAvailability !== -1 && (level % metadataAvailability) === 0;
+}
+
+// Constructs the url for the given tile content
+function getContentUrl(x, y, level, version, layer) {
+	return layer.tiles[0]
+		.replace(/{\s*z\s*}/g, level)
+		.replace(/{\s*x\s*}/g, x)
+		.replace(/{\s*y\s*}/g, y)
+		.replace(/{\s*version\s*}/g, version);
+}
+
+class QuantizedMeshPlugin {
+
+	constructor(options = {}) {
+		const {
+			useRecommendedSettings = true,
+			skirtLength = null,
+			smoothSkirtNormals = true,
+			solid = false
+		} = options;
+
+		this.name = 'QUANTIZED_MESH_PLUGIN';
+
+		this.tiles = null;
+		this.layer = null;
+		this.useRecommendedSettings = useRecommendedSettings;
+		this.skirtLength = skirtLength;
+		this.smoothSkirtNormals = smoothSkirtNormals;
+		this.solid = solid;
+		this.attribution = null;
+
+		this.tiling = new TilingScheme();
+		this.projection = new ProjectionScheme();
+	}
+
+	// Plugin function
+	init(tiles) {
+		// TODO: should we avoid setting this globally?
+		tiles.fetchOptions.headers = tiles.fetchOptions.headers || {};
+		tiles.fetchOptions.headers.Accept = 'application/vnd.quantized-mesh,application/octet-stream;q=0.9';
+
+		if (this.useRecommendedSettings) {
+			tiles.errorTarget = 2;
+		}
+
+		this.tiles = tiles;
+	}
+
+	loadRootTileSet() {
+		const { tiles } = this;
+
+		// initialize href to resolve the root in case it's specified as a relative url
+		let url = new URL('layer.json', new URL(tiles.rootURL, location.href));
+		tiles.invokeAllPlugins(plugin => url = plugin.preprocessURL ? plugin.preprocessURL(url, null) : url);
+
+		return tiles
+			.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(url, this.tiles.fetchOptions))
+			.then(res => res.json())
+			.then(json => {
+				this.layer = json;
+				const {
+					projection: layerProjection = 'EPSG:4326',
+					extensions = [],
+					attribution = '',
+					available = null
+				} = json;
+
+				const {
+					tiling,
+					tiles,
+					projection
+				} = this;
+
+				// attribution
+				if (attribution) {
+					this.attribution = {
+						value: attribution,
+						type: 'string',
+						collapsible: true
+					};
+				}
+
+				// extensions
+				if (extensions.length > 0) {
+					tiles.fetchOptions.headers['Accept'] += `;extensions=${extensions.join('-')}`;
+				}
+
+				// initialize tiling, projection
+				projection.setScheme(layerProjection);
+
+				const { tileCountX, tileCountY } = projection;
+				tiling.setProjection(projection);
+				tiling.generateLevels(getMaxLevel(json) + 1, tileCountX, tileCountY);
+
+				// initialize children
+				const children = [];
+				for (let x = 0; x < tileCountX; x++) {
+					const child = this.createChild(0, x, 0, available);
+					if (child) {
+						children.push(child);
+					}
+				}
+
+				// produce the tile set root
+				const tileset = {
+					asset: {
+						version: '1.1'
+					},
+					geometricError: Infinity,
+					root: {
+						refine: 'REPLACE',
+						geometricError: Infinity,
+						boundingVolume: {
+							region: [...this.tiling.getFullBounds(), -INITIAL_HEIGHT_RANGE, INITIAL_HEIGHT_RANGE]
+						},
+						children: children,
+
+						[TILE_AVAILABLE]: available,
+						[TILE_LEVEL]: -1
+					}
+				};
+
+				let baseUrl = tiles.rootURL;
+				tiles.invokeAllPlugins(plugin => baseUrl = plugin.preprocessURL ? plugin.preprocessURL(baseUrl, null) : baseUrl);
+				tiles.preprocessTileSet(tileset, baseUrl);
+
+				return tileset;
+			});
+	}
+
+	async parseToMesh(buffer, tile, extension, uri) {
+		const {
+			skirtLength,
+			solid,
+			smoothSkirtNormals,
+			tiles
+		} = this;
+
+		// set up loader
+		const ellipsoid = tiles.ellipsoid;
+		const loader = new QuantizedMeshLoader(tiles.manager);
+		loader.ellipsoid.copy(ellipsoid);
+		loader.solid = solid;
+		loader.smoothSkirtNormals = smoothSkirtNormals;
+		loader.skirtLength = skirtLength === null ? tile.geometricError : skirtLength;
+
+		// split the parent tile if needed
+		let result;
+		if (extension === 'tile_split') {
+			// split the parent tile
+			const searchParams = new URL(uri).searchParams;
+			const left = searchParams.get('left') === 'true';
+			const bottom = searchParams.get('bottom') === 'true';
+
+			const [west, south, east, north] = tile.parent.boundingVolume.region;
+			loader.minLat = south;
+			loader.maxLat = north;
+			loader.minLon = west;
+			loader.maxLon = east;
+			result = loader.clipToQuadrant(tile.parent.cached.scene, left, bottom);
+		} else {
+			const [west, south, east, north] = tile.boundingVolume.region;
+			loader.minLat = south;
+			loader.maxLat = north;
+			loader.minLon = west;
+			loader.maxLon = east;
+
+			// parse the tile data
+			result = loader.parse(buffer);
+		}
+
+		// adjust the bounding region to be more accurate based on the contents of the terrain file
+		// NOTE: The debug region bounds are only created after the tile is first shown so the debug
+		// region bounding volume will have the correct dimensions.
+		const { minHeight, maxHeight, metadata } = result.userData;
+		tile.boundingVolume.region[4] = minHeight;
+		tile.boundingVolume.region[5] = maxHeight;
+		tile.cached.boundingVolume.setRegionData(ellipsoid, ...tile.boundingVolume.region);
+
+		// use the geometric error value if it's present
+		if (metadata) {
+			if ('geometricerror' in metadata) {
+				tile.geometricError = metadata.geometricerror;
+			}
+
+			// if the tile hasn't been expanded yet and isn't in the queue to do so then
+			// mark it for expansion again
+			const hasMetadata = getTileHasMetadata(tile, this.layer);
+			if (hasMetadata && 'available' in metadata && tile.children.length === 0) {
+				// add an offset to account for the current and previous layers
+				tile[TILE_AVAILABLE] = [
+					...new Array(tile[TILE_LEVEL] + 1).fill(null),
+					...metadata.available
+				];
+			}
+		}
+
+		// NOTE: we expand children only once the parent mesh data is loaded to ensure the mesh
+		// data is ready for clipping. It's possible that this child data gets to the parse stage
+		// first, otherwise, while the parent is still downloading.
+		// Ideally we would be able to guarantee parents are loaded first but this is an odd case.
+		this.expandChildren(tile);
+
+		return result;
+	}
+
+	getAttributions(target) {
+		if (this.attribution) {
+			target.push(this.attribution);
+		}
+	}
+
+	// Local functions
+	createChild(level, x, y, available) {
+		const { tiles, layer, tiling, projection } = this;
+		const ellipsoid = tiles.ellipsoid;
+
+		const isAvailable = available === null || isTileAvailable(available, level, x, y);
+		const url = getContentUrl(x, y, level, 1, layer);
+		const region = [...tiling.getTileBounds(x, y, level), -INITIAL_HEIGHT_RANGE, INITIAL_HEIGHT_RANGE];
+		const [, south, /* east */, north, /* minHeight */, maxHeight] = region;
+		const midLat = (south > 0) !== (north > 0) ? 0 : Math.min(Math.abs(south), Math.abs(north));
+
+		// get the projected perimeter
+		ellipsoid.getCartographicToPosition(midLat, 0, maxHeight, _vec);
+		_vec.z = 0;
+
+		// https://github.com/CesiumGS/cesium/blob/53889cbed2a91d38e0fae4b6f2dcf6783632fc92/packages/engine/Source/Scene/QuadtreeTileProvider.js#L24-L31
+		// Implicit quantized mesh tile error halves with every layer
+		const tileCountX = projection.tileCountX;
+		const maxRadius = Math.max(ellipsoid.radius.x, ellipsoid.radius.y, ellipsoid.radius.z);
+		const rootGeometricError = maxRadius * 2 * Math.PI * 0.25 / (65 * tileCountX);
+		const geometricError = rootGeometricError / (2 ** level);
+
+		// Create the child
+		const tile = {
+			[TILE_AVAILABLE]: null,
+			[TILE_LEVEL]: level,
+			[TILE_X]: x,
+			[TILE_Y]: y,
+			refine: 'REPLACE',
+			geometricError: geometricError,
+			boundingVolume: { region },
+			content: isAvailable ? { uri: url } : null,
+			children: []
+		};
+
+		// if we're relying on tile metadata availability then skip storing the tile metadata
+		if (!getTileHasMetadata(tile, layer)) {
+			tile[TILE_AVAILABLE] = available;
+		}
+
+		return tile;
+	}
+
+	expandChildren(tile) {
+		const level = tile[TILE_LEVEL];
+		const x = tile[TILE_X];
+		const y = tile[TILE_Y];
+		const available = tile[TILE_AVAILABLE];
+
+		let hasChildren = false;
+		for (let cx = 0; cx < 2; cx++) {
+			for (let cy = 0; cy < 2; cy++) {
+				const child = this.createChild(level + 1, 2 * x + cx, 2 * y + cy, available);
+				if (child.content !== null) {
+					tile.children.push(child);
+					hasChildren = true;
+				} else {
+					tile.children.push(child);
+					child.content = { uri: `tile.tile_split?bottom=${cy === 0}&left=${cx === 0}` };
+				}
+			}
+		}
+
+		if (!hasChildren) {
+			tile.children.length = 0;
+		}
+	}
+
+	fetchData(uri, options) {
+		// if this is our custom url indicating a tile split then return fake response
+		if (/tile_split/.test(uri)) {
+			return new ArrayBuffer();
+		}
+	}
+
+	disposeTile(tile) {
+		// dispose of the generated children past the metadata layer to avoid accumulating too much
+		if (getTileHasMetadata(tile, this.layer)) {
+			tile.children.length = 0;
+			tile.__childrenProcessed = 0;
+			tile[TILE_AVAILABLE] = null;
+		}
+
+		tile.children.length = 0;
+		tile.__childrenProcessed = 0;
+	}
+
+}
+
 class CesiumIonAuthPlugin {
 
 	constructor({ apiToken, assetId = null, autoRefreshToken = false, useRecommendedSettings = true }) {
@@ -8087,7 +10527,11 @@ class CesiumIonAuthPlugin {
 						// CZML
 						// KML
 						// GEOJSON
-						if (json.type === 'TERRAIN' && tiles.getPluginByName('QUANTIZED_MESH_PLUGIN') === null) ; else if (json.type === 'IMAGERY' && tiles.getPluginByName('TMS_TILES_PLUGIN') === null) ;
+						if (json.type === 'TERRAIN' && tiles.getPluginByName('QUANTIZED_MESH_PLUGIN') === null) {
+							tiles.registerPlugin(new QuantizedMeshPlugin({
+								useRecommendedSettings: this.useRecommendedSettings
+							}));
+						} else if (json.type === 'IMAGERY' && tiles.getPluginByName('TMS_TILES_PLUGIN') === null) ;
 
 						tiles.rootURL = json.url;
 						tiles.fetchOptions.headers = tiles.fetchOptions.headers || {};
@@ -9057,6 +11501,12 @@ Vector3.prototype.angleTo = function(v) {
 	return Math.acos(MathUtils.clamp(theta, -1, 1));
 };
 
+Vector3.prototype[Symbol.iterator] = function* () {
+	yield this.x;
+	yield this.y;
+	yield this.z;
+};
+
 Vector3.prototype.isVector3 = true;
 
 Quaternion.prototype.angleTo = function(q) {
@@ -9074,6 +11524,14 @@ if (!Quaternion.prototype.slerp) {
 	};
 }
 
+Triangle.prototype.setFromAttributeAndIndices = function(attribute, i0, i1, i2) {
+	const array = attribute.buffer.array;
+	const itemSize = attribute.size;
+	const offset = attribute.offset;
+	this.a.fromArray(array, i0 * itemSize + offset);
+	this.b.fromArray(array, i1 * itemSize + offset);
+	this.c.fromArray(array, i2 * itemSize + offset);
+};
 
 Object3D.prototype.removeFromParent = function() {
 	const parent = this.parent;
@@ -9084,6 +11542,8 @@ Object3D.prototype.removeFromParent = function() {
 
 	return this;
 };
+
+Object3D.prototype.isObject3D = true;
 
 Ray.prototype.closestPointToPoint = function(point, target) {
 	target.subVectors(point, this.origin);
@@ -9159,4 +11619,4 @@ Camera.prototype.updateProjectionMatrix = function() {
 	return this;
 };
 
-export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, EnvironmentControls, GlobeControls, I3DMLoader, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, ReorientationPlugin, TileGLTFLoader, Tiles3D, TilesFadePlugin };
+export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, EnvironmentControls, GlobeControls, I3DMLoader, ImplicitTilingPlugin, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, QuantizedMeshPlugin, ReorientationPlugin, TileGLTFLoader, Tiles3D, TilesFadePlugin };

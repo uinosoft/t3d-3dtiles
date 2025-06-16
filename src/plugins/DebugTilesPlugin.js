@@ -3,7 +3,7 @@ import { Box3Helper } from 't3d/addons/objects/Box3Helper.js';
 import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
 import { InstancedPBRMaterial } from '../materials/InstancedPBRMaterial.js';
 import { InstancedBasicMaterial } from '../materials/InstancedBasicMaterial.js';
-import { traverseSet, traverseAncestors } from '../utils/traverseFunctions.js';
+import { traverseSet, traverseAncestors } from '../utilities/traverseFunctions.js';
 
 export class DebugTilesPlugin {
 

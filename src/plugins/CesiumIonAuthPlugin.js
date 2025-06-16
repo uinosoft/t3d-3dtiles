@@ -1,4 +1,5 @@
 import { GoogleCloudAuthPlugin } from './GoogleCloudAuthPlugin.js';
+import { QuantizedMeshPlugin } from './QuantizedMeshPlugin.js';
 
 export class CesiumIonAuthPlugin {
 
@@ -118,7 +119,9 @@ export class CesiumIonAuthPlugin {
 						// KML
 						// GEOJSON
 						if (json.type === 'TERRAIN' && tiles.getPluginByName('QUANTIZED_MESH_PLUGIN') === null) {
-							// TODO QuantizedMeshPlugin
+							tiles.registerPlugin(new QuantizedMeshPlugin({
+								useRecommendedSettings: this.useRecommendedSettings
+							}));
 						} else if (json.type === 'IMAGERY' && tiles.getPluginByName('TMS_TILES_PLUGIN') === null) {
 							// TODO TMSTilesPlugin
 						}

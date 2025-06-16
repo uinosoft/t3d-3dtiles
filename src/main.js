@@ -14,16 +14,18 @@ export * from './loaders/PNTSLoader.js';
 export { GlobeControls } from './controls/GlobeControls.js';
 export { EnvironmentControls } from './controls/EnvironmentControls.js';
 
+export { ImplicitTilingPlugin } from './plugins/base/ImplicitTilingPlugin.js';
 export { TilesFadePlugin } from './plugins/fade/TilesFadePlugin.js';
 export { CesiumIonAuthPlugin } from './plugins/CesiumIonAuthPlugin.js';
 export { DebugTilesPlugin } from './plugins/DebugTilesPlugin.js';
 export { ReorientationPlugin } from './plugins/ReorientationPlugin.js';
+export { QuantizedMeshPlugin } from './plugins/QuantizedMeshPlugin.js';
 
 export { LoadParser as DebugLoadParser } from './loaders/parsers/LoadParser.js';
 
 // Exporting some prototype methods for Matrix4, Vector3, and Object3D classes
 
-import { Vector3, Quaternion, Matrix4, Object3D, Ray, MathUtils, Camera } from 't3d';
+import { Vector3, Quaternion, Matrix4, Triangle, Object3D, Ray, MathUtils, Camera } from 't3d';
 
 const _quaternion = new Quaternion();
 const _vector = new Vector3();
@@ -198,6 +200,12 @@ Vector3.prototype.angleTo = function(v) {
 	return Math.acos(MathUtils.clamp(theta, -1, 1));
 };
 
+Vector3.prototype[Symbol.iterator] = function* () {
+	yield this.x;
+	yield this.y;
+	yield this.z;
+};
+
 Vector3.prototype.isVector3 = true;
 
 Quaternion.prototype.angleTo = function(q) {
@@ -215,6 +223,14 @@ if (!Quaternion.prototype.slerp) {
 	};
 }
 
+Triangle.prototype.setFromAttributeAndIndices = function(attribute, i0, i1, i2) {
+	const array = attribute.buffer.array;
+	const itemSize = attribute.size;
+	const offset = attribute.offset;
+	this.a.fromArray(array, i0 * itemSize + offset);
+	this.b.fromArray(array, i1 * itemSize + offset);
+	this.c.fromArray(array, i2 * itemSize + offset);
+};
 
 Object3D.prototype.removeFromParent = function() {
 	const parent = this.parent;
@@ -225,6 +241,8 @@ Object3D.prototype.removeFromParent = function() {
 
 	return this;
 };
+
+Object3D.prototype.isObject3D = true;
 
 Ray.prototype.closestPointToPoint = function(point, target) {
 	target.subVectors(point, this.origin);

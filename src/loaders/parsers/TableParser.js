@@ -1,5 +1,5 @@
-import { BatchTable } from '../../utils/BatchTable.js';
-import { FeatureTable } from '../../utils/FeatureTable.js';
+import { BatchTable } from '../../utilities/BatchTable.js';
+import { FeatureTable } from '../../utilities/FeatureTable.js';
 
 /**
  * This parser is used to parse the feature table and batch table of a 3D Tiles resource.
