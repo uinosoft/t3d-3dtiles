@@ -9093,8 +9093,8 @@ class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 		const uvs = [];
 		const indexArr = [];
 		const normals = [];
-		let groupOffset = 0;
-		let materialIndex = 0;
+		// const groupOffset = 0;
+		// const materialIndex = 0;
 
 		// construct terrain
 		for (let i = 0; i < vertexCount; i++) {
@@ -9117,9 +9117,9 @@ class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 		}
 
 		// add material group
-		geometry.addGroup(groupOffset, indices.length, materialIndex);
-		groupOffset += indices.length;
-		materialIndex++;
+		// geometry.addGroup(groupOffset, indices.length, materialIndex);
+		// groupOffset += indices.length;
+		// materialIndex++;
 
 		// create a lower cap
 		if (solid) {
@@ -9143,11 +9143,10 @@ class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 				}
 			}
 
-
 			// add material group
-			geometry.addGroup(groupOffset, indices.length, materialIndex);
-			groupOffset += indices.length;
-			materialIndex++;
+			// geometry.addGroup(groupOffset, indices.length, materialIndex);
+			// groupOffset += indices.length;
+			// materialIndex++;
 		}
 
 		// construct skirts
@@ -9207,9 +9206,9 @@ class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 			}
 
 			// add material group
-			geometry.addGroup(groupOffset, indices.length, materialIndex);
-			groupOffset += indices.length;
-			materialIndex++;
+			// geometry.addGroup(groupOffset, indices.length, materialIndex);
+			// groupOffset += indices.length;
+			// materialIndex++;
 		}
 
 		// shift the positions by the center of the tile
@@ -9397,8 +9396,8 @@ class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 		const capGroup = sourceGeometry.groups[0];
 
 		// construct the cap geometry
-		let newStart = newIndex.length;
-		let materialIndex = 0;
+		// const newStart = newIndex.length;
+		// const materialIndex = 0;
 		for (let i = capGroup.start / 3; i < (capGroup.start + capGroup.count) / 3; i++) {
 			const i0 = index.getX(i * 3 + 0);
 			const i1 = index.getX(i * 3 + 1);
@@ -9444,13 +9443,13 @@ class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 			triPool.reset();
 		}
 
-		geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
-		materialIndex++;
+		// geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
+		// materialIndex++;
 
 		// construct bottom cap
 		const capTriangles = newIndex.length / 3;
 		if (solid) {
-			newStart = newIndex.length;
+			// newStart = newIndex.length;
 			for (let i = capTriangles * 3 - 1; i >= 0; i--) {
 				const index = newIndex[i];
 				_temp.fromArray(newPosition, index * 3).add(mesh.position);
@@ -9463,14 +9462,14 @@ class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 				pushVertex(_pos0, _uv0, _temp);
 			}
 
-			geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
-			materialIndex++;
+			// geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
+			// materialIndex++;
 		}
 
 		// construct the skirt
 		if (skirtLength > 0) {
 			// TODO: this seems to have some problematic cases at the root tiles near the poles
-			newStart = newIndex.length;
+			// newStart = newIndex.length;
 			for (let i = 0; i < capTriangles; i++) {
 				const triOffset = 3 * i;
 				for (let e = 0; e < 3; e++) {
@@ -9523,8 +9522,8 @@ class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 				}
 			}
 
-			geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
-			materialIndex++;
+			// geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
+			// materialIndex++;
 		}
 
 		// offset the uvs
@@ -10579,10 +10578,81 @@ class CesiumIonAuthPlugin {
 
 }
 
+const ORIGINAL_MATERIAL = Symbol('ORIGINAL_MATERIAL');
+const HAS_RANDOM_COLOR = Symbol('HAS_RANDOM_COLOR');
+const HAS_RANDOM_NODE_COLOR = Symbol('HAS_RANDOM_NODE_COLOR');
+const LOAD_TIME = Symbol('LOAD_TIME');
+const PARENT_BOUND_REF_COUNT = Symbol('PARENT_BOUND_REF_COUNT');
+
+const _sphere = /* @__PURE__ */ new Sphere();
+const emptyRaycast = () => {};
+const colors = {};
+
+// Return a consistant random color for an index
+function getIndexedRandomColor(index) {
+	if (!colors[index]) {
+		const h = Math.random();
+		const s = 0.5 + Math.random() * 0.5;
+		const l = 0.375 + Math.random() * 0.25;
+
+		colors[index] = new Color3().setHSL(h, s, l);
+	}
+	return colors[index];
+}
+
+// color modes
+const NONE = 0;
+const SCREEN_ERROR = 1;
+const GEOMETRIC_ERROR = 2;
+const DISTANCE = 3;
+const DEPTH = 4;
+const RELATIVE_DEPTH = 5;
+const IS_LEAF = 6;
+const RANDOM_COLOR = 7;
+const RANDOM_NODE_COLOR = 8;
+const CUSTOM_COLOR = 9;
+const LOAD_ORDER = 10;
+
+const ColorModes = Object.freeze({
+	NONE,
+	SCREEN_ERROR,
+	GEOMETRIC_ERROR,
+	DISTANCE,
+	DEPTH,
+	RELATIVE_DEPTH,
+	IS_LEAF,
+	RANDOM_COLOR,
+	RANDOM_NODE_COLOR,
+	CUSTOM_COLOR,
+	LOAD_ORDER
+});
+
 class DebugTilesPlugin {
 
 	static get ColorModes() {
 		return ColorModes;
+	}
+
+	get unlit() {
+		return this._unlit;
+	}
+
+	set unlit(v) {
+		if (v !== this._unlit) {
+			this._unlit = v;
+			this.materialsNeedUpdate = true;
+		}
+	}
+
+	get colorMode() {
+		return this._colorMode;
+	}
+
+	set colorMode(v) {
+		if (v !== this._colorMode) {
+			this._colorMode = v;
+			this.materialsNeedUpdate = true;
+		}
 	}
 
 	constructor(options) {
@@ -10596,13 +10666,17 @@ class DebugTilesPlugin {
 			maxDebugDistance: -1,
 			maxDebugError: -1,
 			customColorCallback: null,
+			unlit: false,
+			enabled: true,
 			...options
 		};
 
 		this.name = 'DEBUG_TILES_PLUGIN';
 		this.tiles = null;
 
-		this._enabled = true;
+		this._colorMode = null;
+		this._unlit = null;
+		this.materialsNeedUpdate = false;
 
 		this.extremeDebugDepth = -1;
 		this.extremeDebugError = -1;
@@ -10611,6 +10685,7 @@ class DebugTilesPlugin {
 		this.regionGroup = null;
 
 		// options
+		this._enabled = options.enabled;
 		this._displayParentBounds = options.displayParentBounds;
 		this.displayBoxBounds = options.displayBoxBounds;
 		this.displaySphereBounds = options.displaySphereBounds;
@@ -10620,6 +10695,7 @@ class DebugTilesPlugin {
 		this.maxDebugDistance = options.maxDebugDistance;
 		this.maxDebugError = options.maxDebugError;
 		this.customColorCallback = options.customColorCallback;
+		this.unlit = options.unlit;
 
 		this.getDebugColor = (value, target) => {
 			target.setRGB(value, value, value);
@@ -10631,17 +10707,15 @@ class DebugTilesPlugin {
 	}
 
 	set enabled(v) {
-		if (v !== this._enabled) {
-			this._enabled = v;
-
-			if (this._enabled) {
-				if (this.tiles) {
-					this.init(this.tiles);
-				}
+		if (v !== this._enabled && this.tiles !== null) {
+			if (v) {
+				this.init(this.tiles);
 			} else {
 				this.dispose();
 			}
 		}
+
+		this._enabled = v;
 	}
 
 	get displayParentBounds() {
@@ -10672,6 +10746,10 @@ class DebugTilesPlugin {
 	// initialize the groups for displaying helpers, register events, and initialize existing tiles
 	init(tiles) {
 		this.tiles = tiles;
+
+		if (!this.enabled) {
+			return;
+		}
 
 		// initialize groups
 		this.boxGroup = new Object3D();
@@ -10784,10 +10862,17 @@ class DebugTilesPlugin {
 	}
 
 	_onUpdateAfter() {
-		const tiles = this.tiles;
+		const { tiles, colorMode } = this;
 
 		if (!tiles.root) {
 			return;
+		}
+
+		if (this.materialsNeedUpdate) {
+			tiles.forEachLoadedModel(scene => {
+				this._updateMaterial(scene);
+			});
+			this.materialsNeedUpdate = false;
 		}
 
 		// set box or sphere visibility
@@ -10818,9 +10903,7 @@ class DebugTilesPlugin {
 			maxDistance = this.maxDebugDistance;
 		}
 
-		const errorTarget = tiles.errorTarget;
-		const colorMode = this.colorMode;
-		const visibleTiles = tiles.visibleTiles;
+		const { errorTarget, visibleTiles } = tiles;
 		let sortedTiles;
 		if (colorMode === LOAD_ORDER) {
 			sortedTiles = Array.from(visibleTiles).sort((a, b) => {
@@ -10847,38 +10930,7 @@ class DebugTilesPlugin {
 					l = 0.375 + Math.random() * 0.25;
 				}
 
-				const currMaterial = c.material;
-				if (currMaterial) {
-					// Reset the material if needed
-					const originalMaterial = c[ORIGINAL_MATERIAL];
-
-					if (colorMode === NONE && currMaterial !== originalMaterial) {
-						c.material.dispose();
-						c.material = c[ORIGINAL_MATERIAL];
-					} else if (colorMode !== NONE && currMaterial === originalMaterial) {
-						if (c.material.drawMode === DRAW_MODE.POINTS) {
-							const pointsMaterial = new PointsMaterial();
-							pointsMaterial.size = originalMaterial.size;
-							pointsMaterial.sizeAttenuation = originalMaterial.sizeAttenuation;
-							c.material = pointsMaterial;
-						} else {
-							if (c.material.isInstancedPBRMaterial) {
-								c.material = new InstancedPBRMaterial();
-								c.material.metalness = 0.0;
-								c.material.roughness = 1.0;
-							} else if (c.material.isInstancedBasicMaterial) {
-								c.material = new InstancedBasicMaterial();
-							} else {
-								c.material = new PBRMaterial();
-								c.material.metalness = 0.0;
-								c.material.roughness = 1.0;
-							}
-
-							c.material.shading = SHADING_TYPE.FLAT_SHADING;
-							c.material.envMap = undefined;
-						}
-					}
-
+				if (c.material) {
 					if (colorMode !== RANDOM_COLOR) {
 						delete c.material[HAS_RANDOM_COLOR];
 					}
@@ -11087,6 +11139,54 @@ class DebugTilesPlugin {
 		}
 	}
 
+	_updateMaterial(scene) {
+		// update the materials for debug rendering
+		const { colorMode, unlit } = this;
+		scene.traverse(c => {
+			if (!c.material) {
+				return;
+			}
+
+			const currMaterial = c.material;
+			const originalMaterial = c[ORIGINAL_MATERIAL];
+
+			// dispose the previous material
+			if (currMaterial !== originalMaterial) {
+				currMaterial.dispose();
+			}
+
+			// assign the new material
+			if (colorMode !== NONE || unlit) {
+				if (c.material.drawMode === DRAW_MODE.POINTS) {
+					const pointsMaterial = new PointsMaterial();
+					pointsMaterial.size = originalMaterial.size;
+					pointsMaterial.sizeAttenuation = originalMaterial.sizeAttenuation;
+					c.material = pointsMaterial;
+				} else if (c.geometry.instanceCount >= 0) {
+					c.material = unlit ? new InstancedBasicMaterial() : new InstancedPBRMaterial();
+					c.material.metalness = 0.0;
+					c.material.roughness = 1.0;
+					c.material.shading = unlit ? SHADING_TYPE.SMOOTH_SHADING : SHADING_TYPE.FLAT_SHADING;
+				} else {
+					c.material = unlit ? new BasicMaterial() : new PBRMaterial();
+					c.material.metalness = 0.0;
+					c.material.roughness = 1.0;
+					c.material.shading = unlit ? SHADING_TYPE.SMOOTH_SHADING : SHADING_TYPE.FLAT_SHADING;
+				}
+
+				c.material.envMap = undefined;
+
+				// if no debug rendering is happening then assign the material properties
+				if (colorMode === NONE) {
+					c.material.diffuseMap = originalMaterial.diffuseMap;
+					c.material.diffuse.setRGB(originalMaterial.diffuse);
+				}
+			} else {
+				c.material = originalMaterial;
+			}
+		});
+	}
+
 	_onLoadModel(scene, tile) {
 		tile[LOAD_TIME] = performance.now();
 
@@ -11097,6 +11197,9 @@ class DebugTilesPlugin {
 				c[ORIGINAL_MATERIAL] = material;
 			}
 		});
+
+		// Update the materials to align with the settings
+		this._updateMaterial(scene);
 	}
 
 	_onDisposeModel(tile) {
@@ -11118,24 +11221,29 @@ class DebugTilesPlugin {
 	}
 
 	dispose() {
+		if (!this.enabled) {
+			return;
+		}
+
 		const tiles = this.tiles;
 
-		if (tiles) {
-			tiles.removeEventListener('load-tile-set', this._onLoadTileSetCB);
-			tiles.removeEventListener('load-model', this._onLoadModelCB);
-			tiles.removeEventListener('dispose-model', this._onDisposeModelCB);
-			tiles.removeEventListener('update-after', this._onUpdateAfterCB);
-			tiles.removeEventListener('tile-visibility-change', this._onTileVisibilityChangeCB);
+		tiles.removeEventListener('load-tile-set', this._onLoadTileSetCB);
+		tiles.removeEventListener('load-model', this._onLoadModelCB);
+		tiles.removeEventListener('dispose-model', this._onDisposeModelCB);
+		tiles.removeEventListener('update-after', this._onUpdateAfterCB);
+		tiles.removeEventListener('tile-visibility-change', this._onTileVisibilityChangeCB);
 
-			// reset all materials
-			this.colorMode = NONE;
-			this._onUpdateAfter();
+		// reset all materials
+		this.colorMode = NONE;
+		this.unlit = false;
+		tiles.forEachLoadedModel(scene => {
+			this._updateMaterial(scene);
+		});
 
-			// dispose of all helper objects
-			tiles.traverse(tile => {
-				this._onDisposeModel(tile);
-			});
-		}
+		// dispose of all helper objects
+		tiles.traverse(tile => {
+			this._onDisposeModel(tile);
+		});
 
 		this.boxGroup?.removeFromParent();
 		this.sphereGroup?.removeFromParent();
@@ -11143,55 +11251,6 @@ class DebugTilesPlugin {
 	}
 
 }
-
-const ORIGINAL_MATERIAL = Symbol('ORIGINAL_MATERIAL');
-const HAS_RANDOM_COLOR = Symbol('HAS_RANDOM_COLOR');
-const HAS_RANDOM_NODE_COLOR = Symbol('HAS_RANDOM_NODE_COLOR');
-const LOAD_TIME = Symbol('LOAD_TIME');
-const PARENT_BOUND_REF_COUNT = Symbol('PARENT_BOUND_REF_COUNT');
-
-const _sphere = new Sphere();
-const emptyRaycast = () => {};
-const colors = {};
-
-// Return a consistant random color for an index
-function getIndexedRandomColor(index) {
-	if (!colors[index]) {
-		const h = Math.random();
-		const s = 0.5 + Math.random() * 0.5;
-		const l = 0.375 + Math.random() * 0.25;
-
-		colors[index] = new Color3().setHSL(h, s, l);
-	}
-	return colors[index];
-}
-
-// color modes
-const NONE = 0;
-const SCREEN_ERROR = 1;
-const GEOMETRIC_ERROR = 2;
-const DISTANCE = 3;
-const DEPTH = 4;
-const RELATIVE_DEPTH = 5;
-const IS_LEAF = 6;
-const RANDOM_COLOR = 7;
-const RANDOM_NODE_COLOR = 8;
-const CUSTOM_COLOR = 9;
-const LOAD_ORDER = 10;
-
-const ColorModes = Object.freeze({
-	NONE,
-	SCREEN_ERROR,
-	GEOMETRIC_ERROR,
-	DISTANCE,
-	DEPTH,
-	RELATIVE_DEPTH,
-	IS_LEAF,
-	RANDOM_COLOR,
-	RANDOM_NODE_COLOR,
-	CUSTOM_COLOR,
-	LOAD_ORDER
-});
 
 class ReorientationPlugin {
 

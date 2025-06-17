@@ -72,8 +72,8 @@ export class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 		const uvs = [];
 		const indexArr = [];
 		const normals = [];
-		let groupOffset = 0;
-		let materialIndex = 0;
+		// const groupOffset = 0;
+		// const materialIndex = 0;
 
 		// construct terrain
 		for (let i = 0; i < vertexCount; i++) {
@@ -96,9 +96,9 @@ export class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 		}
 
 		// add material group
-		geometry.addGroup(groupOffset, indices.length, materialIndex);
-		groupOffset += indices.length;
-		materialIndex++;
+		// geometry.addGroup(groupOffset, indices.length, materialIndex);
+		// groupOffset += indices.length;
+		// materialIndex++;
 
 		// create a lower cap
 		if (solid) {
@@ -122,11 +122,10 @@ export class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 				}
 			}
 
-
 			// add material group
-			geometry.addGroup(groupOffset, indices.length, materialIndex);
-			groupOffset += indices.length;
-			materialIndex++;
+			// geometry.addGroup(groupOffset, indices.length, materialIndex);
+			// groupOffset += indices.length;
+			// materialIndex++;
 		}
 
 		// construct skirts
@@ -186,9 +185,9 @@ export class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 			}
 
 			// add material group
-			geometry.addGroup(groupOffset, indices.length, materialIndex);
-			groupOffset += indices.length;
-			materialIndex++;
+			// geometry.addGroup(groupOffset, indices.length, materialIndex);
+			// groupOffset += indices.length;
+			// materialIndex++;
 		}
 
 		// shift the positions by the center of the tile
@@ -376,8 +375,8 @@ export class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 		const capGroup = sourceGeometry.groups[0];
 
 		// construct the cap geometry
-		let newStart = newIndex.length;
-		let materialIndex = 0;
+		// const newStart = newIndex.length;
+		// const materialIndex = 0;
 		for (let i = capGroup.start / 3; i < (capGroup.start + capGroup.count) / 3; i++) {
 			const i0 = index.getX(i * 3 + 0);
 			const i1 = index.getX(i * 3 + 1);
@@ -423,13 +422,13 @@ export class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 			triPool.reset();
 		}
 
-		geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
-		materialIndex++;
+		// geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
+		// materialIndex++;
 
 		// construct bottom cap
 		const capTriangles = newIndex.length / 3;
 		if (solid) {
-			newStart = newIndex.length;
+			// newStart = newIndex.length;
 			for (let i = capTriangles * 3 - 1; i >= 0; i--) {
 				const index = newIndex[i];
 				_temp.fromArray(newPosition, index * 3).add(mesh.position);
@@ -442,14 +441,14 @@ export class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 				pushVertex(_pos0, _uv0, _temp, false);
 			}
 
-			geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
-			materialIndex++;
+			// geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
+			// materialIndex++;
 		}
 
 		// construct the skirt
 		if (skirtLength > 0) {
 			// TODO: this seems to have some problematic cases at the root tiles near the poles
-			newStart = newIndex.length;
+			// newStart = newIndex.length;
 			for (let i = 0; i < capTriangles; i++) {
 				const triOffset = 3 * i;
 				for (let e = 0; e < 3; e++) {
@@ -502,8 +501,8 @@ export class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 				}
 			}
 
-			geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
-			materialIndex++;
+			// geometry.addGroup(newStart, newIndex.length - newStart, materialIndex);
+			// materialIndex++;
 		}
 
 		// offset the uvs
