@@ -64,7 +64,8 @@
 		camera.setPerspective(45 / 180 * Math.PI, width / height, 10, 10000000);
 		scene.add(camera);
 
-		let controller;
+		const controller = new GlobeControls(scene, camera, canvas, null);
+		controller.pivotMesh.material.uniforms.resolution = [width, height];
 
 		// Create 3D tiles
 
@@ -91,8 +92,7 @@
 			tiles3D.addCamera(camera);
 			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
-			controller = new GlobeControls(scene, camera, canvas, tiles3D);
-			controller.pivotMesh.material.uniforms.resolution = [width, height];
+			controller.setTilesRenderer(tiles3D);
 
 			const pane = new Pane();
 
@@ -114,7 +114,7 @@
 		function loop(count) {
 			requestAnimationFrame(loop);
 
-			controller && controller.update();
+			controller.update();
 		
 			scene.anchorMatrix.copy(camera.worldMatrix);
 

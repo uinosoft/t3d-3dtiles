@@ -7686,9 +7686,11 @@
 	const _toCenter = /* @__PURE__ */new t3d.Vector3();
 	const _ray = /* @__PURE__ */new t3d.Ray();
 	const _ellipsoid = /* @__PURE__ */new Ellipsoid();
+	const _pointer = /* @__PURE__ */new t3d.Vector2();
 	const _latLon = {};
-	const _pointer = new t3d.Vector2();
-	const MIN_ELEVATION = 400;
+
+	// hand picked minimum elevation to tune far plane near surface
+	const MIN_ELEVATION = 2550;
 	class GlobeControls extends EnvironmentControls {
 		get ellipsoid() {
 			return this.tilesRenderer ? this.tilesRenderer.ellipsoid : null;
@@ -7841,12 +7843,11 @@
 				ellipsoid.getPositionToCartographic(_pos$1, _latLon);
 
 				// use a minimum elevation for computing the horizon distance to avoid the far clip
-				// plane approaching zero as the camera goes to or below sea level.
+				// plane approaching zero or clipping mountains over the horizon in the distance as
+				// the camera goes to or below sea level.
 				const elevation = Math.max(ellipsoid.getPositionElevation(_pos$1), MIN_ELEVATION);
 				const horizonDistance = ellipsoid.calculateHorizonDistance(_latLon.lat, elevation);
-
-				// extend the horizon distance by 2.5 to handle cases where geometry extends above the horizon
-				camera.far = horizonDistance * 2.5 + 0.1 + maxRadius * farMargin;
+				camera.far = horizonDistance + 0.1 + maxRadius * farMargin;
 				camera.updateProjectionMatrix();
 			} else {
 				this._getVirtualOrthoCameraPosition(camera.position, camera);
