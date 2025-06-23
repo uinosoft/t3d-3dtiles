@@ -6234,95 +6234,6 @@
 		}
 	}
 
-	class Raycaster {
-		/**
-		 * This creates a new raycaster object.
-		 * @param {Vector3} origin — The origin vector where the ray casts from.
-		 * @param {Vector3} direction — The direction vector that gives direction to the ray. Should be normalized.
-		 */
-		constructor(origin, direction) {
-			/**
-			 * The Ray used for the raycasting.
-			 * @type {Ray}
-			 */
-			this.ray = new t3d.Ray(origin, direction);
-		}
-
-		/**
-		 * Updates the ray with a new origin and direction.
-		 * @param {Vector3} origin — The origin vector where the ray casts from.
-		 * @param {Vector3} direction — The normalized direction vector that gives direction to the ray.
-		 */
-		set(origin, direction) {
-			this.ray.set(origin, direction);
-		}
-
-		/**
-		 * Updates the ray with a new origin and direction.
-		 * @param {Vector2} coords — 2D coordinates of the mouse, in normalized device coordinates (NDC)---X and Y components should be between -1 and 1.
-		 * @param {Camera} camera — camera from which the ray should originate.
-		 */
-		setFromCamera(coords, camera) {
-			if (camera.projectionMatrix.elements[11] === -1) {
-				// perspective
-				this.ray.origin.setFromMatrixPosition(camera.worldMatrix);
-				this.ray.direction.set(coords.x, coords.y, 0.5).unproject(camera).sub(this.ray.origin).normalize();
-			} else {
-				// orthographic
-				// set origin in plane of camera
-				// projectionMatrix.elements[14] = (near + far) / (near - far)
-				this.ray.origin.set(coords.x, coords.y, camera.projectionMatrix.elements[14]).unproject(camera);
-				this.ray.direction.set(0, 0, -1).transformDirection(camera.worldMatrix);
-			}
-		}
-
-		/**
-		 * Checks all intersection between the ray and the object with or without the descendants. Intersections are returned sorted by distance, closest first. An array of intersections is returned:
-		 * [ { distance, point, face, faceIndex, object }, ... ]
-		 * @param {Object3D} object — The object to check for intersection with the ray.
-		 * @param {boolean} [recursive] — If true, it also checks all descendants. Otherwise it only checks intersecton with the object.
-		 * @returns {object[]} An array of intersections
-		 */
-		intersectObject(object, recursive) {
-			const intersects = [];
-			intersectObject(object, this, intersects, recursive);
-			intersects.sort(ascSort);
-			return intersects;
-		}
-
-		/**
-		 * Checks all intersection between the ray and the objects with or without the descendants. Intersections are returned sorted by distance, closest first. An array of intersections is returned:
-		 * [ { distance, point, face, faceIndex, object }, ... ]
-		 * @param {Object3D[]} objects — The objects to check for intersection with the ray.
-		 * @param {boolean} [recursive=false] — If true, it also checks all descendants. Otherwise it only checks intersecton with the object.
-		 * @returns {object[]} An array of intersections
-		 */
-		intersectObjects(objects, recursive) {
-			const intersects = [];
-			if (Array.isArray(objects) === false) {
-				console.warn('Raycaster.intersectObjects: objects is not an Array.');
-				return intersects;
-			}
-			for (let i = 0, l = objects.length; i < l; i++) {
-				intersectObject(objects[i], this, intersects, recursive);
-			}
-			intersects.sort(ascSort);
-			return intersects;
-		}
-	}
-	function ascSort(a, b) {
-		return a.distance - b.distance;
-	}
-	function intersectObject(object, raycaster, intersects, recursive) {
-		object.raycast(raycaster.ray, intersects);
-		if (recursive === true) {
-			const children = object.children;
-			for (let i = 0, l = children.length; i < l; i++) {
-				intersectObject(children[i], raycaster, intersects, true);
-			}
-		}
-	}
-
 	class PivotPointMesh extends t3d.Mesh {
 		constructor() {
 			super(new t3d.PlaneGeometry(0, 0), new PivotMaterial());
@@ -6737,7 +6648,7 @@
 			this.pivotMesh.scale.setScalar(0.25);
 
 			// raycaster
-			this.raycaster = new Raycaster();
+			this.raycaster = new t3d.Raycaster();
 			this.up = new t3d.Vector3(0, 1, 0);
 			this._detachCallback = null;
 			this._upInitialized = false;
@@ -11448,17 +11359,17 @@
 			for (let i = 0; i < 3; i++) {
 				const axis1 = axes[i];
 				const axis2 = axes[(i + 1) % 3];
-				_vector$1.set(0, 0, 0);
+				_vector.set(0, 0, 0);
 				for (let a = 0; a < angleSteps; a++) {
 					let angle;
 					angle = 2 * Math.PI * a / (angleSteps - 1);
-					_vector$1[axis1] = Math.sin(angle);
-					_vector$1[axis2] = Math.cos(angle);
-					positions.push(_vector$1.x, _vector$1.y, _vector$1.z);
+					_vector[axis1] = Math.sin(angle);
+					_vector[axis2] = Math.cos(angle);
+					positions.push(_vector.x, _vector.y, _vector.z);
 					angle = 2 * Math.PI * (a + 1) / (angleSteps - 1);
-					_vector$1[axis1] = Math.sin(angle);
-					_vector$1[axis2] = Math.cos(angle);
-					positions.push(_vector$1.x, _vector$1.y, _vector$1.z);
+					_vector[axis1] = Math.sin(angle);
+					_vector[axis2] = Math.cos(angle);
+					positions.push(_vector.x, _vector.y, _vector.z);
 				}
 			}
 			const geometry = new t3d.Geometry();
@@ -11481,7 +11392,7 @@
 		}
 	}
 	SphereHelper.prototype.isSphereHelper = true;
-	const _vector$1 = new t3d.Vector3();
+	const _vector = new t3d.Vector3();
 	const axes = ['x', 'y', 'z'];
 
 	const ORIGINAL_MATERIAL = Symbol('ORIGINAL_MATERIAL');
@@ -12228,174 +12139,12 @@
 	}
 
 	const _quaternion = new t3d.Quaternion();
-	const _vector = new t3d.Vector3();
-	if (!t3d.Matrix4.prototype.makeScale) {
-		t3d.Matrix4.prototype.makeScale = function (x, y, z) {
-			return this.set(x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1);
-		};
-	}
-	t3d.Matrix4.prototype.makeBasis = function (xAxis, yAxis, zAxis) {
-		this.set(xAxis.x, yAxis.x, zAxis.x, 0, xAxis.y, yAxis.y, zAxis.y, 0, xAxis.z, yAxis.z, zAxis.z, 0, 0, 0, 0, 1);
-		return this;
-	};
-	t3d.Matrix4.prototype.setPosition = function (x, y, z) {
-		const te = this.elements;
-		if (x.isVector3) {
-			te[12] = x.x;
-			te[13] = x.y;
-			te[14] = x.z;
-		} else {
-			te[12] = x;
-			te[13] = y;
-			te[14] = z;
-		}
-		return this;
-	};
-	t3d.Matrix4.prototype.makeRotationFromEuler = function (euler) {
-		const te = this.elements;
-		const x = euler.x,
-			y = euler.y,
-			z = euler.z;
-		const a = Math.cos(x),
-			b = Math.sin(x);
-		const c = Math.cos(y),
-			d = Math.sin(y);
-		const e = Math.cos(z),
-			f = Math.sin(z);
-		if (euler.order === 'XYZ') {
-			const ae = a * e,
-				af = a * f,
-				be = b * e,
-				bf = b * f;
-			te[0] = c * e;
-			te[4] = -c * f;
-			te[8] = d;
-			te[1] = af + be * d;
-			te[5] = ae - bf * d;
-			te[9] = -b * c;
-			te[2] = bf - ae * d;
-			te[6] = be + af * d;
-			te[10] = a * c;
-		} else if (euler.order === 'YXZ') {
-			const ce = c * e,
-				cf = c * f,
-				de = d * e,
-				df = d * f;
-			te[0] = ce + df * b;
-			te[4] = de * b - cf;
-			te[8] = a * d;
-			te[1] = a * f;
-			te[5] = a * e;
-			te[9] = -b;
-			te[2] = cf * b - de;
-			te[6] = df + ce * b;
-			te[10] = a * c;
-		} else if (euler.order === 'ZXY') {
-			const ce = c * e,
-				cf = c * f,
-				de = d * e,
-				df = d * f;
-			te[0] = ce - df * b;
-			te[4] = -a * f;
-			te[8] = de + cf * b;
-			te[1] = cf + de * b;
-			te[5] = a * e;
-			te[9] = df - ce * b;
-			te[2] = -a * d;
-			te[6] = b;
-			te[10] = a * c;
-		} else if (euler.order === 'ZYX') {
-			const ae = a * e,
-				af = a * f,
-				be = b * e,
-				bf = b * f;
-			te[0] = c * e;
-			te[4] = be * d - af;
-			te[8] = ae * d + bf;
-			te[1] = c * f;
-			te[5] = bf * d + ae;
-			te[9] = af * d - be;
-			te[2] = -d;
-			te[6] = b * c;
-			te[10] = a * c;
-		} else if (euler.order === 'YZX') {
-			const ac = a * c,
-				ad = a * d,
-				bc = b * c,
-				bd = b * d;
-			te[0] = c * e;
-			te[4] = bd - ac * f;
-			te[8] = bc * f + ad;
-			te[1] = f;
-			te[5] = a * e;
-			te[9] = -b * e;
-			te[2] = -d * e;
-			te[6] = ad * f + bc;
-			te[10] = ac - bd * f;
-		} else if (euler.order === 'XZY') {
-			const ac = a * c,
-				ad = a * d,
-				bc = b * c,
-				bd = b * d;
-			te[0] = c * e;
-			te[4] = -f;
-			te[8] = d * e;
-			te[1] = ac * f + bd;
-			te[5] = a * e;
-			te[9] = ad * f - bc;
-			te[2] = bc * f - ad;
-			te[6] = b * e;
-			te[10] = bd * f + ac;
-		}
-
-		// bottom row
-		te[3] = 0;
-		te[7] = 0;
-		te[11] = 0;
-
-		// last column
-		te[12] = 0;
-		te[13] = 0;
-		te[14] = 0;
-		te[15] = 1;
-		return this;
-	};
-	t3d.Matrix4.prototype.invert = function () {
-		return this.getInverse(this);
-	};
 	t3d.Vector3.prototype.applyEuler = function (euler) {
 		return this.applyQuaternion(_quaternion.setFromEuler(euler));
 	};
 	t3d.Vector3.prototype.applyAxisAngle = function (axis, angle) {
 		return this.applyQuaternion(_quaternion.setFromAxisAngle(axis, angle));
 	};
-	t3d.Vector3.prototype.angleTo = function (v) {
-		const denominator = Math.sqrt(this.getLengthSquared() * v.getLengthSquared());
-		if (denominator === 0) return Math.PI / 2;
-		const theta = this.dot(v) / denominator;
-
-		// clamp, to handle numerical problems
-
-		return Math.acos(t3d.MathUtils.clamp(theta, -1, 1));
-	};
-	t3d.Vector3.prototype[Symbol.iterator] = function* () {
-		yield this.x;
-		yield this.y;
-		yield this.z;
-	};
-	t3d.Vector3.prototype.isVector3 = true;
-	t3d.Quaternion.prototype.angleTo = function (q) {
-		return 2 * Math.acos(Math.abs(t3d.MathUtils.clamp(this.dot(q), -1, 1)));
-	};
-	t3d.Quaternion.prototype.identity = function () {
-		return this.set(0, 0, 0, 1);
-	};
-	if (!t3d.Quaternion.prototype.slerp) {
-		t3d.Quaternion.prototype.slerp = function (q, t) {
-			this.slerpQuaternions(this, q, t);
-			return this;
-		};
-	}
 	t3d.Triangle.prototype.setFromAttributeAndIndices = function (attribute, i0, i1, i2) {
 		const array = attribute.buffer.array;
 		const itemSize = attribute.size;
@@ -12411,26 +12160,7 @@
 		}
 		return this;
 	};
-	t3d.Object3D.prototype.isObject3D = true;
-	t3d.Ray.prototype.closestPointToPoint = function (point, target) {
-		target.subVectors(point, this.origin);
-		const directionDistance = target.dot(this.direction);
-		if (directionDistance < 0) {
-			return target.copy(this.origin);
-		}
-		return target.copy(this.origin).addScaledVector(this.direction, directionDistance);
-	};
-	t3d.Ray.prototype.recast = function (t) {
-		this.origin.copy(this.at(t, _vector));
-		return this;
-	};
-	t3d.MathUtils.mapLinear = function (x, a1, a2, b1, b2) {
-		return b1 + (x - a1) * (b2 - b1) / (a2 - a1);
-	};
 	t3d.MathUtils.DEG2RAD = Math.PI / 180;
-	t3d.MathUtils.lerp = function (x, y, t) {
-		return x + (y - x) * t;
-	};
 	let oldMethod;
 	oldMethod = t3d.Camera.prototype.setOrtho;
 	t3d.Camera.prototype.setOrtho = function (left, right, bottom, top, near, far) {
