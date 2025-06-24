@@ -667,8 +667,8 @@
 			const latRangeValue = latRange.y - latRange.x;
 			if (latRangeValue < PI / 2) {
 				// get the midway point for the region
-				const midLat = mapLinear(0.5, 0, 1, latRange.x, latRange.y);
-				const midLon = mapLinear(0.5, 0, 1, lonRange.x, lonRange.y);
+				const midLat = t3d.MathUtils.mapLinear(0.5, 0, 1, latRange.x, latRange.y);
+				const midLon = t3d.MathUtils.mapLinear(0.5, 0, 1, lonRange.x, lonRange.y);
 
 				// get the frame matrix for the box - works well for smaller regions
 				this.getCartographicToNormal(midLat, midLon, _orthoZ);
@@ -687,11 +687,13 @@
 			const points = this._getPoints(true);
 
 			// get the center of the region
-			_center$1.set(0, 0, 0);
+			target.box.makeEmpty();
 			for (let i = 0, l = points.length; i < l; i++) {
-				_center$1.add(points[i]);
+				_center$1.copy(points[i]).applyMatrix4(_invMatrix$1);
+				target.box.expandByPoint(_center$1);
 			}
-			_center$1.multiplyScalar(1 / points.length);
+			target.box.getCenter(_center$1);
+			_center$1.applyMatrix3(target.rotation);
 			for (let i = 0, l = points.length; i < l; i++) {
 				points[i].sub(_center$1).applyMatrix4(_invMatrix$1).add(_center$1);
 			}
@@ -710,14 +712,14 @@
 				lonRange,
 				heightRange
 			} = this;
-			const midLat = mapLinear(0.5, 0, 1, latRange.x, latRange.y);
-			const midLon = mapLinear(0.5, 0, 1, lonRange.x, lonRange.y);
+			const midLat = t3d.MathUtils.mapLinear(0.5, 0, 1, latRange.x, latRange.y);
+			const midLon = t3d.MathUtils.mapLinear(0.5, 0, 1, lonRange.x, lonRange.y);
 			const lonOffset = Math.floor(lonRange.x / HALF_PI) * HALF_PI;
 			const latlon = [[-PI / 2, 0], [PI / 2, 0], [0, lonOffset], [0, lonOffset + PI / 2], [0, lonOffset + PI], [0, lonOffset + 3 * PI / 2], [latRange.x, lonRange.y], [latRange.y, lonRange.y], [latRange.x, lonRange.x], [latRange.y, lonRange.x], [0, lonRange.x], [0, lonRange.y], [midLat, midLon], [latRange.x, midLon], [latRange.y, midLon], [midLat, lonRange.x], [midLat, lonRange.y]];
 			const target = [];
 			const total = latlon.length;
 			for (let z = 0; z <= 1; z++) {
-				const height = mapLinear(z, 0, 1, heightRange.x, heightRange.y);
+				const height = t3d.MathUtils.mapLinear(z, 0, 1, heightRange.x, heightRange.y);
 				for (let i = 0, l = total; i < l; i++) {
 					const [lat, lon] = latlon[i];
 					if (lat >= latRange.x && lat <= latRange.y && lon >= lonRange.x && lon <= lonRange.y) {
@@ -737,11 +739,6 @@
 	const _invMatrix$1 = new t3d.Matrix4();
 	const PI = Math.PI;
 	const HALF_PI = PI / 2;
-
-	// Linear mapping from range <a1, a2> to range <b1, b2>
-	function mapLinear(x, a1, a2, b1, b2) {
-		return b1 + (x - a1) * (b2 - b1) / (a2 - a1);
-	}
 	let _poolIndex = 0;
 	const _pointsPool = [];
 	function getVector(usePool = false) {

@@ -1,4 +1,4 @@
-import { Matrix4, Vector2, Vector3 } from 't3d';
+import { Matrix4, Vector2, Vector3, MathUtils } from 't3d';
 import { Ellipsoid } from './Ellipsoid.js';
 
 export class EllipsoidRegion extends Ellipsoid {
@@ -27,8 +27,8 @@ export class EllipsoidRegion extends Ellipsoid {
 
 		if (latRangeValue < PI / 2) {
 			// get the midway point for the region
-			const midLat = mapLinear(0.5, 0, 1, latRange.x, latRange.y);
-			const midLon = mapLinear(0.5, 0, 1, lonRange.x, lonRange.y);
+			const midLat = MathUtils.mapLinear(0.5, 0, 1, latRange.x, latRange.y);
+			const midLon = MathUtils.mapLinear(0.5, 0, 1, lonRange.x, lonRange.y);
 
 			// get the frame matrix for the box - works well for smaller regions
 			this.getCartographicToNormal(midLat, midLon, _orthoZ);
@@ -53,11 +53,13 @@ export class EllipsoidRegion extends Ellipsoid {
 		const points = this._getPoints(true);
 
 		// get the center of the region
-		_center.set(0, 0, 0);
+		target.box.makeEmpty();
 		for (let i = 0, l = points.length; i < l; i++) {
-			_center.add(points[i]);
+			_center.copy(points[i]).applyMatrix4(_invMatrix);
+			target.box.expandByPoint(_center);
 		}
-		_center.multiplyScalar(1 / points.length);
+		target.box.getCenter(_center);
+		_center.applyMatrix3(target.rotation);
 
 		for (let i = 0, l = points.length; i < l; i++) {
 			points[i].sub(_center).applyMatrix4(_invMatrix).add(_center);
@@ -78,8 +80,8 @@ export class EllipsoidRegion extends Ellipsoid {
 	_getPoints(usePool = false) {
 		const { latRange, lonRange, heightRange } = this;
 
-		const midLat = mapLinear(0.5, 0, 1, latRange.x, latRange.y);
-		const midLon = mapLinear(0.5, 0, 1, lonRange.x, lonRange.y);
+		const midLat = MathUtils.mapLinear(0.5, 0, 1, latRange.x, latRange.y);
+		const midLon = MathUtils.mapLinear(0.5, 0, 1, lonRange.x, lonRange.y);
 
 		const lonOffset = Math.floor(lonRange.x / HALF_PI) * HALF_PI;
 
@@ -110,7 +112,7 @@ export class EllipsoidRegion extends Ellipsoid {
 		const total = latlon.length;
 
 		for (let z = 0; z <= 1; z++) {
-			const height = mapLinear(z, 0, 1, heightRange.x, heightRange.y);
+			const height = MathUtils.mapLinear(z, 0, 1, heightRange.x, heightRange.y);
 			for (let i = 0, l = total; i < l; i++) {
 				const [lat, lon] = latlon[i];
 				if (lat >= latRange.x && lat <= latRange.y && lon >= lonRange.x && lon <= lonRange.y) {
@@ -134,11 +136,6 @@ const _invMatrix = new Matrix4();
 
 const PI = Math.PI;
 const HALF_PI = PI / 2;
-
-// Linear mapping from range <a1, a2> to range <b1, b2>
-function mapLinear(x, a1, a2, b1, b2) {
-	return b1 + (x - a1) * (b2 - b1) / (a2 - a1);
-}
 
 let _poolIndex = 0;
 const _pointsPool = [];
