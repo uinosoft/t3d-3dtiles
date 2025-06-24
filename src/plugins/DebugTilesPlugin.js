@@ -1,10 +1,10 @@
 import { BasicMaterial, Color3, DRAW_MODE, Object3D, PBRMaterial, PointsMaterial, SHADING_TYPE, Sphere } from 't3d';
 import { Box3Helper } from 't3d/addons/objects/Box3Helper.js';
 import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
+import { EllipsoidRegionHelper } from './objects/EllipsoidRegionHelper.js';
 import { InstancedPBRMaterial } from '../materials/InstancedPBRMaterial.js';
 import { InstancedBasicMaterial } from '../materials/InstancedBasicMaterial.js';
 import { traverseSet, traverseAncestors } from '../utilities/traverseFunctions.js';
-
 
 const ORIGINAL_MATERIAL = Symbol('ORIGINAL_MATERIAL');
 const HAS_RANDOM_COLOR = Symbol('HAS_RANDOM_COLOR');
@@ -501,7 +501,15 @@ export class DebugTilesPlugin {
 		}
 
 		if (region) {
-			// TODO
+			// Create debug bounding region
+			const regionHelper = new EllipsoidRegionHelper(region, getIndexedRandomColor(tile.__depth).getHex());
+			regionHelper.raycast = emptyRaycast;
+			cached.regionHelper = regionHelper;
+
+			if (tiles.visibleTiles.has(tile) && this.displayRegionBounds) {
+				this.regionGroup.add(regionHelper);
+				regionHelper.updateMatrix(true);
+			}
 		}
 	}
 

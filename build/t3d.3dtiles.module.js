@@ -1,5 +1,5 @@
 // t3d-3dtiles
-import { Vector3, Matrix3, Box3, Ray, Plane, Matrix4, Spherical, Sphere, Euler, MathUtils, Vector2, Frustum, PBRMaterial, ShaderLib, MATERIAL_TYPE, TEXEL_ENCODING_TYPE, DRAW_SIDE, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Quaternion, Attribute, Buffer, Color3, Mesh, Object3D, LoadingManager, EventDispatcher, PlaneGeometry, ShaderMaterial, DefaultLoadingManager, Texture2D, PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER, Triangle, DRAW_MODE, Camera } from 't3d';
+import { Vector3, Matrix3, Box3, Ray, Plane, Matrix4, Spherical, Sphere, Euler, MathUtils, Vector2, Frustum, PBRMaterial, ShaderLib, MATERIAL_TYPE, TEXEL_ENCODING_TYPE, DRAW_SIDE, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Quaternion, Attribute, Buffer, Color3, Mesh, Object3D, LoadingManager, EventDispatcher, PlaneGeometry, ShaderMaterial, DefaultLoadingManager, Texture2D, PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER, Triangle, LineMaterial, BoxGeometry, DRAW_MODE, Camera } from 't3d';
 import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
 import { ReferenceParser } from 't3d/addons/loaders/glTF/parsers/ReferenceParser.js';
 import { Validator } from 't3d/addons/loaders/glTF/parsers/Validator.js';
@@ -21,6 +21,7 @@ import { KHR_materials_clearcoat } from 't3d/addons/loaders/glTF/extensions/KHR_
 import { Raycaster } from 't3d/addons/Raycaster.js';
 import { Box3Helper } from 't3d/addons/objects/Box3Helper.js';
 import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
+import { EdgesBuilder } from 't3d/addons/geometries/builders/EdgesBuilder.js';
 
 /**
  * An oriented bounding box.
@@ -575,11 +576,11 @@ class Ellipsoid {
 	// Y pointing north
 	// X pointing east
 	getEastNorthUpFrame(lat, lon, target) {
-		this.getEastNorthUpAxes(lat, lon, _vecX, _vecY, _vecZ, _pos$2);
-		return target.makeBasis(_vecX, _vecY, _vecZ).setPosition(_pos$2);
+		this.getEastNorthUpAxes(lat, lon, _vecX, _vecY, _vecZ, _pos$3);
+		return target.makeBasis(_vecX, _vecY, _vecZ).setPosition(_pos$3);
 	}
 
-	getEastNorthUpAxes(lat, lon, vecEast, vecNorth, vecUp, point = _pos$2) {
+	getEastNorthUpAxes(lat, lon, vecEast, vecNorth, vecUp, point = _pos$3) {
 		this.getCartographicToPosition(lat, lon, 0, point);
 		this.getCartographicToNormal(lat, lon, vecUp);		// up
 		vecEast.set(-point.y, point.x, 0).normalize();		// east
@@ -787,7 +788,7 @@ const _euler = new Euler();
 const _vecX = new Vector3();
 const _vecY = new Vector3();
 const _vecZ = new Vector3();
-const _pos$2 = new Vector3();
+const _pos$3 = new Vector3();
 
 const _ray$3 = new Ray();
 
@@ -6531,7 +6532,7 @@ class EnvironmentControls extends EventDispatcher {
 
 const _invMatrix = /* @__PURE__ */ new Matrix4();
 const _rotMatrix = /* @__PURE__ */ new Matrix4();
-const _pos$1 = /* @__PURE__ */ new Vector3();
+const _pos$2 = /* @__PURE__ */ new Vector3();
 const _vec$1 = /* @__PURE__ */ new Vector3();
 const _center = /* @__PURE__ */ new Vector3();
 const _forward = /* @__PURE__ */ new Vector3();
@@ -6701,13 +6702,13 @@ class GlobeControls extends EnvironmentControls {
 
 			// update the far plane to the horizon distance
 			_invMatrix.copy(tilesGroup.worldMatrix).invert();
-			_pos$1.copy(camera.position).applyMatrix4(_invMatrix);
-			ellipsoid.getPositionToCartographic(_pos$1, _latLon);
+			_pos$2.copy(camera.position).applyMatrix4(_invMatrix);
+			ellipsoid.getPositionToCartographic(_pos$2, _latLon);
 
 			// use a minimum elevation for computing the horizon distance to avoid the far clip
 			// plane approaching zero or clipping mountains over the horizon in the distance as
 			// the camera goes to or below sea level.
-			const elevation = Math.max(ellipsoid.getPositionElevation(_pos$1), MIN_ELEVATION);
+			const elevation = Math.max(ellipsoid.getPositionElevation(_pos$2), MIN_ELEVATION);
 			const horizonDistance = ellipsoid.calculateHorizonDistance(_latLon.lat, elevation);
 
 			camera.far = horizonDistance + 0.1 + maxRadius * farMargin;
@@ -6777,18 +6778,18 @@ class GlobeControls extends EnvironmentControls {
 			_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _vec$1);
 			_vec$1.applyMatrix4(camera.worldMatrix);
 
-			setRaycasterFromCamera(_ray, _pos$1.set(pixelThreshold, pixelThreshold, -1), camera);
+			setRaycasterFromCamera(_ray, _pos$2.set(pixelThreshold, pixelThreshold, -1), camera);
 			_ray.applyMatrix4(camera.viewMatrix);
 			_ray.direction.normalize();
-			_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _pos$1);
-			_pos$1.applyMatrix4(camera.worldMatrix);
+			_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _pos$2);
+			_pos$2.applyMatrix4(camera.worldMatrix);
 
 			// get implied angle
 			_vec$1.sub(_center).normalize();
-			_pos$1.sub(_center).normalize();
+			_pos$2.sub(_center).normalize();
 
 			this.globeInertiaFactor *= factor;
-			const threshold = _vec$1.angleTo(_pos$1) / deltaTime;
+			const threshold = _vec$1.angleTo(_pos$2) / deltaTime;
 			const globeAngle = 2 * Math.acos(globeInertia.w) * this.globeInertiaFactor;
 			if (globeAngle < threshold || !enableDamping) {
 				this.globeInertiaFactor = 0;
@@ -6841,7 +6842,7 @@ class GlobeControls extends EnvironmentControls {
 			} = this;
 
 			// reuse cache variables
-			const pivotDir = _pos$1;
+			const pivotDir = _pos$2;
 			const newPivotDir = _targetRight;
 
 			// get the pointer and ray
@@ -7122,8 +7123,8 @@ class GlobeControls extends EnvironmentControls {
 		_ray.applyMatrix4(_invMatrix);
 
 		// get the closest point to the ray on the globe in the global coordinate frame
-		closestRayEllipsoidSurfacePointEstimate(_ray, ellipsoid, _pos$1);
-		_pos$1.applyMatrix4(tilesGroup.worldMatrix);
+		closestRayEllipsoidSurfacePointEstimate(_ray, ellipsoid, _pos$2);
+		_pos$2.applyMatrix4(tilesGroup.worldMatrix);
 
 		// get ortho camera info
 		const orthoHeight = (camera.top - camera.bottom);
@@ -7133,7 +7134,7 @@ class GlobeControls extends EnvironmentControls {
 
 		// ensure we move the camera exactly along the forward vector to avoid shifting
 		// the camera in other directions due to floating point error
-		const dist = _pos$1.sub(camera.position).dot(_forward);
+		const dist = _pos$2.sub(camera.position).dot(_forward);
 		target.copy(camera.position).addScaledVector(_forward, dist - orthoSize * 4);
 	}
 
@@ -9040,7 +9041,7 @@ function signNotZero(v) {
 const _norm = /* @__PURE__ */ new Vector3();
 const _tri = /* @__PURE__ */ new Triangle();
 const _uvh = /* @__PURE__ */ new Vector3();
-const _pos = /* @__PURE__ */ new Vector3();
+const _pos$1 = /* @__PURE__ */ new Vector3();
 
 class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 
@@ -9099,10 +9100,10 @@ class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 		// construct terrain
 		for (let i = 0; i < vertexCount; i++) {
 			readUVHeight(i, _uvh);
-			readPosition(_uvh.x, _uvh.y, _uvh.z, _pos);
+			readPosition(_uvh.x, _uvh.y, _uvh.z, _pos$1);
 
 			uvs.push(_uvh.x, _uvh.y);
-			positions.push(..._pos);
+			positions.push(..._pos$1);
 		}
 
 		for (let i = 0, l = indices.length; i < l; i++) {
@@ -9126,10 +9127,10 @@ class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 			const indexOffset = positions.length / 3;
 			for (let i = 0; i < vertexCount; i++) {
 				readUVHeight(i, _uvh);
-				readPosition(_uvh.x, _uvh.y, _uvh.z, _pos, -skirtLength);
+				readPosition(_uvh.x, _uvh.y, _uvh.z, _pos$1, -skirtLength);
 
 				uvs.push(_uvh.x, _uvh.y);
-				positions.push(..._pos);
+				positions.push(..._pos$1);
 			}
 
 			for (let i = indices.length - 1; i >= 0; i--) {
@@ -9289,11 +9290,11 @@ class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 				topUvs.push(_uvh.x, _uvh.y);
 				botUvs.push(_uvh.x, _uvh.y);
 
-				readPosition(_uvh.x, _uvh.y, _uvh.z, _pos);
-				topPos.push(..._pos);
+				readPosition(_uvh.x, _uvh.y, _uvh.z, _pos$1);
+				topPos.push(..._pos$1);
 
-				readPosition(_uvh.x, _uvh.y, _uvh.z, _pos, -skirtLength);
-				botPos.push(..._pos);
+				readPosition(_uvh.x, _uvh.y, _uvh.z, _pos$1, -skirtLength);
+				botPos.push(..._pos$1);
 			}
 
 			const triCount = (indices.length - 1);
@@ -10578,6 +10579,82 @@ class CesiumIonAuthPlugin {
 
 }
 
+const _pos = new Vector3();
+
+function getRegionGeometry(ellipsoidRegion) {
+	// retrieve the relevant fields
+	const {
+		latRange,
+		lonRange,
+		heightRange
+	} = ellipsoidRegion;
+
+	const { x: latStart, y: latEnd } = latRange;
+	const { x: lonStart, y: lonEnd } = lonRange;
+	const { x: heightStart, y: heightEnd } = heightRange;
+
+	// get the attributes
+	const geometry = new BoxGeometry(1, 1, 1, 32, 32);
+	const { a_Position: position } = geometry.attributes;
+
+	// perturb the position buffer into an ellipsoid region
+	for (let i = 0, l = position.buffer.count; i < l; i++) {
+		_pos.fromArray(position.buffer.array, i * 3);
+
+		const lat = MathUtils.mapLinear(_pos.x, -0.5, 0.5, latStart, latEnd);
+		const lon = MathUtils.mapLinear(_pos.y, -0.5, 0.5, lonStart, lonEnd);
+
+		let height = heightStart;
+		if (_pos.z < 0) {
+			height = heightEnd;
+		}
+		ellipsoidRegion.getCartographicToPosition(lat, lon, height, _pos);
+		_pos.toArray(position.buffer.array, i * 3);
+	}
+
+	return geometry;
+}
+
+class EllipsoidRegionHelper extends Mesh {
+
+	constructor(ellipsoidRegion = new EllipsoidRegion(), color = 0xffff00) {
+		super(new Geometry(), new LineMaterial());
+
+		this.ellipsoidRegion = ellipsoidRegion;
+
+		this.material.diffuse.setHex(color);
+
+		this.update();
+
+		this.raycast = () => {}; // disable raycasting
+	}
+
+	update() {
+		this.geometry.dispose();
+
+		const regionGeometry = getRegionGeometry(this.ellipsoidRegion);
+		const { positions } = EdgesBuilder.getGeometryData(
+			regionGeometry.attributes.a_Position.buffer.array,
+			regionGeometry.index.buffer.array,
+			{ thresholdAngle: 80 }
+		);
+		const geometry = new Geometry();
+		geometry.addAttribute('a_Position', new Attribute(new Buffer(new Float32Array(positions), 3)));
+		// geometry.computeBoundingBox();
+		// geometry.computeBoundingSphere();
+
+		this.geometry = geometry;
+		this.geometry.computeBoundingBox();
+		this.geometry.computeBoundingSphere();
+	}
+
+	dispose() {
+		this.geometry.dispose();
+		this.material.dispose();
+	}
+
+}
+
 const ORIGINAL_MATERIAL = Symbol('ORIGINAL_MATERIAL');
 const HAS_RANDOM_COLOR = Symbol('HAS_RANDOM_COLOR');
 const HAS_RANDOM_NODE_COLOR = Symbol('HAS_RANDOM_NODE_COLOR');
@@ -11069,6 +11146,18 @@ class DebugTilesPlugin {
 			if (tiles.visibleTiles.has(tile) && this.displaySphereBounds) {
 				this.sphereGroup.add(sphereHelper);
 				sphereHelper.updateMatrix(true);
+			}
+		}
+
+		if (region) {
+			// Create debug bounding region
+			const regionHelper = new EllipsoidRegionHelper(region, getIndexedRandomColor(tile.__depth).getHex());
+			regionHelper.raycast = emptyRaycast;
+			cached.regionHelper = regionHelper;
+
+			if (tiles.visibleTiles.has(tile) && this.displayRegionBounds) {
+				this.regionGroup.add(regionHelper);
+				regionHelper.updateMatrix(true);
 			}
 		}
 	}

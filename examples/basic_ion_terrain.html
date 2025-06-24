@@ -99,6 +99,7 @@
 			const debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });
 			const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
 			debugFolder.addBinding(debugTilesPlugin, 'displayBoxBounds', { label: 'Display Box Bounds' });
+			debugFolder.addBinding(debugTilesPlugin, 'displayRegionBounds', { label: 'Display Region Bounds' });
 
 			const monitorFolder = pane.addFolder({ title: 'Tiles Monitor' });
 			const monitorOptions = { readonly: true, format: v => v.toFixed(0) };

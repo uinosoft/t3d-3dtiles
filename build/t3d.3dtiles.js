@@ -476,10 +476,10 @@
 		// Y pointing north
 		// X pointing east
 		getEastNorthUpFrame(lat, lon, target) {
-			this.getEastNorthUpAxes(lat, lon, _vecX, _vecY, _vecZ, _pos$2);
-			return target.makeBasis(_vecX, _vecY, _vecZ).setPosition(_pos$2);
+			this.getEastNorthUpAxes(lat, lon, _vecX, _vecY, _vecZ, _pos$3);
+			return target.makeBasis(_vecX, _vecY, _vecZ).setPosition(_pos$3);
 		}
-		getEastNorthUpAxes(lat, lon, vecEast, vecNorth, vecUp, point = _pos$2) {
+		getEastNorthUpAxes(lat, lon, vecEast, vecNorth, vecUp, point = _pos$3) {
 			this.getCartographicToPosition(lat, lon, 0, point);
 			this.getCartographicToNormal(lat, lon, vecUp); // up
 			vecEast.set(-point.y, point.x, 0).normalize(); // east
@@ -640,7 +640,7 @@
 	const _vecX = new t3d.Vector3();
 	const _vecY = new t3d.Vector3();
 	const _vecZ = new t3d.Vector3();
-	const _pos$2 = new t3d.Vector3();
+	const _pos$3 = new t3d.Vector3();
 	const _ray$3 = new t3d.Ray();
 	const EPSILON12 = 1e-12;
 	const CENTER_EPS = 0.1;
@@ -7585,7 +7585,7 @@
 
 	const _invMatrix = /* @__PURE__ */new t3d.Matrix4();
 	const _rotMatrix = /* @__PURE__ */new t3d.Matrix4();
-	const _pos$1 = /* @__PURE__ */new t3d.Vector3();
+	const _pos$2 = /* @__PURE__ */new t3d.Vector3();
 	const _vec$1 = /* @__PURE__ */new t3d.Vector3();
 	const _center = /* @__PURE__ */new t3d.Vector3();
 	const _forward = /* @__PURE__ */new t3d.Vector3();
@@ -7750,13 +7750,13 @@
 
 				// update the far plane to the horizon distance
 				_invMatrix.copy(tilesGroup.worldMatrix).invert();
-				_pos$1.copy(camera.position).applyMatrix4(_invMatrix);
-				ellipsoid.getPositionToCartographic(_pos$1, _latLon);
+				_pos$2.copy(camera.position).applyMatrix4(_invMatrix);
+				ellipsoid.getPositionToCartographic(_pos$2, _latLon);
 
 				// use a minimum elevation for computing the horizon distance to avoid the far clip
 				// plane approaching zero or clipping mountains over the horizon in the distance as
 				// the camera goes to or below sea level.
-				const elevation = Math.max(ellipsoid.getPositionElevation(_pos$1), MIN_ELEVATION);
+				const elevation = Math.max(ellipsoid.getPositionElevation(_pos$2), MIN_ELEVATION);
 				const horizonDistance = ellipsoid.calculateHorizonDistance(_latLon.lat, elevation);
 				camera.far = horizonDistance + 0.1 + maxRadius * farMargin;
 				camera.updateProjectionMatrix();
@@ -7815,17 +7815,17 @@
 				_ray.direction.normalize();
 				_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _vec$1);
 				_vec$1.applyMatrix4(camera.worldMatrix);
-				setRaycasterFromCamera(_ray, _pos$1.set(pixelThreshold, pixelThreshold, -1), camera);
+				setRaycasterFromCamera(_ray, _pos$2.set(pixelThreshold, pixelThreshold, -1), camera);
 				_ray.applyMatrix4(camera.viewMatrix);
 				_ray.direction.normalize();
-				_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _pos$1);
-				_pos$1.applyMatrix4(camera.worldMatrix);
+				_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _pos$2);
+				_pos$2.applyMatrix4(camera.worldMatrix);
 
 				// get implied angle
 				_vec$1.sub(_center).normalize();
-				_pos$1.sub(_center).normalize();
+				_pos$2.sub(_center).normalize();
 				this.globeInertiaFactor *= factor;
-				const threshold = _vec$1.angleTo(_pos$1) / deltaTime;
+				const threshold = _vec$1.angleTo(_pos$2) / deltaTime;
 				const globeAngle = 2 * Math.acos(globeInertia.w) * this.globeInertiaFactor;
 				if (globeAngle < threshold || !enableDamping) {
 					this.globeInertiaFactor = 0;
@@ -7868,7 +7868,7 @@
 				} = this;
 
 				// reuse cache variables
-				const pivotDir = _pos$1;
+				const pivotDir = _pos$2;
 				const newPivotDir = _targetRight;
 
 				// get the pointer and ray
@@ -8156,8 +8156,8 @@
 			_ray.applyMatrix4(_invMatrix);
 
 			// get the closest point to the ray on the globe in the global coordinate frame
-			closestRayEllipsoidSurfacePointEstimate(_ray, ellipsoid, _pos$1);
-			_pos$1.applyMatrix4(tilesGroup.worldMatrix);
+			closestRayEllipsoidSurfacePointEstimate(_ray, ellipsoid, _pos$2);
+			_pos$2.applyMatrix4(tilesGroup.worldMatrix);
 
 			// get ortho camera info
 			const orthoHeight = camera.top - camera.bottom;
@@ -8167,7 +8167,7 @@
 
 			// ensure we move the camera exactly along the forward vector to avoid shifting
 			// the camera in other directions due to floating point error
-			const dist = _pos$1.sub(camera.position).dot(_forward);
+			const dist = _pos$2.sub(camera.position).dot(_forward);
 			target.copy(camera.position).addScaledVector(_forward, dist - orthoSize * 4);
 		}
 		_isNearControls() {
@@ -9918,7 +9918,7 @@
 	const _norm = /* @__PURE__ */new t3d.Vector3();
 	const _tri = /* @__PURE__ */new t3d.Triangle();
 	const _uvh = /* @__PURE__ */new t3d.Vector3();
-	const _pos = /* @__PURE__ */new t3d.Vector3();
+	const _pos$1 = /* @__PURE__ */new t3d.Vector3();
 	class QuantizedMeshLoader extends QuantizedMeshLoaderBase {
 		constructor(manager = t3d.DefaultLoadingManager) {
 			super();
@@ -9970,9 +9970,9 @@
 			// construct terrain
 			for (let i = 0; i < vertexCount; i++) {
 				readUVHeight(i, _uvh);
-				readPosition(_uvh.x, _uvh.y, _uvh.z, _pos);
+				readPosition(_uvh.x, _uvh.y, _uvh.z, _pos$1);
 				uvs.push(_uvh.x, _uvh.y);
-				positions.push(..._pos);
+				positions.push(..._pos$1);
 			}
 			for (let i = 0, l = indices.length; i < l; i++) {
 				indexArr.push(indices[i]);
@@ -9994,9 +9994,9 @@
 				const indexOffset = positions.length / 3;
 				for (let i = 0; i < vertexCount; i++) {
 					readUVHeight(i, _uvh);
-					readPosition(_uvh.x, _uvh.y, _uvh.z, _pos, -skirtLength);
+					readPosition(_uvh.x, _uvh.y, _uvh.z, _pos$1, -skirtLength);
 					uvs.push(_uvh.x, _uvh.y);
-					positions.push(..._pos);
+					positions.push(..._pos$1);
 				}
 				for (let i = indices.length - 1; i >= 0; i--) {
 					indexArr.push(indices[i] + indexOffset);
@@ -10151,10 +10151,10 @@
 					readUVHeight(indices[i], _uvh);
 					topUvs.push(_uvh.x, _uvh.y);
 					botUvs.push(_uvh.x, _uvh.y);
-					readPosition(_uvh.x, _uvh.y, _uvh.z, _pos);
-					topPos.push(..._pos);
-					readPosition(_uvh.x, _uvh.y, _uvh.z, _pos, -skirtLength);
-					botPos.push(..._pos);
+					readPosition(_uvh.x, _uvh.y, _uvh.z, _pos$1);
+					topPos.push(..._pos$1);
+					readPosition(_uvh.x, _uvh.y, _uvh.z, _pos$1, -skirtLength);
+					botPos.push(..._pos$1);
 				}
 				const triCount = indices.length - 1;
 				for (let i = 0; i < triCount; i++) {
@@ -11395,6 +11395,229 @@
 	const _vector = new t3d.Vector3();
 	const axes = ['x', 'y', 'z'];
 
+	/**
+	 * EdgesBuilder is a helper for building edges geometry from given triangles data.
+	 */
+	const EdgesBuilder = {
+		/**
+		 * @param {Array} bufferArray - Flat buffer array containing vertex positions.
+		 * @param {Array} [indices] - Flat buffer array of indices, must be multiple of 3.
+		 * @param {object} [options={}] - The options object.
+		 * @param {number} [options.thresholdAngle=1] - An edge is only rendered if the angle (in degrees) between the face normals of the adjoining faces exceeds this value.
+		 * @param {number} [options.stride=3] - The number of values of the array that should be associated with a particular vertex.
+		 * @param {number} [options.offset=0] - The offset in the buffer array where the position starts.
+		 * @returns {object} - The edges geometry data.
+		 */
+		getGeometryData: function (bufferArray, indices, options = {}) {
+			const thresholdAngle = options.thresholdAngle !== undefined ? options.thresholdAngle : 1;
+			const stride = options.stride !== undefined ? options.stride : 3;
+			const offset = options.offset !== undefined ? options.offset : 0;
+			let i, j, l, key, face;
+			const result = [];
+
+			/** merge vertices */
+
+			const verticesMap = {};
+			const unique = [],
+				changes = [];
+			const precisionPoints = 4; // number of decimal points, e.g. 4 for epsilon of 0.0001
+			const precision = Math.pow(10, precisionPoints);
+			let offsetIndex, x, y, z;
+			l = bufferArray.length / stride;
+			for (i = 0; i < l; i++) {
+				offsetIndex = i * stride + offset;
+				x = bufferArray[offsetIndex + 0];
+				y = bufferArray[offsetIndex + 1];
+				z = bufferArray[offsetIndex + 2];
+				key = Math.round(x * precision) + '_' + Math.round(y * precision) + '_' + Math.round(z * precision);
+				if (verticesMap[key] === undefined) {
+					verticesMap[key] = i;
+					unique.push(x, y, z);
+					changes[i] = unique.length / 3 - 1;
+				} else {
+					changes[i] = changes[verticesMap[key]];
+				}
+			}
+
+			/** get faces	(vertices and normal) */
+
+			const faces = [];
+			if (indices) {
+				l = indices.length / 3;
+				for (i = 0; i < l; i++) {
+					face = {
+						i: [0, 0, 0],
+						n: [1, 1, 1]
+					};
+					face.i[0] = changes[indices[i * 3 + 0]];
+					face.i[1] = changes[indices[i * 3 + 1]];
+					face.i[2] = changes[indices[i * 3 + 2]];
+					computeFaceNormal(face, unique);
+					faces.push(face);
+				}
+			} else {
+				for (i = 0; i < l; i++) {
+					face = {
+						i: [0, 0, 0],
+						n: [1, 1, 1]
+					};
+					face.i[0] = changes[i * 3 + 0];
+					face.i[1] = changes[i * 3 + 1];
+					face.i[2] = changes[i * 3 + 2];
+					computeFaceNormal(face, unique);
+					faces.push(face);
+				}
+			}
+
+			/**
+			 * get edges { index1: edge[ 0 ], index2: edge[ 1 ], face1: i, face2: undefined }
+			 */
+			let edge1, edge2;
+			const edge = [0, 0],
+				edges = {};
+			for (i = 0, l = faces.length; i < l; i++) {
+				face = faces[i];
+				for (j = 0; j < 3; j++) {
+					edge1 = face.i[j];
+					edge2 = face.i[(j + 1) % 3];
+					edge[0] = Math.min(edge1, edge2);
+					edge[1] = Math.max(edge1, edge2);
+					key = edge[0] + ',' + edge[1];
+					if (edges[key] === undefined) {
+						edges[key] = {
+							index1: edge[0],
+							index2: edge[1],
+							face1: i,
+							face2: undefined
+						};
+					} else {
+						edges[key].face2 = i;
+					}
+				}
+			}
+
+			/** edges filter */
+			const thresholdDot = Math.cos(DEG2RAD * thresholdAngle);
+			for (key in edges) {
+				const e = edges[key];
+				// an edge is only rendered if the angle (in degrees) between the face normals of the adjoining faces exceeds this value. default = 1 degree.
+				if (e.face2 === undefined || dot(faces[e.face1].n, faces[e.face2].n) <= thresholdDot) {
+					result.push(unique[e.index1 * 3 + 0], unique[e.index1 * 3 + 1], unique[e.index1 * 3 + 2], unique[e.index2 * 3 + 0], unique[e.index2 * 3 + 1], unique[e.index2 * 3 + 2]);
+				}
+			}
+
+			/** return */
+			return {
+				positions: result
+			};
+		}
+	};
+	function dot(v1, v2) {
+		return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
+	}
+	function computeFaceNormal(face, buffer) {
+		const vAX = buffer[face.i[0] * 3 + 0];
+		const vAY = buffer[face.i[0] * 3 + 1];
+		const vAZ = buffer[face.i[0] * 3 + 2];
+		const vBX = buffer[face.i[1] * 3 + 0];
+		const vBY = buffer[face.i[1] * 3 + 1];
+		const vBZ = buffer[face.i[1] * 3 + 2];
+		const vCX = buffer[face.i[2] * 3 + 0];
+		const vCY = buffer[face.i[2] * 3 + 1];
+		const vCZ = buffer[face.i[2] * 3 + 2];
+		const cbX = vCX - vBX; // ax
+		const cbY = vCY - vBY; // ay
+		const cbZ = vCZ - vBZ; // az
+
+		const abX = vAX - vBX; // bx
+		const abY = vAY - vBY; // by
+		const abZ = vAZ - vBZ; // bz
+
+		let nX = cbY * abZ - cbZ * abY;
+		let nY = cbZ * abX - cbX * abZ;
+		let nZ = cbX * abY - cbY * abX;
+		const nLen = Math.sqrt(nX * nX + nY * nY + nZ * nZ);
+		nX /= nLen;
+		nY /= nLen;
+		nZ /= nLen;
+		face.n[0] = nX;
+		face.n[1] = nY;
+		face.n[2] = nZ;
+	}
+	const DEG2RAD = Math.PI / 180;
+
+	const _pos = new t3d.Vector3();
+	function getRegionGeometry(ellipsoidRegion) {
+		// retrieve the relevant fields
+		const {
+			latRange,
+			lonRange,
+			heightRange
+		} = ellipsoidRegion;
+		const {
+			x: latStart,
+			y: latEnd
+		} = latRange;
+		const {
+			x: lonStart,
+			y: lonEnd
+		} = lonRange;
+		const {
+			x: heightStart,
+			y: heightEnd
+		} = heightRange;
+
+		// get the attributes
+		const geometry = new t3d.BoxGeometry(1, 1, 1, 32, 32);
+		const {
+			a_Position: position
+		} = geometry.attributes;
+
+		// perturb the position buffer into an ellipsoid region
+		for (let i = 0, l = position.buffer.count; i < l; i++) {
+			_pos.fromArray(position.buffer.array, i * 3);
+			const lat = t3d.MathUtils.mapLinear(_pos.x, -0.5, 0.5, latStart, latEnd);
+			const lon = t3d.MathUtils.mapLinear(_pos.y, -0.5, 0.5, lonStart, lonEnd);
+			let height = heightStart;
+			if (_pos.z < 0) {
+				height = heightEnd;
+			}
+			ellipsoidRegion.getCartographicToPosition(lat, lon, height, _pos);
+			_pos.toArray(position.buffer.array, i * 3);
+		}
+		return geometry;
+	}
+	class EllipsoidRegionHelper extends t3d.Mesh {
+		constructor(ellipsoidRegion = new EllipsoidRegion(), color = 0xffff00) {
+			super(new t3d.Geometry(), new t3d.LineMaterial());
+			this.ellipsoidRegion = ellipsoidRegion;
+			this.material.diffuse.setHex(color);
+			this.update();
+			this.raycast = () => {}; // disable raycasting
+		}
+		update() {
+			this.geometry.dispose();
+			const regionGeometry = getRegionGeometry(this.ellipsoidRegion);
+			const {
+				positions
+			} = EdgesBuilder.getGeometryData(regionGeometry.attributes.a_Position.buffer.array, regionGeometry.index.buffer.array, {
+				thresholdAngle: 80
+			});
+			const geometry = new t3d.Geometry();
+			geometry.addAttribute('a_Position', new t3d.Attribute(new t3d.Buffer(new Float32Array(positions), 3)));
+			// geometry.computeBoundingBox();
+			// geometry.computeBoundingSphere();
+
+			this.geometry = geometry;
+			this.geometry.computeBoundingBox();
+			this.geometry.computeBoundingSphere();
+		}
+		dispose() {
+			this.geometry.dispose();
+			this.material.dispose();
+		}
+	}
+
 	const ORIGINAL_MATERIAL = Symbol('ORIGINAL_MATERIAL');
 	const HAS_RANDOM_COLOR = Symbol('HAS_RANDOM_COLOR');
 	const HAS_RANDOM_NODE_COLOR = Symbol('HAS_RANDOM_NODE_COLOR');
@@ -11860,6 +12083,16 @@
 				if (tiles.visibleTiles.has(tile) && this.displaySphereBounds) {
 					this.sphereGroup.add(sphereHelper);
 					sphereHelper.updateMatrix(true);
+				}
+			}
+			if (region) {
+				// Create debug bounding region
+				const regionHelper = new EllipsoidRegionHelper(region, getIndexedRandomColor(tile.__depth).getHex());
+				regionHelper.raycast = emptyRaycast;
+				cached.regionHelper = regionHelper;
+				if (tiles.visibleTiles.has(tile) && this.displayRegionBounds) {
+					this.regionGroup.add(regionHelper);
+					regionHelper.updateMatrix(true);
 				}
 			}
 		}
