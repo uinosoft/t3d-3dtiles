@@ -1,4 +1,5 @@
 import { GoogleCloudAuthPlugin } from './GoogleCloudAuthPlugin.js';
+import { TMSTilesPlugin } from './images/EPSGTilesPlugin.js';
 import { QuantizedMeshPlugin } from './QuantizedMeshPlugin.js';
 
 export class CesiumIonAuthPlugin {
@@ -123,7 +124,10 @@ export class CesiumIonAuthPlugin {
 								useRecommendedSettings: this.useRecommendedSettings
 							}));
 						} else if (json.type === 'IMAGERY' && tiles.getPluginByName('TMS_TILES_PLUGIN') === null) {
-							// TODO TMSTilesPlugin
+							tiles.registerPlugin(new TMSTilesPlugin({
+								useRecommendedSettings: this.useRecommendedSettings,
+								shape: 'ellipsoid'
+							}));
 						}
 
 						tiles.rootURL = json.url;

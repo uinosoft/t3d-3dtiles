@@ -57,6 +57,7 @@ Object3D.prototype.removeFromParent = function() {
 };
 
 MathUtils.DEG2RAD = Math.PI / 180;
+MathUtils.RAD2DEG = 180 / Math.PI;
 
 let oldMethod;
 

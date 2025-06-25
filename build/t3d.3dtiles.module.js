@@ -1,5 +1,5 @@
 // t3d-3dtiles
-import { Vector3, Matrix3, Box3, Ray, Plane, Matrix4, Spherical, Sphere, Euler, MathUtils, Vector2, Frustum, PBRMaterial, ShaderLib, MATERIAL_TYPE, TEXEL_ENCODING_TYPE, DRAW_SIDE, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Quaternion, Attribute, Buffer, Color3, Mesh, Object3D, LoadingManager, EventDispatcher, PlaneGeometry, ShaderMaterial, DefaultLoadingManager, Texture2D, PIXEL_FORMAT, PIXEL_TYPE, TEXTURE_FILTER, Triangle, LineMaterial, BoxGeometry, DRAW_MODE, Camera } from 't3d';
+import { Vector3, Matrix3, Box3, Ray, Plane, Matrix4, Spherical, Sphere, Euler, MathUtils, Vector2, Frustum, PBRMaterial, ShaderLib, MATERIAL_TYPE, TEXEL_ENCODING_TYPE, DRAW_SIDE, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Quaternion, Attribute, Buffer, Color3, Mesh, Object3D, LoadingManager, EventDispatcher, PlaneGeometry, ShaderMaterial, Texture2D, TEXTURE_FILTER, DefaultLoadingManager, PIXEL_FORMAT, PIXEL_TYPE, Triangle, LineMaterial, BoxGeometry, DRAW_MODE, Camera } from 't3d';
 import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
 import { ReferenceParser } from 't3d/addons/loaders/glTF/parsers/ReferenceParser.js';
 import { Validator } from 't3d/addons/loaders/glTF/parsers/Validator.js';
@@ -559,11 +559,11 @@ class Ellipsoid {
 
 	intersectRay(ray, target) {
 		_matrix$1.makeScale(...this.radius.toArray([])).invert();
-		_sphere$1.center.set(0, 0, 0);
-		_sphere$1.radius = 1;
+		_sphere$2.center.set(0, 0, 0);
+		_sphere$2.radius = 1;
 
 		_ray$3.copy(ray).applyMatrix4(_matrix$1);
-		if (_ray$3.intersectSphere(_sphere$1, target)) {
+		if (_ray$3.intersectSphere(_sphere$2, target)) {
 			_matrix$1.makeScale(...this.radius.toArray([]));
 			target.applyMatrix4(_matrix$1);
 			return target;
@@ -576,11 +576,11 @@ class Ellipsoid {
 	// Y pointing north
 	// X pointing east
 	getEastNorthUpFrame(lat, lon, target) {
-		this.getEastNorthUpAxes(lat, lon, _vecX, _vecY, _vecZ, _pos$3);
-		return target.makeBasis(_vecX, _vecY, _vecZ).setPosition(_pos$3);
+		this.getEastNorthUpAxes(lat, lon, _vecX, _vecY, _vecZ, _pos$4);
+		return target.makeBasis(_vecX, _vecY, _vecZ).setPosition(_pos$4);
 	}
 
-	getEastNorthUpAxes(lat, lon, vecEast, vecNorth, vecUp, point = _pos$3) {
+	getEastNorthUpAxes(lat, lon, vecEast, vecNorth, vecUp, point = _pos$4) {
 		this.getCartographicToPosition(lat, lon, 0, point);
 		this.getCartographicToNormal(lat, lon, vecUp);		// up
 		vecEast.set(-point.y, point.x, 0).normalize();		// east
@@ -614,30 +614,30 @@ class Ellipsoid {
 	getCartographicToPosition(lat, lon, height, target) {
 		// From Cesium function Ellipsoid.cartographicToCartesian
 		// https://github.com/CesiumGS/cesium/blob/665ec32e813d5d6fe906ec3e87187f6c38ed5e49/packages/engine/Source/Core/Ellipsoid.js#L396
-		this.getCartographicToNormal(lat, lon, _norm$1);
+		this.getCartographicToNormal(lat, lon, _norm$2);
 
 		const radius = this.radius;
-		_vec$6.copy(_norm$1);
+		_vec$6.copy(_norm$2);
 		_vec$6.x *= radius.x ** 2;
 		_vec$6.y *= radius.y ** 2;
 		_vec$6.z *= radius.z ** 2;
 
-		const gamma = Math.sqrt(_norm$1.dot(_vec$6));
+		const gamma = Math.sqrt(_norm$2.dot(_vec$6));
 		_vec$6.multiplyScalar(1 / gamma);
 
-		return target.copy(_vec$6).addScaledVector(_norm$1, height);
+		return target.copy(_vec$6).addScaledVector(_norm$2, height);
 	}
 
 	getPositionToCartographic(pos, target) {
 		// From Cesium function Ellipsoid.cartesianToCartographic
 		// https://github.com/CesiumGS/cesium/blob/665ec32e813d5d6fe906ec3e87187f6c38ed5e49/packages/engine/Source/Core/Ellipsoid.js#L463
 		this.getPositionToSurfacePoint(pos, _vec$6);
-		this.getPositionToNormal(pos, _norm$1);
+		this.getPositionToNormal(pos, _norm$2);
 
 		const heightDelta = _vec2$1.subVectors(pos, _vec$6);
 
-		target.lon = Math.atan2(_norm$1.y, _norm$1.x);
-		target.lat = Math.asin(_norm$1.z);
+		target.lon = Math.atan2(_norm$2.y, _norm$2.x);
+		target.lat = Math.asin(_norm$2.z);
 		target.height = Math.sign(heightDelta.dot(pos)) * heightDelta.getLength();
 		return target;
 	}
@@ -777,18 +777,18 @@ class Ellipsoid {
 }
 
 const _spherical = new Spherical();
-const _norm$1 = new Vector3();
+const _norm$2 = new Vector3();
 const _vec$6 = new Vector3();
 const _vec2$1 = new Vector3();
 const _matrix$1 = new Matrix4();
 const _matrix2 = new Matrix4();
-const _sphere$1 = new Sphere();
+const _sphere$2 = new Sphere();
 const _euler = new Euler();
 
 const _vecX = new Vector3();
 const _vecY = new Vector3();
 const _vecZ = new Vector3();
-const _pos$3 = new Vector3();
+const _pos$4 = new Vector3();
 
 const _ray$3 = new Ray();
 
@@ -6529,7 +6529,7 @@ class EnvironmentControls extends EventDispatcher {
 
 const _invMatrix = /* @__PURE__ */ new Matrix4();
 const _rotMatrix = /* @__PURE__ */ new Matrix4();
-const _pos$2 = /* @__PURE__ */ new Vector3();
+const _pos$3 = /* @__PURE__ */ new Vector3();
 const _vec$1 = /* @__PURE__ */ new Vector3();
 const _center = /* @__PURE__ */ new Vector3();
 const _forward = /* @__PURE__ */ new Vector3();
@@ -6699,13 +6699,13 @@ class GlobeControls extends EnvironmentControls {
 
 			// update the far plane to the horizon distance
 			_invMatrix.copy(tilesGroup.worldMatrix).invert();
-			_pos$2.copy(camera.position).applyMatrix4(_invMatrix);
-			ellipsoid.getPositionToCartographic(_pos$2, _latLon);
+			_pos$3.copy(camera.position).applyMatrix4(_invMatrix);
+			ellipsoid.getPositionToCartographic(_pos$3, _latLon);
 
 			// use a minimum elevation for computing the horizon distance to avoid the far clip
 			// plane approaching zero or clipping mountains over the horizon in the distance as
 			// the camera goes to or below sea level.
-			const elevation = Math.max(ellipsoid.getPositionElevation(_pos$2), MIN_ELEVATION);
+			const elevation = Math.max(ellipsoid.getPositionElevation(_pos$3), MIN_ELEVATION);
 			const horizonDistance = ellipsoid.calculateHorizonDistance(_latLon.lat, elevation);
 
 			camera.far = horizonDistance + 0.1 + maxRadius * farMargin;
@@ -6775,18 +6775,18 @@ class GlobeControls extends EnvironmentControls {
 			_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _vec$1);
 			_vec$1.applyMatrix4(camera.worldMatrix);
 
-			setRaycasterFromCamera(_ray, _pos$2.set(pixelThreshold, pixelThreshold, -1), camera);
+			setRaycasterFromCamera(_ray, _pos$3.set(pixelThreshold, pixelThreshold, -1), camera);
 			_ray.applyMatrix4(camera.viewMatrix);
 			_ray.direction.normalize();
-			_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _pos$2);
-			_pos$2.applyMatrix4(camera.worldMatrix);
+			_ray.recast(-_ray.direction.dot(_ray.origin)).at(stableDistance / _ray.direction.z, _pos$3);
+			_pos$3.applyMatrix4(camera.worldMatrix);
 
 			// get implied angle
 			_vec$1.sub(_center).normalize();
-			_pos$2.sub(_center).normalize();
+			_pos$3.sub(_center).normalize();
 
 			this.globeInertiaFactor *= factor;
-			const threshold = _vec$1.angleTo(_pos$2) / deltaTime;
+			const threshold = _vec$1.angleTo(_pos$3) / deltaTime;
 			const globeAngle = 2 * Math.acos(globeInertia.w) * this.globeInertiaFactor;
 			if (globeAngle < threshold || !enableDamping) {
 				this.globeInertiaFactor = 0;
@@ -6839,7 +6839,7 @@ class GlobeControls extends EnvironmentControls {
 			} = this;
 
 			// reuse cache variables
-			const pivotDir = _pos$2;
+			const pivotDir = _pos$3;
 			const newPivotDir = _targetRight;
 
 			// get the pointer and ray
@@ -7120,8 +7120,8 @@ class GlobeControls extends EnvironmentControls {
 		_ray.applyMatrix4(_invMatrix);
 
 		// get the closest point to the ray on the globe in the global coordinate frame
-		closestRayEllipsoidSurfacePointEstimate(_ray, ellipsoid, _pos$2);
-		_pos$2.applyMatrix4(tilesGroup.worldMatrix);
+		closestRayEllipsoidSurfacePointEstimate(_ray, ellipsoid, _pos$3);
+		_pos$3.applyMatrix4(tilesGroup.worldMatrix);
 
 		// get ortho camera info
 		const orthoHeight = (camera.top - camera.bottom);
@@ -7131,7 +7131,7 @@ class GlobeControls extends EnvironmentControls {
 
 		// ensure we move the camera exactly along the forward vector to avoid shifting
 		// the camera in other directions due to floating point error
-		const dist = _pos$2.sub(camera.position).dot(_forward);
+		const dist = _pos$3.sub(camera.position).dot(_forward);
 		target.copy(camera.position).addScaledVector(_forward, dist - orthoSize * 4);
 	}
 
@@ -8817,6 +8817,1072 @@ function getSessionToken(root) {
 	return sessionToken;
 }
 
+const TILE_X$1 = Symbol('TILE_X');
+const TILE_Y$1 = Symbol('TILE_Y');
+const TILE_LEVEL$1 = Symbol('TILE_LEVEL');
+
+// Base class for supporting tiled images with a consistent size / resolution per tile
+class ImageFormatPlugin {
+
+	get tiling() {
+		return this.imageSource.tiling;
+	}
+
+	constructor(options = {}) {
+		const {
+			pixelSize = 0.01,
+			center = false,
+			useRecommendedSettings = true,
+			imageSource = null
+		} = options;
+
+		this.priority = -10;
+		this.tiles = null;
+
+		// tiling scheme
+		this.imageSource = imageSource;
+
+		// options
+		this.pixelSize = pixelSize;
+		this.center = center;
+		this.useRecommendedSettings = useRecommendedSettings;
+	}
+
+	// Plugin functions
+	init(tiles) {
+		if (this.useRecommendedSettings) {
+			tiles.errorTarget = 1;
+			// TODO: apply skip traversal settings here once supported, as well, for faster loading
+		}
+
+		this.tiles = tiles;
+
+		this.imageSource.fetchOptions = tiles.fetchOptions;
+		this.imageSource.fetchData = (url, options) => {
+			tiles.invokeAllPlugins(plugin => url = plugin.preprocessURL ? plugin.preprocessURL(url, null) : url);
+			return tiles.invokeOnePlugin(plugin => plugin !== this && plugin.fetchData && plugin.fetchData(url, options));
+		};
+	}
+
+	async loadRootTileSet() {
+		const { tiles, imageSource } = this;
+		let url = tiles.rootURL;
+		tiles.invokeAllPlugins(plugin => url = plugin.preprocessURL ? plugin.preprocessURL(url, null) : url);
+		await imageSource.init(url);
+
+		return this.getTileset(url);
+	}
+
+	async parseToMesh(buffer, tile, extension, uri, abortSignal) {
+		// Construct texture
+		const tx = tile[TILE_X$1];
+		const ty = tile[TILE_Y$1];
+		const level = tile[TILE_LEVEL$1];
+		const texture = await this.imageSource.processBufferToTexture(buffer);
+		this.imageSource.setData(tx, ty, level, texture);
+
+		// Construct mesh
+		let sx = 1, sy = 1;
+		let x = 0, y = 0, z = 0;
+
+		const boundingBox = tile.boundingVolume.box;
+		if (boundingBox) {
+			[x, y, z] = boundingBox;
+			sx = boundingBox[3];
+			sy = boundingBox[7];
+		}
+
+		// adjust the geometry transform itself rather than the mesh because it reduces the artifact errors
+		// when using batched mesh rendering.
+		const mesh = new Mesh(new PlaneGeometry(2 * sx, 2 * sy), new BasicMaterial());
+		mesh.material.diffuseMap = texture;
+		mesh.material.transparent = true;
+		mesh.position.set(x, y, z);
+
+		return mesh;
+	}
+
+	preprocessNode(tile) {
+		// generate children
+		const { tiling } = this;
+		const maxLevel = tiling.maxLevel;
+		const level = tile[TILE_LEVEL$1];
+		if (level < maxLevel && tile.parent !== null) {
+			this.expandChildren(tile);
+		}
+	}
+
+	disposeTile(tile) {
+		const tx = tile[TILE_X$1];
+		const ty = tile[TILE_Y$1];
+		const level = tile[TILE_LEVEL$1];
+		this.imageSource.release(tx, ty, level);
+	}
+
+	// Local functions
+	getTileset(baseUrl) {
+		const { tiling, tiles } = this;
+		const minLevel = tiling.minLevel;
+		const { tileCountX, tileCountY } = tiling.getLevel(minLevel);
+
+		// generate all children for the root
+		const children = [];
+		for (let x = 0; x < tileCountX; x++) {
+			for (let y = 0; y < tileCountY; y++) {
+				const child = this.createChild(x, y, minLevel);
+				if (child !== null) {
+					children.push(child);
+				}
+			}
+		}
+
+		// generate tile set
+		const tileset = {
+			asset: {
+				version: '1.1'
+			},
+			geometricError: 1e5,
+			root: {
+				refine: 'REPLACE',
+				geometricError: 1e5,
+				boundingVolume: this.createBoundingVolume(0, 0, -1),
+				children,
+
+				[TILE_LEVEL$1]: -1,
+				[TILE_X$1]: 0,
+				[TILE_Y$1]: 0
+			}
+		};
+
+		tiles.preprocessTileSet(tileset, baseUrl);
+
+		return tileset;
+	}
+
+	getUrl(x, y, level) {
+		return this.imageSource.getUrl(x, y, level);
+	}
+
+	createBoundingVolume(x, y, level) {
+		const { center, pixelSize, tiling } = this;
+		const { pixelWidth, pixelHeight } = tiling.getLevel(tiling.maxLevel);
+
+		// calculate the world space bounds position from the range
+		const [minX, minY, maxX, maxY] = level === -1 ? tiling.getFullBounds(true) : tiling.getTileBounds(x, y, level, true);
+		let extentsX = (maxX - minX) / 2;
+		let extentsY = (maxY - minY) / 2;
+		let centerX = minX + extentsX;
+		let centerY = minY + extentsY;
+		if (center) {
+			centerX -= 0.5;
+			centerY -= 0.5;
+		}
+
+		// scale the fields
+		centerX *= pixelWidth * pixelSize;
+		extentsX *= pixelWidth * pixelSize;
+
+		centerY *= pixelHeight * pixelSize;
+		extentsY *= pixelHeight * pixelSize;
+
+		// return bounding box
+		return {
+			box: [
+				// center
+				centerX, centerY, 0,
+
+				// x, y, z half vectors
+				extentsX, 0.0, 0.0,
+				0.0, extentsY, 0.0,
+				0.0, 0.0, 0.0
+			]
+		};
+	}
+
+	createChild(x, y, level) {
+		const { pixelSize, tiling } = this;
+		if (!tiling.getTileExists(x, y, level)) {
+			return null;
+		}
+
+		// the scale ration of the image at this level
+		const { pixelWidth, pixelHeight } = tiling.getLevel(tiling.maxLevel);
+		const { pixelWidth: levelWidth, pixelHeight: levelHeight } = tiling.getLevel(level);
+		const geometricError = pixelSize * (Math.max(pixelWidth / levelWidth, pixelHeight / levelHeight) - 1);
+
+		// Generate the node
+		return {
+			refine: 'REPLACE',
+			geometricError: geometricError,
+			boundingVolume: this.createBoundingVolume(x, y, level),
+			content: {
+				uri: this.getUrl(x, y, level)
+			},
+			children: [],
+
+			// save the tile params so we can expand later
+			[TILE_X$1]: x,
+			[TILE_Y$1]: y,
+			[TILE_LEVEL$1]: level
+		};
+	}
+
+	expandChildren(tile) {
+		const level = tile[TILE_LEVEL$1];
+		const x = tile[TILE_X$1];
+		const y = tile[TILE_Y$1];
+
+		for (let cx = 0; cx < 2; cx++) {
+			for (let cy = 0; cy < 2; cy++) {
+				const child = this.createChild(2 * x + cx, 2 * y + cy, level + 1);
+				if (child) {
+					tile.children.push(child);
+				}
+			}
+		}
+	}
+
+}
+
+const _v0 = /* @__PURE__ */ new Vector3();
+const _v1 = /* @__PURE__ */ new Vector3();
+
+function getCartographicToMeterDerivative(ellipsoid, lat, lon) {
+	const EPS = 1e-5;
+	const lonp = lon + EPS;
+	let latp = lat + EPS;
+	if (Math.abs(latp) > Math.PI / 2) {
+		latp = latp - EPS;
+	}
+
+	ellipsoid.getCartographicToPosition(lat, lon, 0, _v0);
+
+	ellipsoid.getCartographicToPosition(latp, lon, 0, _v1);
+	const dy = _v0.distanceTo(_v1) / EPS;
+
+	ellipsoid.getCartographicToPosition(lat, lonp, 0, _v1);
+	const dx = _v0.distanceTo(_v1) / EPS;
+
+	return [dx, dy];
+}
+
+const MIN_LON_VERTS = 30;
+const MIN_LAT_VERTS = 15;
+
+const _pos$2 = /* @__PURE__ */ new Vector3();
+const _norm$1 = /* @__PURE__ */ new Vector3();
+const _uv = /* @__PURE__ */ new Vector2();
+const _sphere$1 = /* @__PURE__ */ new Sphere();
+
+class EllipsoidProjectionTilesPlugin extends ImageFormatPlugin {
+
+	get projection() {
+		return this.tiling.projection;
+	}
+
+	constructor(options = {}) {
+		const {
+			shape = 'planar',
+			endCaps = true,
+			...rest
+		} = options;
+
+		super(rest);
+
+		// options
+		this.shape = shape;
+		this.endCaps = endCaps;
+	}
+
+	// override the parse to mesh logic to support a region mesh
+	async parseToMesh(buffer, tile, ...args) {
+		const mesh = await super.parseToMesh(buffer, tile, ...args);
+
+		// if displaying the tiles as an ellipsoid
+		const { shape, projection, tiles, tiling } = this;
+		if (shape === 'ellipsoid') {
+			const ellipsoid = tiles.ellipsoid;
+			const level = tile[TILE_LEVEL$1];
+			const x = tile[TILE_X$1];
+			const y = tile[TILE_Y$1];
+
+			const [minU, minV, maxU, maxV] = tiling.getTileBounds(x, y, level, true);
+			const [west, south, east, north] = tile.boundingVolume.region;
+
+			// new geometry
+			// default to a minimum number of vertices per degree on each axis
+			const latVerts = Math.ceil((north - south) * MathUtils.RAD2DEG * 0.25);
+			const lonVerts = Math.ceil((east - west) * MathUtils.RAD2DEG * 0.25);
+			const yVerts = Math.max(MIN_LAT_VERTS, latVerts);
+			const xVerts = Math.max(MIN_LON_VERTS, lonVerts);
+			const geometry = new PlaneGeometry(1, 1, xVerts, yVerts);
+
+			// adjust the geometry to position it at the region
+			const { a_Position: position, a_Normal: normal, a_Uv: uv } = geometry.attributes;
+			const vertCount = position.buffer.count;
+			tile.cached.boundingVolume.getBoundingSphere(_sphere$1);
+			for (let i = 0; i < vertCount; i++) {
+				_pos$2.fromArray(position.buffer.array, i * 3);
+				_norm$1.fromArray(normal.buffer.array, i * 3);
+				_uv.fromArray(uv.buffer.array, i * 2);
+
+				const lon = MathUtils.mapLinear(_uv.x, 0, 1, west, east);
+				let lat = MathUtils.mapLinear(_uv.y, 0, 1, south, north);
+				if (projection.isMercator && _uv.y !== 0 && _uv.y !== 1) {
+					// ensure we have an edge loop positioned at the mercator limit
+					// to avoid UV distortion as much as possible at low LoDs
+					const latLimit = projection.convertProjectionToLatitude(1);
+					const vStep = 1 / yVerts;
+
+					const prevLat = MathUtils.mapLinear(_uv.y - vStep, 0, 1, south, north);
+					const nextLat = MathUtils.mapLinear(_uv.y + vStep, 0, 1, south, north);
+					if (lat > latLimit && prevLat < latLimit) {
+						lat = latLimit;
+					}
+
+					if (lat < -latLimit && nextLat > -latLimit) {
+						lat = -latLimit;
+					}
+				}
+
+				ellipsoid.getCartographicToPosition(lat, lon, 0, _pos$2).sub(_sphere$1.center);
+				ellipsoid.getCartographicToNormal(lat, lon, _norm$1);
+
+				// update the geometry
+				const u = MathUtils.mapLinear(projection.convertLongitudeToProjection(lon), minU, maxU, 0, 1);
+				const v = MathUtils.mapLinear(projection.convertLatitudeToProjection(lat), minV, maxV, 0, 1);
+				uv.buffer.array[i * 2] = u;
+				uv.buffer.array[i * 2 + 1] = v;
+				_pos$2.toArray(position.buffer.array, i * 3);
+				_norm$1.toArray(normal.buffer.array, i * 3);
+			}
+
+			mesh.geometry = geometry;
+			mesh.position.copy(_sphere$1.center);
+		}
+
+		return mesh;
+	}
+
+	createBoundingVolume(x, y, level) {
+		if (this.shape === 'ellipsoid') {
+			const { tiling, endCaps } = this;
+			const isRoot = level === -1;
+			const normalizedBounds = isRoot ? tiling.getFullBounds(true) : tiling.getTileBounds(x, y, level, true);
+			const cartBounds = isRoot ? tiling.getFullBounds() : tiling.getTileBounds(x, y, level);
+
+			if (endCaps) {
+				// if the north side is at the edge
+				if (normalizedBounds[3] === 1) {
+					cartBounds[3] = Math.PI / 2;
+				}
+
+				// if the south side is at the edge
+				if (normalizedBounds[1] === 0) {
+					cartBounds[1] = -Math.PI / 2;
+				}
+			}
+
+			return {
+				region: [...cartBounds, -1, 1]
+			};
+		} else {
+			return super.createBoundingVolume(x, y, level);
+		}
+	}
+
+	preprocessNode(tile, ...rest) {
+		super.preprocessNode(tile, rest);
+
+		const { shape, projection, tiling } = this;
+		if (shape === 'ellipsoid') {
+			const level = tile[TILE_LEVEL$1];
+			const x = tile[TILE_X$1];
+			const y = tile[TILE_Y$1];
+
+			// if this is the root node then skip calculating the geometric error
+			if (level === -1) {
+				tile.geometricError = 1e50;
+				return parent;
+			}
+
+			const [minU, minV, maxU, maxV] = tiling.getTileBounds(x, y, level, true);
+			const { tilePixelWidth, tilePixelHeight } = tiling.getLevel(level);
+			const { pixelWidth, pixelHeight } = tiling.getLevel(tiling.maxLevel);
+
+			// one pixel width in uv space
+			const tileUWidth = (maxU - minU) / tilePixelWidth;
+			const tileVWidth = (maxV - minV) / tilePixelHeight;
+			const rootUWidth = 1 / pixelWidth;
+			const rootVWidth = 1 / pixelHeight;
+
+			// calculate the region ranges
+			const [, south, east, north] = tiling.getTileBounds(x, y, level);
+
+			// calculate the changes in lat / lon at the given point
+			// find the most bowed point of the latitude range since the amount that latitude changes is
+			// dependent on the Y value of the image
+			const midLat = (south > 0) !== (north > 0) ? 0 : Math.min(Math.abs(south), Math.abs(north));
+			const midV = projection.convertLatitudeToProjection(midLat);
+			const lonFactor = projection.getLongitudeDerivativeAtValue(minU);
+			const latFactor = projection.getLatitudeDerivativeAtValue(midV);
+
+			// TODO: is this correct?
+
+			// calculate the size of a pixel on the surface
+			const [xDeriv, yDeriv] = getCartographicToMeterDerivative(this.tiles.ellipsoid, midLat, east);
+			const tilePixelWidth2 = Math.max(tileUWidth * lonFactor * xDeriv, tileVWidth * latFactor * yDeriv);
+			const rootPixelWidth = Math.max(rootUWidth * lonFactor * xDeriv, rootVWidth * latFactor * yDeriv);
+			tile.geometricError = tilePixelWidth2 - rootPixelWidth;
+
+			// if this is the root then keep the geometric error high
+			if (tile.parent === null) {
+				tile.geometricError = 1e50;
+			}
+		}
+
+		return tile;
+	}
+
+}
+
+// Class for storing and querying a certain projection scheme for an image and converting
+// between the [0, 1] image range to cartographic longitude / latitude values.
+class ProjectionScheme {
+
+	get isMercator() {
+		return this.scheme === 'EPSG:3857';
+	}
+
+	constructor(scheme = 'EPSG:4326') {
+		this.scheme = scheme;
+		this.tileCountX = 1;
+		this.tileCountY = 1;
+
+		this.setScheme(scheme);
+	}
+
+	setScheme(scheme) {
+		this.scheme = scheme;
+		switch (scheme) {
+			// equirect
+			case 'EPSG:4326':
+				this.tileCountX = 2;
+				this.tileCountY = 1;
+				break;
+
+			// mercator
+			case 'EPSG:3857':
+				this.tileCountX = 1;
+				this.tileCountY = 1;
+				break;
+
+			default:
+				throw new Error();
+		}
+	}
+
+	convertProjectionToLatitude(v) {
+		if (this.isMercator) {
+			// https://gis.stackexchange.com/questions/447421/convert-a-point-on-a-flat-2d-web-mercator-map-image-to-a-coordinate
+			const ratio = MathUtils.mapLinear(v, 0, 1, -1, 1);
+			return 2 * Math.atan(Math.exp(ratio * Math.PI)) - Math.PI / 2;
+		} else {
+			return MathUtils.mapLinear(v, 0, 1, -Math.PI / 2, Math.PI / 2);
+		}
+	}
+
+	convertProjectionToLongitude(v) {
+		return MathUtils.mapLinear(v, 0, 1, -Math.PI, Math.PI);
+	}
+
+	convertLatitudeToProjection(lat) {
+		if (this.isMercator) {
+			// https://stackoverflow.com/questions/14329691/convert-latitude-longitude-point-to-a-pixels-x-y-on-mercator-projection
+			const mercatorN = Math.log(Math.tan((Math.PI / 4) + (lat / 2)));
+			return (1 / 2) + (1 * mercatorN / (2 * Math.PI));
+		} else {
+			return MathUtils.mapLinear(lat, -Math.PI / 2, Math.PI / 2, 0, 1);
+		}
+	}
+
+	convertLongitudeToProjection(lon) {
+		return (lon + Math.PI) / (2 * Math.PI);
+	}
+
+	getLongitudeDerivativeAtValue(value) {
+		return 2 * Math.PI;
+	}
+
+	getLatitudeDerivativeAtValue(value) {
+		const EPS = 1e-5;
+		let yp = value - EPS;
+		if (yp < 0) {
+			yp = value + EPS;
+		}
+
+		if (this.isMercator) {
+			// TODO: why is this 2 * Math.PI rather than Math.PI?
+			return Math.abs(this.convertProjectionToLatitude(value) - this.convertProjectionToLatitude(yp)) / EPS;
+		} else {
+			return Math.PI;
+		}
+	}
+
+	getBounds() {
+		return [
+			this.convertProjectionToLongitude(0), this.convertProjectionToLatitude(0),
+			this.convertProjectionToLongitude(1), this.convertProjectionToLatitude(1)
+		];
+	}
+
+}
+
+function hash(...args) {
+	return args.join('_');
+}
+
+// class for retrieving and locking data being requested
+// "fetchItem" and "disposeItem" should be implemented
+class DataCache {
+
+	constructor() {
+		this.cache = {};
+		this.count = 0;
+		this.cachedBytes = 0;
+	}
+
+	// overridable
+	fetchItem() {}
+	disposeItem() {}
+	getMemoryUsage(item) {
+		return 0;
+	}
+
+	// sets the data in the cache explicitly without need to load
+	setData(...args) {
+		const { cache } = this;
+		const data = args.pop();
+		const key = hash(...args);
+		if (key in cache) {
+			throw new Error(`DataCache: "${key}" is already present.`);
+		} else {
+			this.cache[key] = {
+				abortController: new AbortController(),
+				result: data,
+				count: 1,
+				bytes: this.getMemoryUsage(data)
+			};
+			this.count++;
+			this.cachedBytes += this.cache[key].bytes;
+		}
+
+		return data;
+	}
+
+	// fetches the associated data if it doesn't exist and increments the lock counter
+	lock(...args) {
+		const { cache } = this;
+		const key = hash(...args);
+		if (key in cache) {
+			cache[key].count++;
+		} else {
+			const abortController = new AbortController();
+			const info = {
+				abortController,
+				result: null,
+				count: 1,
+				bytes: 0
+			};
+
+			info.result = this.fetchItem(...args, abortController.signal)
+				.then(res => {
+					info.result = res;
+					info.bytes = this.getMemoryUsage(res);
+					this.cachedBytes += info.bytes;
+					return res;
+				});
+
+			this.cache[key] = info;
+			this.count++;
+		}
+
+		return cache[key].result;
+	}
+
+	// decrements the lock counter for the item and deletes the item if it has reached zero
+	release(...args) {
+		const key = hash(...args);
+		this.releaseViaFullKey(key);
+	}
+
+	// get the loaded item
+	get(...args) {
+		const { cache } = this;
+		const key = hash(...args);
+		if (key in cache) {
+			return cache[key].result;
+		} else {
+			return null;
+		}
+	}
+
+	// dispose all items
+	dispose() {
+		const { cache } = this;
+		for (const key in cache) {
+			const { abortController } = cache[key];
+			abortController.abort();
+
+			this.releaseViaFullKey(key, true);
+		}
+
+		this.cache = {};
+	}
+
+	// releases an item with an optional force flag
+	releaseViaFullKey(key, force = false) {
+		const { cache } = this;
+		if (key in cache) {
+			// decrement the lock
+			const info = cache[key];
+			info.count--;
+
+			// if the item is no longer being used
+			if (info.count === 0 || force) {
+				const disposeCallback = () => {
+					// if the object isn't in the cache anymore then exit early
+					if (cache[key] !== info) {
+						return;
+					}
+
+					// abort any loads
+					const { result, abortController } = info;
+					abortController.abort();
+
+					// dispose of the object even if it still is in progress
+					if (result instanceof Promise) {
+						// "disposeItem" will throw potentially if fetch, etc are cancelled using the abort signal
+						result.then(item => this.disposeItem(item)).catch(() => {});
+					} else {
+						this.disposeItem(result);
+					}
+
+					delete cache[key];
+					this.count--;
+					this.cachedBytes -= info.bytes;
+				};
+
+				if (force) {
+					// if we're forcing disposal then dispose immediately
+					disposeCallback();
+				} else {
+					// queue for disposal in a frame here - we need to make sure we're not disposing of something twice
+					// this can get called multiple times in a row to increment then decrement again.
+					queueMicrotask(() => {
+						if (info.count === 0) {
+							disposeCallback();
+						}
+					});
+				}
+			}
+
+			return true;
+		} else {
+			throw new Error('DataCache: Attempting to release key that does not exist');
+		}
+	}
+
+}
+
+// Class for storing and querying a tiling scheme including a bounds, origin, and negative tile indices.
+// Assumes that tiles are split into four child tiles at each level.
+function clamp(x, min, max) {
+	return Math.min(Math.max(x, min), max);
+}
+
+class TilingScheme {
+
+	get levelCount() {
+		return this._levels.length;
+	}
+
+	get maxLevel() {
+		return this.levelCount - 1;
+	}
+
+	get minLevel() {
+		const levels = this._levels;
+		for (let i = 0; i < levels.length; i++) {
+			if (levels[i] !== null) {
+				return i;
+			}
+		}
+
+		return -1;
+	}
+
+	// prioritize user-set bounds over projection bounds if present
+	get rootBounds() {
+		return this._rootBounds ?? this.projection?.getBounds() ?? [0, 0, 1, 1];
+	}
+
+	get rootOrigin() {
+		const bounds = this.rootBounds;
+		return this._rootOrigin ?? [bounds[0], bounds[1]];
+	}
+
+	constructor() {
+		this.flipY = false;
+		this.pixelOverlap = 0;
+
+		// The origin and bounds
+		this._rootBounds = null;
+		this._rootOrigin = null;
+		this.projection = null;
+
+		this._levels = [];
+	}
+
+	// build the zoom levels
+	setLevel(level, options = {}) {
+		const levels = this._levels;
+		while (levels.length < level) {
+			levels.push(null);
+		}
+
+		const {
+			tilePixelWidth = 256,
+			tilePixelHeight = 256,
+			tileCountX = 2 ** level,
+			tileCountY = 2 ** level
+		} = options;
+
+		const {
+			pixelWidth = tilePixelWidth * tileCountX,
+			pixelHeight = tilePixelHeight * tileCountY
+		} = options;
+
+		levels[level] = {
+			tilePixelWidth,
+			tilePixelHeight,
+			pixelWidth,
+			pixelHeight,
+			tileCountX,
+			tileCountY
+		};
+	}
+
+	generateLevels(levels, rootTileX, rootTileY, options = {}) {
+		const {
+			minLevel = 0,
+			tilePixelWidth = 256,
+			tilePixelHeight = 256
+		} = options;
+
+		const maxLevel = levels - 1;
+		const {
+			pixelWidth = tilePixelWidth * rootTileX * (2 ** maxLevel),
+			pixelHeight = tilePixelHeight * rootTileY * (2 ** maxLevel)
+		} = options;
+		for (let level = minLevel; level < levels; level++) {
+			const invLevel = levels - level - 1;
+			const levelPixelWidth = Math.ceil(pixelWidth * (2 ** -invLevel));
+			const levelPixelHeight = Math.ceil(pixelHeight * (2 ** -invLevel));
+			const tileCountX = Math.ceil(levelPixelWidth / tilePixelWidth);
+			const tileCountY = Math.ceil(levelPixelHeight / tilePixelHeight);
+
+			this.setLevel(level, {
+				tilePixelWidth,
+				tilePixelHeight,
+				pixelWidth: levelPixelWidth,
+				pixelHeight: levelPixelHeight,
+				tileCountX,
+				tileCountY
+			});
+		}
+	}
+
+	getLevel(level) {
+		return this._levels[level];
+	}
+
+	// bounds setters
+	setOrigin(x, y) {
+		this._rootOrigin = [x, y];
+	}
+
+	setBounds(minX, minY, maxX, maxY) {
+		this._rootBounds = [minX, minY, maxX, maxY];
+	}
+
+	setProjection(projection) {
+		this.projection = projection;
+	}
+
+	// query functions
+	getTileAtPoint(bx, by, level, normalized = false, clampTiles = true) {
+		const { projection, flipY } = this;
+		const { tileCountX, tileCountY } = this.getLevel(level);
+		const xStride = 1 / tileCountX;
+		const yStride = 1 / tileCountY;
+
+		if (projection && !normalized) {
+			bx = projection.convertLongitudeToProjection(bx);
+			by = projection.convertLatitudeToProjection(by);
+		}
+
+		if (clampTiles) {
+			bx = clamp(bx, 0, 1);
+			by = clamp(by, 0, 1);
+		}
+
+		let tx = Math.floor(bx / xStride);
+		let ty = Math.floor(by / yStride);
+
+		if (flipY) {
+			ty = tileCountY - 1 - ty;
+		}
+
+		if (clampTiles) {
+			tx = clamp(tx, 0, tileCountX - 1);
+			ty = clamp(ty, 0, tileCountY - 1);
+		}
+
+		return [tx, ty];
+	}
+
+	getTilesInRange(minX, minY, maxX, maxY, level, normalized = false, clampTiles = true) {
+		const minTile = this.getTileAtPoint(minX, minY, level, normalized, clampTiles);
+		const maxTile = this.getTileAtPoint(maxX, maxY, level, normalized, clampTiles);
+
+		if (this.flipY) {
+			[minTile[1], maxTile[1]] = [maxTile[1], minTile[1]];
+		}
+
+		return [...minTile, ...maxTile];
+	}
+
+	getTileExists(x, y, level, LOG) {
+		const [rminx, rminy, rmaxx, rmaxy] = this.rootBounds;
+		const [tminx, tminy, tmaxx, tmaxy] = this.getTileBounds(x, y, level, LOG);
+		const isDegenerate = tminx >= tmaxx || tminy >= tmaxy;
+
+		return !isDegenerate && tminx <= rmaxx && tminy <= rmaxy && tmaxx >= rminx && tmaxy >= rminy;
+	}
+
+	getFullBounds(normalized = false) {
+		const { projection } = this;
+		const bounds = [...this.rootBounds];
+		if (projection && normalized) {
+			bounds[0] = projection.convertLongitudeToProjection(bounds[0]);
+			bounds[1] = projection.convertLatitudeToProjection(bounds[1]);
+			bounds[2] = projection.convertLongitudeToProjection(bounds[2]);
+			bounds[3] = projection.convertLatitudeToProjection(bounds[3]);
+		}
+
+		return bounds;
+	}
+
+	getTileBounds(x, y, level, normalized = false) {
+		const { flipY, pixelOverlap, projection } = this;
+		const { tilePixelWidth, tilePixelHeight, pixelWidth, pixelHeight } = this.getLevel(level);
+
+		let tileLeft = tilePixelWidth * x - pixelOverlap;
+		let tileTop = tilePixelHeight * y - pixelOverlap;
+		let tileRight = tileLeft + tilePixelWidth + pixelOverlap * 2;
+		let tileBottom = tileTop + tilePixelHeight + pixelOverlap * 2;
+
+		// clamp
+		tileLeft = Math.max(tileLeft, 0);
+		tileTop = Math.max(tileTop, 0);
+		tileRight = Math.min(tileRight, pixelWidth);
+		tileBottom = Math.min(tileBottom, pixelHeight);
+
+		// normalized
+		tileLeft = tileLeft / pixelWidth;
+		tileRight = tileRight / pixelWidth;
+		tileTop = tileTop / pixelHeight;
+		tileBottom = tileBottom / pixelHeight;
+
+		// invert y
+		if (flipY) {
+			const extents = (tileBottom - tileTop) / 2;
+			const centerY = (tileTop + tileBottom) / 2;
+			const invCenterY = 1.0 - centerY;
+
+			tileTop = invCenterY - extents;
+			tileBottom = invCenterY + extents;
+		}
+
+		const bounds = [tileLeft, tileTop, tileRight, tileBottom];
+		if (projection && !normalized) {
+			bounds[0] = projection.convertProjectionToLongitude(bounds[0]);
+			bounds[1] = projection.convertProjectionToLatitude(bounds[1]);
+			bounds[2] = projection.convertProjectionToLongitude(bounds[2]);
+			bounds[3] = projection.convertProjectionToLatitude(bounds[3]);
+		}
+
+		return bounds;
+	}
+
+}
+
+// TODO: support queries for detail at level - ie projected pixel size for geometric error mapping
+// Goes here or in "TilingScheme"?
+class TiledImageSource extends DataCache {
+
+	constructor() {
+		super();
+		this.tiling = new TilingScheme();
+		this.fetchOptions = {};
+		this.fetchData = (...args) => fetch(...args);
+	}
+
+	// async function for initializing the tiled image set
+	init(url) {
+
+	}
+
+	// helper for processing the buffer into a texture
+	async processBufferToTexture(buffer) {
+		const blob = new Blob([buffer]);
+		const imageBitmap = await createImageBitmap(blob, {
+			premultiplyAlpha: 'none',
+			colorSpaceConversion: 'none',
+			imageOrientation: 'flipY'
+		});
+
+		const texture = new Texture2D();
+		texture.image = imageBitmap;
+		texture.generateMipmaps = false;
+		texture.minFilter = TEXTURE_FILTER.LINEAR;
+		texture.encoding = TEXEL_ENCODING_TYPE.SRGB;
+		texture.version++;
+
+		return texture;
+	}
+
+	getMemoryUsage(tex) {
+		return 0;
+	}
+
+	// fetch the item with the given key fields
+	fetchItem(...args) {
+		const url = this.getUrl(...args);
+		return this
+			.fetchData(url, this.fetchOptions)
+			.then(res => res.arrayBuffer())
+			.then(buffer => this.processBufferToTexture(buffer));
+	}
+
+	// dispose of the item that was fetched
+	disposeItem(texture) {
+		texture.dispose();
+		if (texture.image instanceof ImageBitmap) {
+			texture.image.close();
+		}
+	}
+
+	getUrl(...args) {
+
+	}
+
+}
+
+class TMSImageSource extends TiledImageSource {
+
+	constructor() {
+		super();
+
+		this.tileSets = null;
+		this.extension = null;
+		this.url = null;
+	}
+
+	getUrl(x, y, level) {
+		const { url, extension, tileSets, tiling } = this;
+		return new URL(`${parseInt(tileSets[level - tiling.minLevel].href)}/${x}/${y}.${extension}`, url).toString();
+	}
+
+	init(url) {
+		return this
+			.fetchData(new URL('tilemapresource.xml', url), this.fetchOptions)
+			.then(res => res.text())
+			.then(text => {
+				const { tiling } = this;
+
+				// elements
+				const xml = new DOMParser().parseFromString(text, 'text/xml');
+				const boundingBox = xml.querySelector('BoundingBox');
+				const origin = xml.querySelector('Origin');
+				const tileFormat = xml.querySelector('TileFormat');
+				const tileSets = xml.querySelector('TileSets').querySelectorAll('TileSet');
+
+				// tile set definitions
+				const tileSetList = [...tileSets]
+					.map(ts => ({
+						href: parseInt(ts.getAttribute('href')),
+						unitsPerPixel: parseFloat(ts.getAttribute('units-per-pixel')),
+						order: parseInt(ts.getAttribute('order'))
+					}))
+					.sort((a, b) => {
+						return a.order - b.order;
+					});
+
+				// bounding box
+				const minX = parseFloat(boundingBox.getAttribute('minx')) * MathUtils.DEG2RAD;
+				const maxX = parseFloat(boundingBox.getAttribute('maxx')) * MathUtils.DEG2RAD;
+				const minY = parseFloat(boundingBox.getAttribute('miny')) * MathUtils.DEG2RAD;
+				const maxY = parseFloat(boundingBox.getAttribute('maxy')) * MathUtils.DEG2RAD;
+
+				// origin in lat / lon
+				const originX = parseFloat(origin.getAttribute('x')) * MathUtils.DEG2RAD;
+				const originY = parseFloat(origin.getAttribute('y')) * MathUtils.DEG2RAD;
+
+				// image dimensions in pixels
+				const tileWidth = parseInt(tileFormat.getAttribute('width'));
+				const tileHeight = parseInt(tileFormat.getAttribute('height'));
+				const extension = tileFormat.getAttribute('extension');
+				const srs = xml.querySelector('SRS').textContent;
+
+				// assign settings
+				this.extension = extension;
+				this.url = url;
+				this.tileSets = tileSetList;
+
+				// initialize tiling and projection schemes
+				tiling.setProjection(new ProjectionScheme(srs));
+				tiling.setOrigin(originX, originY);
+				tiling.setBounds(minX, minY, maxX, maxY);
+
+				tileSetList.forEach(({ order }) => {
+					tiling.setLevel(order, {
+						tileCountX: tiling.projection.tileCountX * 2 ** order,
+						tilePixelWidth: tileWidth,
+						tilePixelHeight: tileHeight
+					});
+				});
+			});
+	}
+
+}
+
+// Support for TMS tiles
+// https://wiki.osgeo.org/wiki/Tile_Map_Service_Specification
+// NOTE: Most, if not all, TMS generation implementations do not correctly support the Origin tag
+// and tile index offsets, including CesiumJS and Ion.
+class TMSTilesPlugin extends EllipsoidProjectionTilesPlugin {
+
+	constructor(...args) {
+		super(...args);
+
+		this.name = 'TMS_TILES_PLUGIN';
+		this.imageSource = new TMSImageSource();
+	}
+
+}
+
 function zigZagDecode(value) {
 	return (value >> 1) ^ (-(value & 1));
 }
@@ -9736,331 +10802,6 @@ class AttributeTriangle {
 
 }
 
-// Class for storing and querying a tiling scheme including a bounds, origin, and negative tile indices.
-// Assumes that tiles are split into four child tiles at each level.
-function clamp(x, min, max) {
-	return Math.min(Math.max(x, min), max);
-}
-
-class TilingScheme {
-
-	get levelCount() {
-		return this._levels.length;
-	}
-
-	get maxLevel() {
-		return this.levelCount - 1;
-	}
-
-	get minLevel() {
-		const levels = this._levels;
-		for (let i = 0; i < levels.length; i++) {
-			if (levels[i] !== null) {
-				return i;
-			}
-		}
-
-		return -1;
-	}
-
-	// prioritize user-set bounds over projection bounds if present
-	get rootBounds() {
-		return this._rootBounds ?? this.projection?.getBounds() ?? [0, 0, 1, 1];
-	}
-
-	get rootOrigin() {
-		const bounds = this.rootBounds;
-		return this._rootOrigin ?? [bounds[0], bounds[1]];
-	}
-
-	constructor() {
-		this.flipY = false;
-		this.pixelOverlap = 0;
-
-		// The origin and bounds
-		this._rootBounds = null;
-		this._rootOrigin = null;
-		this.projection = null;
-
-		this._levels = [];
-	}
-
-	// build the zoom levels
-	setLevel(level, options = {}) {
-		const levels = this._levels;
-		while (levels.length < level) {
-			levels.push(null);
-		}
-
-		const {
-			tilePixelWidth = 256,
-			tilePixelHeight = 256,
-			tileCountX = 2 ** level,
-			tileCountY = 2 ** level
-		} = options;
-
-		const {
-			pixelWidth = tilePixelWidth * tileCountX,
-			pixelHeight = tilePixelHeight * tileCountY
-		} = options;
-
-		levels[level] = {
-			tilePixelWidth,
-			tilePixelHeight,
-			pixelWidth,
-			pixelHeight,
-			tileCountX,
-			tileCountY
-		};
-	}
-
-	generateLevels(levels, rootTileX, rootTileY, options = {}) {
-		const {
-			minLevel = 0,
-			tilePixelWidth = 256,
-			tilePixelHeight = 256
-		} = options;
-
-		const maxLevel = levels - 1;
-		const {
-			pixelWidth = tilePixelWidth * rootTileX * (2 ** maxLevel),
-			pixelHeight = tilePixelHeight * rootTileY * (2 ** maxLevel)
-		} = options;
-		for (let level = minLevel; level < levels; level++) {
-			const invLevel = levels - level - 1;
-			const levelPixelWidth = Math.ceil(pixelWidth * (2 ** -invLevel));
-			const levelPixelHeight = Math.ceil(pixelHeight * (2 ** -invLevel));
-			const tileCountX = Math.ceil(levelPixelWidth / tilePixelWidth);
-			const tileCountY = Math.ceil(levelPixelHeight / tilePixelHeight);
-
-			this.setLevel(level, {
-				tilePixelWidth,
-				tilePixelHeight,
-				pixelWidth: levelPixelWidth,
-				pixelHeight: levelPixelHeight,
-				tileCountX,
-				tileCountY
-			});
-		}
-	}
-
-	getLevel(level) {
-		return this._levels[level];
-	}
-
-	// bounds setters
-	setOrigin(x, y) {
-		this._rootOrigin = [x, y];
-	}
-
-	setBounds(minX, minY, maxX, maxY) {
-		this._rootBounds = [minX, minY, maxX, maxY];
-	}
-
-	setProjection(projection) {
-		this.projection = projection;
-	}
-
-	// query functions
-	getTileAtPoint(bx, by, level, normalized = false, clampTiles = true) {
-		const { projection, flipY } = this;
-		const { tileCountX, tileCountY } = this.getLevel(level);
-		const xStride = 1 / tileCountX;
-		const yStride = 1 / tileCountY;
-
-		if (projection && !normalized) {
-			bx = projection.convertLongitudeToProjection(bx);
-			by = projection.convertLatitudeToProjection(by);
-		}
-
-		if (clampTiles) {
-			bx = clamp(bx, 0, 1);
-			by = clamp(by, 0, 1);
-		}
-
-		let tx = Math.floor(bx / xStride);
-		let ty = Math.floor(by / yStride);
-
-		if (flipY) {
-			ty = tileCountY - 1 - ty;
-		}
-
-		if (clampTiles) {
-			tx = clamp(tx, 0, tileCountX - 1);
-			ty = clamp(ty, 0, tileCountY - 1);
-		}
-
-		return [tx, ty];
-	}
-
-	getTilesInRange(minX, minY, maxX, maxY, level, normalized = false, clampTiles = true) {
-		const minTile = this.getTileAtPoint(minX, minY, level, normalized, clampTiles);
-		const maxTile = this.getTileAtPoint(maxX, maxY, level, normalized, clampTiles);
-
-		if (this.flipY) {
-			[minTile[1], maxTile[1]] = [maxTile[1], minTile[1]];
-		}
-
-		return [...minTile, ...maxTile];
-	}
-
-	getTileExists(x, y, level, LOG) {
-		const [rminx, rminy, rmaxx, rmaxy] = this.rootBounds;
-		const [tminx, tminy, tmaxx, tmaxy] = this.getTileBounds(x, y, level, LOG);
-		const isDegenerate = tminx >= tmaxx || tminy >= tmaxy;
-
-		return !isDegenerate && tminx <= rmaxx && tminy <= rmaxy && tmaxx >= rminx && tmaxy >= rminy;
-	}
-
-	getFullBounds(normalized = false) {
-		const { projection } = this;
-		const bounds = [...this.rootBounds];
-		if (projection && normalized) {
-			bounds[0] = projection.convertLongitudeToProjection(bounds[0]);
-			bounds[1] = projection.convertLatitudeToProjection(bounds[1]);
-			bounds[2] = projection.convertLongitudeToProjection(bounds[2]);
-			bounds[3] = projection.convertLatitudeToProjection(bounds[3]);
-		}
-
-		return bounds;
-	}
-
-	getTileBounds(x, y, level, normalized = false) {
-		const { flipY, pixelOverlap, projection } = this;
-		const { tilePixelWidth, tilePixelHeight, pixelWidth, pixelHeight } = this.getLevel(level);
-
-		let tileLeft = tilePixelWidth * x - pixelOverlap;
-		let tileTop = tilePixelHeight * y - pixelOverlap;
-		let tileRight = tileLeft + tilePixelWidth + pixelOverlap * 2;
-		let tileBottom = tileTop + tilePixelHeight + pixelOverlap * 2;
-
-		// clamp
-		tileLeft = Math.max(tileLeft, 0);
-		tileTop = Math.max(tileTop, 0);
-		tileRight = Math.min(tileRight, pixelWidth);
-		tileBottom = Math.min(tileBottom, pixelHeight);
-
-		// normalized
-		tileLeft = tileLeft / pixelWidth;
-		tileRight = tileRight / pixelWidth;
-		tileTop = tileTop / pixelHeight;
-		tileBottom = tileBottom / pixelHeight;
-
-		// invert y
-		if (flipY) {
-			const extents = (tileBottom - tileTop) / 2;
-			const centerY = (tileTop + tileBottom) / 2;
-			const invCenterY = 1.0 - centerY;
-
-			tileTop = invCenterY - extents;
-			tileBottom = invCenterY + extents;
-		}
-
-		const bounds = [tileLeft, tileTop, tileRight, tileBottom];
-		if (projection && !normalized) {
-			bounds[0] = projection.convertProjectionToLongitude(bounds[0]);
-			bounds[1] = projection.convertProjectionToLatitude(bounds[1]);
-			bounds[2] = projection.convertProjectionToLongitude(bounds[2]);
-			bounds[3] = projection.convertProjectionToLatitude(bounds[3]);
-		}
-
-		return bounds;
-	}
-
-}
-
-// Class for storing and querying a certain projection scheme for an image and converting
-// between the [0, 1] image range to cartographic longitude / latitude values.
-class ProjectionScheme {
-
-	get isMercator() {
-		return this.scheme === 'EPSG:3857';
-	}
-
-	constructor(scheme = 'EPSG:4326') {
-		this.scheme = scheme;
-		this.tileCountX = 1;
-		this.tileCountY = 1;
-
-		this.setScheme(scheme);
-	}
-
-	setScheme(scheme) {
-		this.scheme = scheme;
-		switch (scheme) {
-			// equirect
-			case 'EPSG:4326':
-				this.tileCountX = 2;
-				this.tileCountY = 1;
-				break;
-
-			// mercator
-			case 'EPSG:3857':
-				this.tileCountX = 1;
-				this.tileCountY = 1;
-				break;
-
-			default:
-				throw new Error();
-		}
-	}
-
-	convertProjectionToLatitude(v) {
-		if (this.isMercator) {
-			// https://gis.stackexchange.com/questions/447421/convert-a-point-on-a-flat-2d-web-mercator-map-image-to-a-coordinate
-			const ratio = MathUtils.mapLinear(v, 0, 1, -1, 1);
-			return 2 * Math.atan(Math.exp(ratio * Math.PI)) - Math.PI / 2;
-		} else {
-			return MathUtils.mapLinear(v, 0, 1, -Math.PI / 2, Math.PI / 2);
-		}
-	}
-
-	convertProjectionToLongitude(v) {
-		return MathUtils.mapLinear(v, 0, 1, -Math.PI, Math.PI);
-	}
-
-	convertLatitudeToProjection(lat) {
-		if (this.isMercator) {
-			// https://stackoverflow.com/questions/14329691/convert-latitude-longitude-point-to-a-pixels-x-y-on-mercator-projection
-			const mercatorN = Math.log(Math.tan((Math.PI / 4) + (lat / 2)));
-			return (1 / 2) + (1 * mercatorN / (2 * Math.PI));
-		} else {
-			return MathUtils.mapLinear(lat, -Math.PI / 2, Math.PI / 2, 0, 1);
-		}
-	}
-
-	convertLongitudeToProjection(lon) {
-		return (lon + Math.PI) / (2 * Math.PI);
-	}
-
-	getLongitudeDerivativeAtValue(value) {
-		return 2 * Math.PI;
-	}
-
-	getLatitudeDerivativeAtValue(value) {
-		const EPS = 1e-5;
-		let yp = value - EPS;
-		if (yp < 0) {
-			yp = value + EPS;
-		}
-
-		if (this.isMercator) {
-			// TODO: why is this 2 * Math.PI rather than Math.PI?
-			return Math.abs(this.convertProjectionToLatitude(value) - this.convertProjectionToLatitude(yp)) / EPS;
-		} else {
-			return Math.PI;
-		}
-	}
-
-	getBounds() {
-		return [
-			this.convertProjectionToLongitude(0), this.convertProjectionToLatitude(0),
-			this.convertProjectionToLongitude(1), this.convertProjectionToLatitude(1)
-		];
-	}
-
-}
-
 const TILE_X = Symbol('TILE_X');
 const TILE_Y = Symbol('TILE_Y');
 const TILE_LEVEL = Symbol('TILE_LEVEL');
@@ -10528,7 +11269,12 @@ class CesiumIonAuthPlugin {
 							tiles.registerPlugin(new QuantizedMeshPlugin({
 								useRecommendedSettings: this.useRecommendedSettings
 							}));
-						} else if (json.type === 'IMAGERY' && tiles.getPluginByName('TMS_TILES_PLUGIN') === null) ;
+						} else if (json.type === 'IMAGERY' && tiles.getPluginByName('TMS_TILES_PLUGIN') === null) {
+							tiles.registerPlugin(new TMSTilesPlugin({
+								useRecommendedSettings: this.useRecommendedSettings,
+								shape: 'ellipsoid'
+							}));
+						}
 
 						tiles.rootURL = json.url;
 						tiles.fetchOptions.headers = tiles.fetchOptions.headers || {};
@@ -11503,6 +12249,7 @@ Object3D.prototype.removeFromParent = function() {
 };
 
 MathUtils.DEG2RAD = Math.PI / 180;
+MathUtils.RAD2DEG = 180 / Math.PI;
 
 let oldMethod;
 
