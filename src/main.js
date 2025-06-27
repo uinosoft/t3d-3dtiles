@@ -20,6 +20,7 @@ export { CesiumIonAuthPlugin } from './plugins/CesiumIonAuthPlugin.js';
 export { DebugTilesPlugin } from './plugins/DebugTilesPlugin.js';
 export { ReorientationPlugin } from './plugins/ReorientationPlugin.js';
 export { QuantizedMeshPlugin } from './plugins/QuantizedMeshPlugin.js';
+export { XYZTilesPlugin, TMSTilesPlugin } from './plugins/images/EPSGTilesPlugin.js';
 
 export { LoadParser as DebugLoadParser } from './loaders/parsers/LoadParser.js';
 

@@ -8,7 +8,8 @@
 		"basic_ion_imagery",
 		"basic_ion_terrain",
 		"basic_globe",
-		"basic_globe_moon"
+		"basic_globe_moon",
+		"basic_maptiles"
 	],
 	"math": [
 		"math_raycast_pick",

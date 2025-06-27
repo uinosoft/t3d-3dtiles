@@ -1,4 +1,5 @@
-import { Mesh, BasicMaterial, PlaneGeometry } from 't3d';
+import { Mesh, BasicMaterial, PlaneGeometry, Matrix4, Euler } from 't3d';
+import { GeometryUtils } from 't3d/addons/geometries/GeometryUtils.js';
 
 export const TILE_X = Symbol('TILE_X');
 export const TILE_Y = Symbol('TILE_Y');
@@ -78,6 +79,8 @@ export class ImageFormatPlugin {
 		// adjust the geometry transform itself rather than the mesh because it reduces the artifact errors
 		// when using batched mesh rendering.
 		const mesh = new Mesh(new PlaneGeometry(2 * sx, 2 * sy), new BasicMaterial());
+		const rotation = new Euler(Math.PI / 2, 0, 0, 'XYZ');
+		GeometryUtils.applyMatrix4(mesh.geometry, new Matrix4().makeRotationFromEuler(rotation), true);
 		mesh.material.diffuseMap = texture;
 		mesh.material.transparent = true;
 		mesh.position.set(x, y, z);

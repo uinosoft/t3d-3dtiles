@@ -19,6 +19,7 @@ import { ALPHA_MODES, ATTRIBUTES, ACCESSOR_COMPONENT_TYPES, WEBGL_DRAW_MODES } f
 import { KHR_materials_pbrSpecularGlossiness } from 't3d/addons/loaders/glTF/extensions/KHR_materials_pbrSpecularGlossiness.js';
 import { KHR_materials_clearcoat } from 't3d/addons/loaders/glTF/extensions/KHR_materials_clearcoat.js';
 import { Raycaster } from 't3d/addons/Raycaster.js';
+import { GeometryUtils } from 't3d/addons/geometries/GeometryUtils.js';
 import { Box3Helper } from 't3d/addons/objects/Box3Helper.js';
 import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
 import { EdgesBuilder } from 't3d/addons/geometries/builders/EdgesBuilder.js';
@@ -8895,6 +8896,8 @@ class ImageFormatPlugin {
 		// adjust the geometry transform itself rather than the mesh because it reduces the artifact errors
 		// when using batched mesh rendering.
 		const mesh = new Mesh(new PlaneGeometry(2 * sx, 2 * sy), new BasicMaterial());
+		const rotation = new Euler(Math.PI / 2, 0, 0, 'XYZ');
+		GeometryUtils.applyMatrix4(mesh.geometry, new Matrix4().makeRotationFromEuler(rotation), true);
 		mesh.material.diffuseMap = texture;
 		mesh.material.transparent = true;
 		mesh.position.set(x, y, z);
@@ -9790,6 +9793,43 @@ class TiledImageSource extends DataCache {
 
 }
 
+class XYZImageSource extends TiledImageSource {
+
+	constructor(options = {}) {
+		super();
+
+		const {
+			levels = 20,
+			tileDimension = 256
+		} = options;
+
+		this.tileDimension = tileDimension;
+		this.levels = levels;
+		this.url = null;
+	}
+
+	getUrl(x, y, level) {
+		return this.url.replace('{z}', level).replace('{x}', x).replace('{y}', y);
+	}
+
+	init(url) {
+		// transform the url
+		const { tiling, tileDimension, levels } = this;
+
+		tiling.flipY = true;
+		tiling.setProjection(new ProjectionScheme('EPSG:3857'));
+		tiling.generateLevels(levels, 1, 1, {
+			tilePixelWidth: tileDimension,
+			tilePixelHeight: tileDimension
+		});
+
+		this.url = url;
+
+		return Promise.resolve();
+	}
+
+}
+
 class TMSImageSource extends TiledImageSource {
 
 	constructor() {
@@ -9864,6 +9904,25 @@ class TMSImageSource extends TiledImageSource {
 					});
 				});
 			});
+	}
+
+}
+
+// https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+class XYZTilesPlugin extends EllipsoidProjectionTilesPlugin {
+
+	constructor(options = {}) {
+		const {
+			levels = 20,
+			tileDimension = 256,
+			pixelSize = 1e-5,
+			...rest
+		} = options;
+
+		super({ pixelSize, ...rest });
+
+		this.name = 'XYZ_TILES_PLUGIN';
+		this.imageSource = new XYZImageSource({ levels, tileDimension });
 	}
 
 }
@@ -12297,4 +12356,4 @@ Camera.prototype.updateProjectionMatrix = function() {
 	return this;
 };
 
-export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, EnvironmentControls, GlobeControls, I3DMLoader, ImplicitTilingPlugin, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, QuantizedMeshPlugin, ReorientationPlugin, TileGLTFLoader, Tiles3D, TilesFadePlugin };
+export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, EnvironmentControls, GlobeControls, I3DMLoader, ImplicitTilingPlugin, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, QuantizedMeshPlugin, ReorientationPlugin, TMSTilesPlugin, TileGLTFLoader, Tiles3D, TilesFadePlugin, XYZTilesPlugin };

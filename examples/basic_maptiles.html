@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>t3d - 3dtiles</title>
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link type="text/css" rel="stylesheet" href="main.css">
+</head>
+<body>
+	<div id="info" class="dark">
+		<a href="" target="_blank">t3d 3dtiles</a> - Map Tiles<br/>
+		Example courtesy of <a href="https://www.openstreetmap.org/">OpenStreetMap</a>.
+	</div>
+
+	<!-- Import maps polyfill -->
+    <!-- Remove this when import maps will be widely supported -->
+    <script async src="./node_modules/es-module-shims/dist/es-module-shims.js"></script>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "t3d": "./node_modules/t3d/build/t3d.module.js",
+                "t3d/addons/": "./node_modules/t3d/examples/jsm/",
+				"tweakpane": "./node_modules/tweakpane/dist/tweakpane.js",
+				"t3d-3dtiles": "../build/t3d.3dtiles.module.js"
+            }
+        }
+    </script>
+
+	<script type="module">
+		import * as t3d from 't3d';
+		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
+		import { Tiles3D, XYZTilesPlugin, DebugTilesPlugin, TilesFadePlugin, GlobeControls, EnvironmentControls } from 't3d-3dtiles';
+		import { Pane } from 'tweakpane';
+
+		let width = window.innerWidth || 2;
+		let height = window.innerHeight || 2;
+
+		const canvas = document.createElement('canvas');
+		canvas.width = width * window.devicePixelRatio;
+		canvas.height = height * window.devicePixelRatio;
+		canvas.style.width = width + 'px';
+		canvas.style.height = height + 'px';
+		document.body.appendChild(canvas);
+
+		const forwardRenderer = new ForwardRenderer(canvas);
+		forwardRenderer.setClearColor(0.6, 0.7, 0.8, 1);
+
+		const scene = new t3d.Scene();
+		scene.logarithmicDepthBuffer = true;
+
+		const camera = new t3d.Camera();
+		camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
+		camera.setPerspective(60 / 180 * Math.PI, width / height, 0.001, 10000);
+		scene.add(camera);
+
+		let tiles, controls, debugFolder, monitorFolder;
+
+		const params = { planar: false };
+
+		// Create 3D tiles
+
+		async function initTiles() {
+			if (tiles) {
+				tiles.dispose();
+			}
+
+			if (controls) {
+				controls.dispose();
+			}
+
+			tiles = new Tiles3D('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+			scene.add(tiles);
+
+			tiles.registerPlugin(new TilesFadePlugin({ maximumFadeOutTiles: 200 }));
+			tiles.registerPlugin(new DebugTilesPlugin());
+			tiles.registerPlugin(new XYZTilesPlugin({
+				center: true,
+				shape: params.planar ? 'planar' : 'ellipsoid'
+			}));
+
+			tiles.lruCache.minSize = 900;
+			tiles.lruCache.maxSize = 1300;
+			tiles.parseQueue.maxJobs = 3;
+		
+			tiles.addCamera(camera);
+			tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+			if (params.planar) {
+				tiles.errorTarget = 1;
+		
+				controls = new EnvironmentControls(scene, camera, canvas);
+				controls.enableDamping = true;
+				controls.minZoomDistance = 2;
+				controls.minDistance = 0.01;
+				controls.maxDistance = 5000;
+				controls.cameraRadius = 0;
+				controls.fallbackPlane.normal.set(0, 0, 1);
+				controls.up.set(0, 0, 1);
+				controls.camera.position.set(0, 0, 2000);
+				controls.camera.quaternion.identity();
+
+				// reset the camera
+				camera.near = 0.001;
+				camera.far = 10000;
+				camera.updateProjectionMatrix();
+			} else {
+				tiles.euler.x = -Math.PI / 2;
+		
+				controls = new GlobeControls(scene, camera, canvas);
+				controls.enableDamping = true;
+				controls.camera.position.set(0, 0, 1.75 * 1e7);
+				controls.camera.quaternion.identity();
+				controls.minDistance = 150;
+			}
+			controls.pivotMesh.material.uniforms.resolution = [width, height];
+			controls.setTilesRenderer(tiles);
+
+			if (debugFolder) {
+				debugFolder.dispose();
+			}
+
+			if (monitorFolder) {
+				monitorFolder.dispose();
+			}
+
+			debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });
+			const debugTilesPlugin = tiles.getPluginByName('DEBUG_TILES_PLUGIN');
+			debugFolder.addBinding(debugTilesPlugin, 'displayBoxBounds', { label: 'Display Box Bounds' });
+			debugFolder.addBinding(debugTilesPlugin, 'displayRegionBounds', { label: 'Display Region Bounds' });
+
+			monitorFolder = pane.addFolder({ title: 'Tiles Monitor' });
+			const monitorOptions = { readonly: true, format: v => v.toFixed(0) };
+			monitorFolder.addBinding(tiles.stats, 'downloading', monitorOptions);
+			monitorFolder.addBinding(tiles.stats, 'parsing', monitorOptions);
+			monitorFolder.addBinding(tiles.stats, 'visible', monitorOptions);
+		}
+
+		const pane = new Pane();
+		pane.addBinding(params, 'planar').on('change', initTiles);
+
+		initTiles();
+
+		//
+
+		function loop(count) {
+			requestAnimationFrame(loop);
+
+			controls && controls.update();
+		
+			scene.anchorMatrix.copy(camera.worldMatrix);
+
+			tiles && tiles.update();
+
+			forwardRenderer.render(scene, camera);
+		}
+		requestAnimationFrame(loop);
+
+		function onWindowResize() {
+			width = window.innerWidth || 2;
+			height = window.innerHeight || 2;
+
+			const aspect = width / height;
+			camera.aspect = aspect;
+			camera.updateProjectionMatrix();
+
+			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+
+			if (tiles) {
+				tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+				controls.pivotMesh.material.uniforms.resolution = [width, height];
+			}
+
+			canvas.style.width = width + 'px';
+			canvas.style.height = height + 'px';
+		}
+		window.addEventListener('resize', onWindowResize, false);
+	</script>
+</body>
+</html>

@@ -28,28 +28,28 @@
 				* @return {OBB} A reference to this OBB.
 				*/
 		setFromCenterAndAxes(center, axisX, axisY, axisZ) {
-			_vec3_1$3.copy(axisX);
+			_vec3_1$4.copy(axisX);
 			_vec3_2$1.copy(axisY);
 			_vec3_3$1.copy(axisZ);
-			const scaleX = _vec3_1$3.getLength();
+			const scaleX = _vec3_1$4.getLength();
 			const scaleY = _vec3_2$1.getLength();
 			const scaleZ = _vec3_3$1.getLength();
-			_vec3_1$3.normalize();
+			_vec3_1$4.normalize();
 			_vec3_2$1.normalize();
 			_vec3_3$1.normalize();
 
 			// handle the case where the box has a dimension of 0 in one axis
 			if (scaleX === 0) {
-				_vec3_1$3.crossVectors(_vec3_2$1, _vec3_3$1);
+				_vec3_1$4.crossVectors(_vec3_2$1, _vec3_3$1);
 			}
 			if (scaleY === 0) {
-				_vec3_2$1.crossVectors(_vec3_1$3, _vec3_3$1);
+				_vec3_2$1.crossVectors(_vec3_1$4, _vec3_3$1);
 			}
 			if (scaleZ === 0) {
-				_vec3_3$1.crossVectors(_vec3_1$3, _vec3_2$1);
+				_vec3_3$1.crossVectors(_vec3_1$4, _vec3_2$1);
 			}
-			this.rotation.set(_vec3_1$3.x, _vec3_2$1.x, _vec3_3$1.x, _vec3_1$3.y, _vec3_2$1.y, _vec3_3$1.y, _vec3_1$3.z, _vec3_2$1.z, _vec3_3$1.z);
-			const halfSize = _vec3_1$3.set(scaleX, scaleY, scaleZ);
+			this.rotation.set(_vec3_1$4.x, _vec3_2$1.x, _vec3_3$1.x, _vec3_1$4.y, _vec3_2$1.y, _vec3_3$1.y, _vec3_1$4.z, _vec3_2$1.z, _vec3_3$1.z);
+			const halfSize = _vec3_1$4.set(scaleX, scaleY, scaleZ);
 			this.box.min.copy(center).sub(halfSize);
 			this.box.max.copy(center).add(halfSize);
 			return this;
@@ -62,26 +62,26 @@
 				*/
 		applyMatrix4(matrix) {
 			const e = matrix.elements;
-			let sx = _vec3_1$3.set(e[0], e[1], e[2]).getLength();
-			const sy = _vec3_1$3.set(e[4], e[5], e[6]).getLength();
-			const sz = _vec3_1$3.set(e[8], e[9], e[10]).getLength();
+			let sx = _vec3_1$4.set(e[0], e[1], e[2]).getLength();
+			const sy = _vec3_1$4.set(e[4], e[5], e[6]).getLength();
+			const sz = _vec3_1$4.set(e[8], e[9], e[10]).getLength();
 			const det = matrix.determinant();
 			if (det < 0) sx = -sx;
-			_mat3_1$1.setFromMatrix4(matrix);
+			_mat3_1$2.setFromMatrix4(matrix);
 			const invSX = 1 / sx;
 			const invSY = 1 / sy;
 			const invSZ = 1 / sz;
-			_mat3_1$1.elements[0] *= invSX;
-			_mat3_1$1.elements[1] *= invSX;
-			_mat3_1$1.elements[2] *= invSX;
-			_mat3_1$1.elements[3] *= invSY;
-			_mat3_1$1.elements[4] *= invSY;
-			_mat3_1$1.elements[5] *= invSY;
-			_mat3_1$1.elements[6] *= invSZ;
-			_mat3_1$1.elements[7] *= invSZ;
-			_mat3_1$1.elements[8] *= invSZ;
-			this.rotation.multiply(_mat3_1$1);
-			const center = this.box.getCenter(_vec3_1$3);
+			_mat3_1$2.elements[0] *= invSX;
+			_mat3_1$2.elements[1] *= invSX;
+			_mat3_1$2.elements[2] *= invSX;
+			_mat3_1$2.elements[3] *= invSY;
+			_mat3_1$2.elements[4] *= invSY;
+			_mat3_1$2.elements[5] *= invSY;
+			_mat3_1$2.elements[6] *= invSZ;
+			_mat3_1$2.elements[7] *= invSZ;
+			_mat3_1$2.elements[8] *= invSZ;
+			this.rotation.multiply(_mat3_1$2);
+			const center = this.box.getCenter(_vec3_1$4);
 			const halfSize = this.box.getSize(_vec3_2$1).multiplyScalar(0.5);
 			halfSize.x *= sx;
 			halfSize.y *= sy;
@@ -100,7 +100,7 @@
 				* @return {Vector3[]} The array of points.
 				*/
 		getPoints(points) {
-			const center = this.box.getCenter(_vec3_1$3);
+			const center = this.box.getCenter(_vec3_1$4);
 			const min = _vec3_2$1.subVectors(this.box.min, center);
 			const max = _vec3_3$1.subVectors(this.box.max, center);
 			let index = 0;
@@ -121,29 +121,29 @@
 				* @return {Plane[]} The array of planes.
 				*/
 		getPlanes(planes) {
-			const center = this.box.getCenter(_vec3_1$3);
+			const center = this.box.getCenter(_vec3_1$4);
 			const worldMin = _vec3_2$1.subVectors(this.box.min, center).applyMatrix3(this.rotation).add(center);
 			const worldMax = _vec3_3$1.subVectors(this.box.max, center).applyMatrix3(this.rotation).add(center);
-			_vec3_1$3.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
-			planes[0].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
-			planes[1].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
+			_vec3_1$4.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
+			planes[0].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
+			planes[1].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
 			planes[1].normal.negate();
 			planes[1].constant *= -1;
-			_vec3_1$3.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
-			planes[2].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
-			planes[3].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
+			_vec3_1$4.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
+			planes[2].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
+			planes[3].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
 			planes[3].normal.negate();
 			planes[3].constant *= -1;
-			_vec3_1$3.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
-			planes[4].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
-			planes[5].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
+			_vec3_1$4.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
+			planes[4].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
+			planes[5].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
 			planes[5].normal.negate();
 			planes[5].constant *= -1;
 			return planes;
 		}
 		containsPoint(point) {
 			const obbStruct = getOBBStruct(this, a);
-			const v = _vec3_1$3.subVectors(point, obbStruct.c);
+			const v = _vec3_1$4.subVectors(point, obbStruct.c);
 
 			// project _vec3_4 onto each axis and check if these points lie inside the OBB
 
@@ -156,7 +156,7 @@
 		 */
 		clampPoint(point, result) {
 			const obbStruct = getOBBStruct(this, a);
-			const v = _vec3_1$3.subVectors(point, obbStruct.c);
+			const v = _vec3_1$4.subVectors(point, obbStruct.c);
 
 			// start at the center position of the OBB
 
@@ -194,7 +194,7 @@
 
 			// compute translation vector
 
-			const v1 = _vec3_1$3.subVectors(b.c, a.c);
+			const v1 = _vec3_1$4.subVectors(b.c, a.c);
 
 			// bring translation into a's coordinate frame
 
@@ -296,7 +296,7 @@
 				* @param {Matrix4} transform - The transformation matrix.
 				*/
 		toBoundingBoxWithTransform(box3, transform) {
-			const center = this.box.getCenter(_vec3_1$3);
+			const center = this.box.getCenter(_vec3_1$4);
 			box3.min.copy(this.box.min).sub(center);
 			box3.max.copy(this.box.max).sub(center);
 			const e = this.rotation.elements;
@@ -304,10 +304,10 @@
 		}
 	}
 	const closestPoint = new t3d.Vector3();
-	const _vec3_1$3 = new t3d.Vector3();
+	const _vec3_1$4 = new t3d.Vector3();
 	const _vec3_2$1 = new t3d.Vector3();
 	const _vec3_3$1 = new t3d.Vector3();
-	const _mat3_1$1 = new t3d.Matrix3();
+	const _mat3_1$2 = new t3d.Matrix3();
 	const R = [[], [], []];
 	const AbsR = [[], [], []];
 	const t = [];
@@ -358,8 +358,8 @@
 			this._originBoxTransformInverse.copy(this._originBoxTransform).inverse();
 		}
 		containsPoint(point) {
-			_vec3_1$2.copy(point).applyMatrix4(this._originBoxTransformInverse);
-			return this.box.containsPoint(_vec3_1$2);
+			_vec3_1$3.copy(point).applyMatrix4(this._originBoxTransformInverse);
+			return this.box.containsPoint(_vec3_1$3);
 		}
 		intersectsRay(ray) {
 			_ray_1.copy(ray).applyMatrix4(this._originBoxTransformInverse);
@@ -406,8 +406,8 @@
 		distanceToPoint(point) {
 			// originBoxTransformInverse has no scale,
 			// so we don't need to scale the distance
-			_vec3_1$2.copy(point).applyMatrix4(this._originBoxTransformInverse);
-			return this._originBox.distanceToPoint(_vec3_1$2);
+			_vec3_1$3.copy(point).applyMatrix4(this._originBoxTransformInverse);
+			return this._originBox.distanceToPoint(_vec3_1$3);
 		}
 		getBoundingSphere(target) {
 			return this.box.getBoundingSphere(target);
@@ -417,7 +417,7 @@
 		}
 	}
 	const _ray_1 = new t3d.Ray();
-	const _vec3_1$2 = new t3d.Vector3();
+	const _vec3_1$3 = new t3d.Vector3();
 
 	// Cesium / 3D tiles Spheroid:
 	// - Up is Z at 90 degrees latitude
@@ -763,7 +763,7 @@
 		}
 		setOBBData(data, transform) {
 			const obb = new TileOBB();
-			obb.setFromCenterAndAxes(_vec3_4.set(data[0], data[1], data[2]), _vec3_1$1.set(data[3], data[4], data[5]), _vec3_2.set(data[6], data[7], data[8]), _vec3_3.set(data[9], data[10], data[11])).applyMatrix4(transform);
+			obb.setFromCenterAndAxes(_vec3_4.set(data[0], data[1], data[2]), _vec3_1$2.set(data[3], data[4], data[5]), _vec3_2.set(data[6], data[7], data[8]), _vec3_3.set(data[9], data[10], data[11])).applyMatrix4(transform);
 			obb.updateCache();
 			this.obb = obb;
 		}
@@ -807,13 +807,13 @@
 			let sphereDistSq = -Infinity;
 			let obbDistSq = -Infinity;
 			if (sphere) {
-				if (ray.intersectSphere(sphere, _vec3_1$1)) {
-					sphereDistSq = sphere.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$1);
+				if (ray.intersectSphere(sphere, _vec3_1$2)) {
+					sphereDistSq = sphere.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$2);
 				}
 			}
 			if (obb) {
-				if (obb.intersectRay(ray, _vec3_1$1)) {
-					obbDistSq = obb.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$1);
+				if (obb.intersectRay(ray, _vec3_1$2)) {
+					obbDistSq = obb.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$2);
 				}
 			}
 
@@ -881,7 +881,7 @@
 			}
 		}
 	}
-	const _vec3_1$1 = new t3d.Vector3();
+	const _vec3_1$2 = new t3d.Vector3();
 	const _vec3_2 = new t3d.Vector3();
 	const _vec3_3 = new t3d.Vector3();
 	const _vec3_4 = new t3d.Vector3();
@@ -1076,12 +1076,12 @@
 			});
 		}
 	}
-	const _mat3_1 = new t3d.Matrix3();
+	const _mat3_1$1 = new t3d.Matrix3();
 
 	// Solve a system of equations to find the point where the three planes intersect
 	function findIntersectionPoint(plane1, plane2, plane3, target) {
 		// Create the matrix A using the normals of the planes as rows
-		const A = _mat3_1.set(plane1.normal.x, plane1.normal.y, plane1.normal.z, plane2.normal.x, plane2.normal.y, plane2.normal.z, plane3.normal.x, plane3.normal.y, plane3.normal.z);
+		const A = _mat3_1$1.set(plane1.normal.x, plane1.normal.y, plane1.normal.z, plane2.normal.x, plane2.normal.y, plane2.normal.z, plane3.normal.x, plane3.normal.y, plane3.normal.z);
 
 		// Create the vector B using the constants of the planes
 		target.set(-plane1.constant, -plane2.constant, -plane3.constant);
@@ -1149,9 +1149,9 @@
 			// get inverse scale of origin matrix
 
 			_mat4_1.copy(originMatrix).inverse();
-			const invScaleX = _vec3_1.setFromMatrixColumn(_mat4_1, 0).getLength();
-			const invScaleY = _vec3_1.setFromMatrixColumn(_mat4_1, 1).getLength();
-			const invScaleZ = _vec3_1.setFromMatrixColumn(_mat4_1, 2).getLength();
+			const invScaleX = _vec3_1$1.setFromMatrixColumn(_mat4_1, 0).getLength();
+			const invScaleY = _vec3_1$1.setFromMatrixColumn(_mat4_1, 1).getLength();
+			const invScaleZ = _vec3_1$1.setFromMatrixColumn(_mat4_1, 2).getLength();
 			if (Math.abs(Math.max(invScaleX - invScaleY, invScaleX - invScaleZ)) > 1e-6) {
 				console.warn('CameraList.updateInfos(): Non uniform scale used for tile which may cause issues when calculating screen space error.');
 			}
@@ -1200,7 +1200,7 @@
 	}
 	const _mat4_1 = new t3d.Matrix4();
 	const _mat4_2 = new t3d.Matrix4();
-	const _vec3_1 = new t3d.Vector3();
+	const _vec3_1$1 = new t3d.Vector3();
 
 	const GIGABYTE_BYTES = 2 ** 30;
 	class LRUCache {
@@ -9716,6 +9716,443 @@
 		return sessionToken;
 	}
 
+	class GeometryUtils {
+		/**
+		 * @param {Geometry} geometry
+		 */
+		static computeNormals(geometry) {
+			const index = geometry.index;
+			const attributes = geometry.attributes;
+			const positionAttribute = attributes.a_Position;
+			if (positionAttribute === undefined) {
+				return;
+			}
+			let normalAttribute = attributes.a_Normal;
+			if (normalAttribute === undefined) {
+				normalAttribute = new t3d.Attribute(new t3d.Buffer(new Float32Array(positionAttribute.buffer.count * 3), 3));
+				geometry.addAttribute('a_Normal', normalAttribute);
+			} else {
+				for (let i = 0; i < normalAttribute.buffer.array.length; i++) {
+					normalAttribute.buffer.array[i] = 0; // reset existing normals to zero
+				}
+				normalAttribute.buffer.version++;
+			}
+			const pA = new t3d.Vector3(),
+				pB = new t3d.Vector3(),
+				pC = new t3d.Vector3();
+			const nA = new t3d.Vector3(),
+				nB = new t3d.Vector3(),
+				nC = new t3d.Vector3();
+			const cb = new t3d.Vector3(),
+				ab = new t3d.Vector3();
+			if (index) {
+				// indexed elements
+				for (let i = 0, il = index.buffer.count; i < il; i += 3) {
+					const vA = index.buffer.array[i + 0];
+					const vB = index.buffer.array[i + 1];
+					const vC = index.buffer.array[i + 2];
+					pA.fromArray(positionAttribute.buffer.array, vA * 3);
+					pB.fromArray(positionAttribute.buffer.array, vB * 3);
+					pC.fromArray(positionAttribute.buffer.array, vC * 3);
+					cb.subVectors(pC, pB);
+					ab.subVectors(pA, pB);
+					cb.cross(ab);
+					nA.fromArray(normalAttribute.buffer.array, vA * 3);
+					nB.fromArray(normalAttribute.buffer.array, vB * 3);
+					nC.fromArray(normalAttribute.buffer.array, vC * 3);
+					nA.add(cb);
+					nB.add(cb);
+					nC.add(cb);
+					nA.toArray(normalAttribute.buffer.array, vA * 3);
+					nB.toArray(normalAttribute.buffer.array, vB * 3);
+					nC.toArray(normalAttribute.buffer.array, vC * 3);
+				}
+			} else {
+				// non-indexed elements (unconnected triangle soup)
+				for (let i = 0, il = positionAttribute.buffer.count * 3; i < il; i += 9) {
+					pA.fromArray(positionAttribute.buffer.array, i + 0);
+					pB.fromArray(positionAttribute.buffer.array, i + 3);
+					pC.fromArray(positionAttribute.buffer.array, i + 6);
+					cb.subVectors(pC, pB);
+					ab.subVectors(pA, pB);
+					cb.cross(ab);
+					cb.toArray(normalAttribute.buffer.array, i + 0);
+					cb.toArray(normalAttribute.buffer.array, i + 3);
+					cb.toArray(normalAttribute.buffer.array, i + 6);
+				}
+			}
+			this.normalizeNormals(geometry);
+		}
+
+		/**
+		 * @param {Geometry} geometry
+		 */
+		static normalizeNormals(geometry) {
+			const normals = geometry.attributes.a_Normal.buffer;
+			for (let i = 0; i < normals.array.length; i += 3) {
+				_vec3_1.fromArray(normals.array, i);
+				_vec3_1.normalize();
+				_vec3_1.toArray(normals.array, i);
+			}
+		}
+
+		/**
+		 * @param {Geometry} geometry
+		 */
+		static computeTangents(geometry) {
+			const index = geometry.index;
+			const attributes = geometry.attributes;
+
+			// based on http://www.terathon.com/code/tangent.html
+			// (per vertex tangents)
+
+			if (index === null || attributes.a_Position === undefined || attributes.a_Normal === undefined || attributes.a_Uv === undefined) {
+				console.warn('GeometryUtils: .computeTangents() failed. Missing required attributes (index, a_Position, a_Normal or a_Uv)');
+				return;
+			}
+			const indices = index.buffer.array;
+			const positions = attributes.a_Position.buffer.array;
+			const normals = attributes.a_Normal.buffer.array;
+			const uvs = attributes.a_Uv.buffer.array;
+			const nVertices = positions.length / 3;
+			if (!attributes.a_Tangent) {
+				geometry.addAttribute('a_Tangent', new t3d.Attribute(new t3d.Buffer(new Float32Array(4 * nVertices), 4)));
+			}
+			const tangents = attributes.a_Tangent.buffer.array;
+			const tan1 = [],
+				tan2 = [];
+			for (let i = 0; i < nVertices; i++) {
+				tan1[i] = new t3d.Vector3();
+				tan2[i] = new t3d.Vector3();
+			}
+			const vA = new t3d.Vector3(),
+				vB = new t3d.Vector3(),
+				vC = new t3d.Vector3(),
+				uvA = new t3d.Vector2(),
+				uvB = new t3d.Vector2(),
+				uvC = new t3d.Vector2(),
+				sdir = new t3d.Vector3(),
+				tdir = new t3d.Vector3();
+			function handleTriangle(a, b, c) {
+				vA.fromArray(positions, a * 3);
+				vB.fromArray(positions, b * 3);
+				vC.fromArray(positions, c * 3);
+				uvA.fromArray(uvs, a * 2);
+				uvB.fromArray(uvs, b * 2);
+				uvC.fromArray(uvs, c * 2);
+				vB.sub(vA);
+				vC.sub(vA);
+				uvB.sub(uvA);
+				uvC.sub(uvA);
+				const r = 1.0 / (uvB.x * uvC.y - uvC.x * uvB.y);
+
+				// silently ignore degenerate uv triangles having coincident or colinear vertices
+
+				if (!isFinite(r)) return;
+				sdir.copy(vB).multiplyScalar(uvC.y).addScaledVector(vC, -uvB.y).multiplyScalar(r);
+				tdir.copy(vC).multiplyScalar(uvB.x).addScaledVector(vB, -uvC.x).multiplyScalar(r);
+				tan1[a].add(sdir);
+				tan1[b].add(sdir);
+				tan1[c].add(sdir);
+				tan2[a].add(tdir);
+				tan2[b].add(tdir);
+				tan2[c].add(tdir);
+			}
+			let groups = geometry.groups;
+			if (groups.length === 0) {
+				groups = [{
+					start: 0,
+					count: indices.length
+				}];
+			}
+			for (let i = 0, il = groups.length; i < il; i++) {
+				const group = groups[i];
+				const start = group.start;
+				const count = group.count;
+				for (let j = start, jl = start + count; j < jl; j += 3) {
+					handleTriangle(indices[j + 0], indices[j + 1], indices[j + 2]);
+				}
+			}
+			const tmp = new t3d.Vector3(),
+				tmp2 = new t3d.Vector3();
+			const n = new t3d.Vector3(),
+				n2 = new t3d.Vector3();
+			function handleVertex(v) {
+				n.fromArray(normals, v * 3);
+				n2.copy(n);
+				const t = tan1[v];
+
+				// Gram-Schmidt orthogonalize
+
+				tmp.copy(t);
+				tmp.sub(n.multiplyScalar(n.dot(t))).normalize();
+
+				// Calculate handedness
+
+				tmp2.crossVectors(n2, t);
+				const test = tmp2.dot(tan2[v]);
+				const w = test < 0.0 ? -1 : 1.0;
+				tangents[v * 4] = tmp.x;
+				tangents[v * 4 + 1] = tmp.y;
+				tangents[v * 4 + 2] = tmp.z;
+				tangents[v * 4 + 3] = -w; // why negative?
+			}
+			for (let i = 0, il = groups.length; i < il; i++) {
+				const group = groups[i];
+				const start = group.start;
+				const count = group.count;
+				for (let j = start, jl = start + count; j < jl; j += 3) {
+					handleVertex(indices[j + 0]);
+					handleVertex(indices[j + 1]);
+					handleVertex(indices[j + 2]);
+				}
+			}
+		}
+
+		/**
+		 * @param {Array<Geometry>} geometries
+		 * @param {boolean} useGroups
+		 * @returns {Geometry}
+		 */
+		static mergeGeometries(geometries, useGroups = false) {
+			const isIndexed = geometries[0].index !== null;
+			const attributesUsed = new Set(Object.keys(geometries[0].attributes));
+			const morphAttributesUsed = new Set(Object.keys(geometries[0].morphAttributes));
+			const attributes = {};
+			const morphAttributes = {};
+			const mergedGeometry = new t3d.Geometry();
+			let offset = 0;
+			for (let i = 0; i < geometries.length; i++) {
+				const geometry = geometries[i];
+
+				// ensure that all geometries are indexed, or none
+
+				if (isIndexed !== (geometry.index !== null)) {
+					console.error('GeometryUtils: .mergeGeometries() failed with geometry at index ' + i + '. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.');
+					return null;
+				}
+
+				// gather attributes, exit early if they're different
+
+				for (const name in geometry.attributes) {
+					if (!attributesUsed.has(name)) {
+						console.error('GeometryUtils: .mergeGeometries() failed with geometry at index ' + i + '. All geometries must have compatible attributes; make sure "' + name + '" attribute exists among all geometries, or in none of them.');
+						return null;
+					}
+					if (attributes[name] === undefined) attributes[name] = [];
+					attributes[name].push(geometry.attributes[name]);
+				}
+
+				// gather morph attributes, exit early they're different
+
+				for (const name in geometry.morphAttributes) {
+					if (!morphAttributesUsed.has(name)) {
+						console.error('GeometryUtils: .mergeGeometries() failed with geometry at index ' + i + '. .morphAttributes must be consistent throughout all geometries.');
+						return null;
+					}
+					if (morphAttributes[name] === undefined) morphAttributes[name] = [];
+					morphAttributes[name].push(geometry.morphAttributes[name]);
+				}
+				if (useGroups) {
+					let count;
+					if (isIndexed) {
+						count = geometry.index.buffer.count;
+					} else if (geometry.attributes.a_Position !== undefined) {
+						count = geometry.attributes.a_Position.buffer.count;
+					} else {
+						console.error('GeometryUtils: .mergeGeometries() failed with geometry at index ' + i + '. The geometry must have either an index or an a_Position attribute');
+						return null;
+					}
+					mergedGeometry.addGroup(offset, count, i);
+					offset += count;
+				}
+			}
+
+			// merge indices
+
+			if (isIndexed) {
+				let indexOffset = 0;
+				const mergedIndex = [];
+				for (let i = 0; i < geometries.length; i++) {
+					const index = geometries[i].index;
+					for (let j = 0; j < index.buffer.count; j++) {
+						mergedIndex.push(index.buffer.array[j] + indexOffset);
+					}
+					indexOffset += geometries[i].attributes.a_Position.buffer.count;
+				}
+				mergedGeometry.setIndex(mergedIndex);
+			}
+
+			// merge attributes
+
+			for (const name in attributes) {
+				const mergedAttribute = this.mergeAttributes(attributes[name]);
+				if (!mergedAttribute) {
+					console.error('GeometryUtils: .mergeGeometries() failed while trying to merge the ' + name + ' attribute.');
+					return null;
+				}
+				mergedGeometry.addAttribute(name, mergedAttribute);
+			}
+
+			// merge morph attributes
+
+			for (const name in morphAttributes) {
+				const numMorphTargets = morphAttributes[name][0].length;
+				if (numMorphTargets === 0) break;
+				mergedGeometry.morphAttributes = mergedGeometry.morphAttributes || {};
+				mergedGeometry.morphAttributes[name] = [];
+				for (let i = 0; i < numMorphTargets; i++) {
+					const morphAttributesToMerge = [];
+					for (let j = 0; j < morphAttributes[name].length; j++) {
+						morphAttributesToMerge.push(morphAttributes[name][j][i]);
+					}
+					const mergedMorphAttribute = this.mergeAttributes(morphAttributesToMerge);
+					if (!mergedMorphAttribute) {
+						console.error('GeometryUtils: .mergeGeometries() failed while trying to merge the ' + name + ' morphAttribute.');
+						return null;
+					}
+					mergedGeometry.morphAttributes[name].push(mergedMorphAttribute);
+				}
+			}
+			return mergedGeometry;
+		}
+
+		/**
+		 * @param {Array<Attribute>} attributes
+		 * @returns {Attribute}
+		 */
+		static mergeAttributes(attributes) {
+			let TypedArray;
+			let size;
+			let normalized;
+			let arrayLength = 0;
+			for (let i = 0; i < attributes.length; i++) {
+				const attribute = attributes[i];
+				if (attribute.buffer.stride !== attribute.size) {
+					console.error('GeometryUtils: .mergeAttributes() failed. Interleaved buffer attributes are not supported.');
+					return null;
+				}
+				if (TypedArray === undefined) TypedArray = attribute.buffer.array.constructor;
+				if (TypedArray !== attribute.buffer.array.constructor) {
+					console.error('GeometryUtils: .mergeAttributes() failed. Buffer.array must be of consistent array types across matching attributes.');
+					return null;
+				}
+				if (size === undefined) size = attribute.size;
+				if (size !== attribute.size) {
+					console.error('GeometryUtils: .mergeAttributes() failed. Attribute.size must be consistent across matching attributes.');
+					return null;
+				}
+				if (normalized === undefined) normalized = attribute.normalized;
+				if (normalized !== attribute.normalized) {
+					console.error('GeometryUtils: .mergeAttributes() failed. Attribute.normalized must be consistent across matching attributes.');
+					return null;
+				}
+				arrayLength += attribute.buffer.array.length;
+			}
+			const array = new TypedArray(arrayLength);
+			let offset = 0;
+			for (let i = 0; i < attributes.length; i++) {
+				array.set(attributes[i].buffer.array, offset);
+				offset += attributes[i].buffer.array.length;
+			}
+			return new t3d.Attribute(new t3d.Buffer(array, size), size, 0, normalized);
+		}
+
+		/**
+		 * @param {Geometry} geometry
+		 * @param {Matrix4} matrix
+		 * @param {boolean} updateBoundings
+		 * @returns {Geometry}
+		 */
+		static applyMatrix4(geometry, matrix, updateBoundings) {
+			let array, count, offset;
+			const position = geometry.attributes['a_Position'];
+			if (position !== undefined) {
+				array = position.buffer.array;
+				count = position.buffer.count;
+				offset = position.offset;
+				for (let i = 0; i < count; i++) {
+					_vec3_1.fromArray(array, i * 3 + offset);
+					_vec3_1.applyMatrix4(matrix);
+					_vec3_1.toArray(array, i * 3 + offset);
+				}
+				position.buffer.version++;
+			}
+			const normal = geometry.attributes['a_Normal'];
+			if (normal !== undefined) {
+				array = normal.buffer.array;
+				count = normal.buffer.count;
+				offset = normal.offset;
+				const normalMatrix = _mat3_1.setFromMatrix4(matrix).invert().transpose();
+				for (let i = 0; i < count; i++) {
+					_vec3_1.fromArray(array, i * 3 + offset);
+					_vec3_1.applyMatrix3(normalMatrix).normalize();
+					_vec3_1.toArray(array, i * 3 + offset);
+				}
+				normal.buffer.version++;
+			}
+			const tangent = geometry.attributes['a_Tangent'];
+			if (tangent !== undefined) {
+				array = tangent.buffer.array;
+				count = tangent.buffer.count;
+				offset = tangent.offset;
+				for (let i = 0; i < count; i++) {
+					_vec3_1.fromArray(array, i * 3 + offset);
+					_vec3_1.transformDirection(matrix);
+					_vec3_1.toArray(array, i * 3 + offset);
+				}
+				tangent.buffer.version++;
+			}
+			if (geometry.boundingBox !== null && updateBoundings) {
+				geometry.computeBoundingBox();
+			}
+			if (geometry.boundingSphere !== null && updateBoundings) {
+				geometry.computeBoundingSphere();
+			}
+			return geometry;
+		}
+
+		/**
+		 * @param {Geometry} geometry
+		 * @returns {Attribute}
+		 */
+		static getWireframeAttribute(geometry) {
+			const indices = [];
+			const geometryIndex = geometry.index;
+			const geometryPosition = geometry.attributes.a_Position;
+			if (!geometryPosition) {
+				console.error('GeometryUtils: .getWireframeAttribute() failed. The geometry must have an a_Position attribute');
+				return null;
+			}
+			if (geometryIndex !== null) {
+				const array = geometryIndex.buffer.array;
+				for (let i = 0, l = array.length; i < l; i += 3) {
+					const a = array[i + 0];
+					const b = array[i + 1];
+					const c = array[i + 2];
+					indices.push(a, b, b, c, c, a);
+				}
+			} else {
+				const array = geometryPosition.buffer.array;
+				for (let i = 0, l = array.length / 3 - 1; i < l; i += 3) {
+					const a = i + 0;
+					const b = i + 1;
+					const c = i + 2;
+					indices.push(a, b, b, c, c, a);
+				}
+			}
+			return new t3d.Attribute(new t3d.Buffer(geometryPosition.buffer.array.length / 3 > 65536 ? new Uint32Array(indices) : new Uint16Array(indices), 1));
+		}
+
+		// deprecated since v0.2.0, add warning since v0.3.0
+		static mergeBufferAttributes(attributes) {
+			console.warn('GeometryUtils: mergeBufferAttributes() has been renamed to mergeAttributes().');
+			return this.mergeAttributes(attributes);
+		}
+	}
+	const _vec3_1 = new t3d.Vector3();
+	const _mat3_1 = new t3d.Matrix3();
+
 	const TILE_X$1 = Symbol('TILE_X');
 	const TILE_Y$1 = Symbol('TILE_Y');
 	const TILE_LEVEL$1 = Symbol('TILE_LEVEL');
@@ -9791,6 +10228,8 @@
 			// adjust the geometry transform itself rather than the mesh because it reduces the artifact errors
 			// when using batched mesh rendering.
 			const mesh = new t3d.Mesh(new t3d.PlaneGeometry(2 * sx, 2 * sy), new t3d.BasicMaterial());
+			const rotation = new t3d.Euler(Math.PI / 2, 0, 0, 'XYZ');
+			GeometryUtils.applyMatrix4(mesh.geometry, new t3d.Matrix4().makeRotationFromEuler(rotation), true);
 			mesh.material.diffuseMap = texture;
 			mesh.material.transparent = true;
 			mesh.position.set(x, y, z);
@@ -10643,6 +11082,38 @@
 		getUrl(...args) {}
 	}
 
+	class XYZImageSource extends TiledImageSource {
+		constructor(options = {}) {
+			super();
+			const {
+				levels = 20,
+				tileDimension = 256
+			} = options;
+			this.tileDimension = tileDimension;
+			this.levels = levels;
+			this.url = null;
+		}
+		getUrl(x, y, level) {
+			return this.url.replace('{z}', level).replace('{x}', x).replace('{y}', y);
+		}
+		init(url) {
+			// transform the url
+			const {
+				tiling,
+				tileDimension,
+				levels
+			} = this;
+			tiling.flipY = true;
+			tiling.setProjection(new ProjectionScheme('EPSG:3857'));
+			tiling.generateLevels(levels, 1, 1, {
+				tilePixelWidth: tileDimension,
+				tilePixelHeight: tileDimension
+			});
+			this.url = url;
+			return Promise.resolve();
+		}
+	}
+
 	class TMSImageSource extends TiledImageSource {
 		constructor() {
 			super();
@@ -10721,6 +11192,27 @@
 
 	// Support for XYZ / Slippy tile systems
 
+
+	// https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+	class XYZTilesPlugin extends EllipsoidProjectionTilesPlugin {
+		constructor(options = {}) {
+			const {
+				levels = 20,
+				tileDimension = 256,
+				pixelSize = 1e-5,
+				...rest
+			} = options;
+			super({
+				pixelSize,
+				...rest
+			});
+			this.name = 'XYZ_TILES_PLUGIN';
+			this.imageSource = new XYZImageSource({
+				levels,
+				tileDimension
+			});
+		}
+	}
 
 	// Support for TMS tiles
 	// https://wiki.osgeo.org/wiki/Tile_Map_Service_Specification
@@ -13174,8 +13666,10 @@
 	exports.PNTSLoader = PNTSLoader;
 	exports.QuantizedMeshPlugin = QuantizedMeshPlugin;
 	exports.ReorientationPlugin = ReorientationPlugin;
+	exports.TMSTilesPlugin = TMSTilesPlugin;
 	exports.TileGLTFLoader = TileGLTFLoader;
 	exports.Tiles3D = Tiles3D;
 	exports.TilesFadePlugin = TilesFadePlugin;
+	exports.XYZTilesPlugin = XYZTilesPlugin;
 
 }));
