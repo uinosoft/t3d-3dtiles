@@ -2,8 +2,8 @@
 
 [![NPM Package][npm]][npm-url]
 
-An extension for [3D Tiles](https://www.ogc.org/standard/3dtiles/) based on [t3d.js](https://github.com/uinosoft/t3d.js), requires t3d.js version `v0.2.7` or later.
-Inspired by [NASSA-AMMOS / 3DTilesRendererJS](https://github.com/NASA-AMMOS/3DTilesRendererJS).
+An [3D Tiles](https://www.ogc.org/standard/3dtiles/) extension for [t3d.js](https://github.com/uinosoft/t3d.js), requires t3d.js version `v0.2.7` or later.
+This project is modified and extended based on [NASSA-AMMOS / 3DTilesRendererJS](https://github.com/NASA-AMMOS/3DTilesRendererJS) (Apache 2.0 License).
 
 [Examples](https://uinosoft.github.io/t3d-3dtiles/examples/)
 
