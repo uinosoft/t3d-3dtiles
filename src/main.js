@@ -1,3 +1,5 @@
+export { ImplicitTilingPlugin } from './core/plugins/ImplicitTilingPlugin.js';
+
 export * from './Tiles3D.js';
 
 export * from './math/OBB.js';
@@ -11,7 +13,6 @@ export * from './loaders/PNTSLoader.js';
 export { GlobeControls } from './controls/GlobeControls.js';
 export { EnvironmentControls } from './controls/EnvironmentControls.js';
 
-export { ImplicitTilingPlugin } from './plugins/base/ImplicitTilingPlugin.js';
 export { TilesFadePlugin } from './plugins/fade/TilesFadePlugin.js';
 export { CesiumIonAuthPlugin } from './plugins/CesiumIonAuthPlugin.js';
 export { DebugTilesPlugin } from './plugins/DebugTilesPlugin.js';

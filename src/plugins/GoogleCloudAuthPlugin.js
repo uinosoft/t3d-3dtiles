@@ -1,22 +1,27 @@
-import { traverseSet } from '../utilities/traverseFunctions.js';
+import { GoogleCloudAuth } from '../core/plugins/auth/GoogleCloudAuth.js';
 import { GoogleAttributionsManager } from './GoogleAttributionsManager.js';
+
+const TILES_3D_API = 'https://tile.googleapis.com/v1/3dtiles/root.json';
 
 export class GoogleCloudAuthPlugin {
 
-	constructor({ apiToken, autoRefreshToken = false, logoUrl = null, useRecommendedSettings = true }) {
+	constructor({
+		apiToken,
+		sessionOptions = null,
+		autoRefreshToken = false,
+		logoUrl = null,
+		useRecommendedSettings = true
+	}) {
 		this.name = 'GOOGLE_CLOUD_AUTH_PLUGIN';
-		this.priority = -Infinity;
 
 		this.apiToken = apiToken;
-		this.autoRefreshToken = autoRefreshToken;
 		this.useRecommendedSettings = useRecommendedSettings;
 		this.logoUrl = logoUrl;
-		this.sessionToken = null;
+
+		this.auth = new GoogleCloudAuth({ apiToken, autoRefreshToken, sessionOptions });
 		this.tiles = null;
 
-		this._onLoadCallback = null;
 		this._visibilityChangeCallback = null;
-		this._tokenRefreshPromise = null;
 		this._attributionsManager = new GoogleAttributionsManager();
 		this._logoAttribution = {
 			value: '',
@@ -31,36 +36,29 @@ export class GoogleCloudAuthPlugin {
 	}
 
 	init(tiles) {
-		if (tiles == null) {
-			return;
-		}
+		const { useRecommendedSettings, auth } = this;
 
 		// reset the tiles in case this plugin was removed and re-added
 		tiles.resetFailedTiles();
 
 		if (tiles.rootURL == null) {
-			tiles.rootURL = 'https://tile.googleapis.com/v1/3dtiles/root.json';
+			tiles.rootURL = TILES_3D_API;
 		}
 
-		if (this.useRecommendedSettings) {
+		if (!auth.sessionOptions) {
+			auth.authURL = tiles.rootURL;
+		}
+
+		if (useRecommendedSettings && !auth.isMapTilesSession) {
 			// This plugin changes below values to be more efficient for the photorealistic tiles
-			tiles.parseQueue.maxJobs = 10;
-			tiles.downloadQueue.maxJobs = 30;
 			tiles.errorTarget = 20;
 		}
 
 		this.tiles = tiles;
-		this._onLoadCallback = ({ tileSet }) => {
-			// the first tile set loaded will be the root
-			this.sessionToken = getSessionToken(tileSet.root);
-
-			// clear the callback once the root is loaded
-			tiles.removeEventListener('load-tile-set', this._onLoadCallback);
-		};
 
 		this._visibilityChangeCallback = ({ tile, visible }) => {
-			// TODO
-			// const copyright = tile.cached.metadata.asset.copyright || '';
+			// TODO metadata support
+			// const copyright = tile.cached.metadata?.asset?.copyright || '';
 			// if (visible) {
 			// 	this._attributionsManager.addAttributions(copyright);
 			// } else {
@@ -68,7 +66,6 @@ export class GoogleCloudAuthPlugin {
 			// }
 		};
 
-		tiles.addEventListener('load-tile-set', this._onLoadCallback);
 		tiles.addEventListener('tile-visibility-change', this._visibilityChangeCallback);
 	}
 
@@ -84,79 +81,12 @@ export class GoogleCloudAuthPlugin {
 		}
 	}
 
-	preprocessURL(uri) {
-		uri = new URL(uri);
-		if (/^http/.test(uri.protocol)) {
-			uri.searchParams.append('key', this.apiToken);
-			if (this.sessionToken !== null) {
-				uri.searchParams.append('session', this.sessionToken);
-			}
-		}
-		return uri.toString();
-	}
-
 	dispose() {
-		const { tiles } = this;
-		tiles.removeEventListener('load-tile-set', this._onLoadCallback);
-		tiles.removeEventListener('tile-visibility-change', this._visibilityChangeCallback);
+		this.tiles.removeEventListener('tile-visibility-change', this._visibilityChangeCallback);
 	}
 
 	async fetchData(uri, options) {
-		// wait for the token to refresh if loading
-		if (this._tokenRefreshPromise !== null) {
-			await this._tokenRefreshPromise;
-			uri = this.preprocessURL(uri);
-		}
-
-		const res = await fetch(uri, options);
-		if (res.status >= 400 && res.status <= 499 && this.autoRefreshToken) {
-			await this._refreshToken(options);
-			return fetch(this.preprocessURL(uri), options);
-		} else {
-			return res;
-		}
+		return this.auth.fetch(uri, options);
 	}
 
-	_refreshToken(options) {
-		if (this._tokenRefreshPromise === null) {
-			// refetch the root if the token has expired
-			const rootURL = new URL(this.tiles.rootURL);
-			rootURL.searchParams.append('key', this.apiToken);
-			this._tokenRefreshPromise = fetch(rootURL, options)
-				.then(res => res.json())
-				.then(res => {
-					this.sessionToken = getSessionToken(res.root);
-					this._tokenRefreshPromise = null;
-				});
-
-			// dispatch an error if we fail to refresh the token
-			this._tokenRefreshPromise
-				.catch(error => {
-					this.tiles.dispatchEvent({
-						type: 'load-error',
-						tile: null,
-						error,
-						url: rootURL
-					});
-				});
-		}
-
-		return this._tokenRefreshPromise;
-	}
-
-}
-
-function getSessionToken(root) {
-	let sessionToken = null;
-	traverseSet(root, tile => {
-		if (tile.content && tile.content.uri) {
-			const [, params] = tile.content.uri.split('?');
-			sessionToken = new URLSearchParams(params).get('session');
-			return true;
-		}
-
-		return false;
-	});
-
-	return sessionToken;
 }

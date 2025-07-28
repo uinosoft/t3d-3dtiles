@@ -1,5 +1,5 @@
 import { GLTFUtils } from 't3d/addons/loaders/glTF/GLTFUtils.js';
-import { getUrlExtension } from '../../../utilities/urlExtension.js';
+import { getUrlExtension } from '../../../core/renderer/utilities/urlExtension.js';
 
 export class IndexParser {
 

@@ -1,20 +1,20 @@
 import { EventDispatcher, LoadingManager, Matrix4, Object3D, Vector3 } from 't3d';
 import { TileBoundingVolume } from './math/TileBoundingVolume.js';
-import { getUrlExtension } from './utilities/urlExtension.js';
+import { getUrlExtension } from './core/renderer/utilities/urlExtension.js';
 import { raycastTraverse, raycastTraverseFirstHit } from './utilities/raycastTraverse.js';
 import { CameraList } from './utilities/CameraList.js';
 import { LRUCache } from './utilities/LRUCache.js';
-import { PriorityQueue } from './utilities/PriorityQueue.js';
+import { PriorityQueue } from './core/renderer/utilities/PriorityQueue.js';
 import { markUsedTiles, markUsedSetLeaves, markVisibleTiles, toggleTiles, traverseSet } from './utilities/traverseFunctions.js';
-import { UNLOADED, LOADING, PARSING, LOADED, FAILED } from './constants.js';
+import { UNLOADED, LOADING, PARSING, LOADED, FAILED } from './core/renderer/constants.js';
 import { WGS84_ELLIPSOID } from './math/GeoConstants.js';
-import { throttle } from './utilities/throttle.js';
+import { throttle } from './core/renderer/utilities/throttle.js';
 import { B3DMLoader } from './loaders/B3DMLoader.js';
 import { I3DMLoader } from './loaders/I3DMLoader.js';
 import { PNTSLoader } from './loaders/PNTSLoader.js';
 import { CMPTLoader } from './loaders/CMPTLoader.js';
 import { TileGLTFLoader } from './loaders/TileGLTFLoader.js';
-import { readMagicBytes } from './utilities/readMagicBytes.js';
+import { readMagicBytes } from './core/renderer/utilities/readMagicBytes.js';
 
 const _updateBeforeEvent = { type: 'update-before' };
 const _updateAfterEvent = { type: 'update-after' };
@@ -928,7 +928,9 @@ export class Tiles3D extends Object3D {
 		const pr = this
 			.invokeOnePlugin(plugin => plugin.fetchData && plugin.fetchData(processedUrl, this.fetchOptions))
 			.then(res => {
-				if (res.ok) {
+				if (!(res instanceof Response)) {
+					return res;
+				} else if (res.ok) {
 					return res.json();
 				} else {
 					throw new Error(`Tiles3D: Failed to load tileset "${processedUrl}" with status ${res.status} : ${res.statusText}`);

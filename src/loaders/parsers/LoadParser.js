@@ -1,4 +1,4 @@
-import { getUrlExtension } from '../../utilities/urlExtension.js';
+import { getUrlExtension } from '../../core/renderer/utilities/urlExtension.js';
 
 export class LoadParser {
 

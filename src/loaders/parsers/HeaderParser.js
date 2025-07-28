@@ -1,4 +1,4 @@
-import { getUrlExtension } from '../../utilities/urlExtension.js';
+import { getUrlExtension } from '../../core/renderer/utilities/urlExtension.js';
 
 /**
  * This parser is used to parse the header of a 3D Tiles resource.

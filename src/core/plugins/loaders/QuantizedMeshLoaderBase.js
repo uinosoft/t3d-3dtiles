@@ -1,4 +1,4 @@
-import { LoaderBase } from '../../../base/loaders/LoaderBase.js';
+import { LoaderBase } from '../../renderer/loaders/LoaderBase.js';
 
 export function zigZagDecode(value) {
 	return (value >> 1) ^ (-(value & 1));
