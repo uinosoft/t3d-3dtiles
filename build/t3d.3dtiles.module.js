@@ -1,5 +1,5 @@
 // t3d-3dtiles
-import { Vector3, Matrix3, Box3, Ray, Plane, Matrix4, Spherical, Sphere, Euler, MathUtils, Vector2, Frustum, PBRMaterial, ShaderLib, MATERIAL_TYPE, TEXEL_ENCODING_TYPE, DRAW_SIDE, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Quaternion, Attribute, Buffer, Color3, Mesh, Object3D, LoadingManager, EventDispatcher, PlaneGeometry, ShaderMaterial, Texture2D, TEXTURE_FILTER, DefaultLoadingManager, PIXEL_FORMAT, PIXEL_TYPE, Triangle, LineMaterial, BoxGeometry, DRAW_MODE, Camera } from 't3d';
+import { Vector3, Matrix3, Box3, Ray, Plane, Matrix4, Spherical, Sphere, Euler, MathUtils, Vector2, Frustum, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Quaternion, Attribute, Buffer, Color3, Mesh, Object3D, LoadingManager, EventDispatcher, PlaneGeometry, ShaderMaterial, MATERIAL_TYPE, ShaderLib, Texture2D, TEXTURE_FILTER, DefaultLoadingManager, PIXEL_FORMAT, PIXEL_TYPE, Triangle, LineMaterial, BoxGeometry, DRAW_MODE, Camera } from 't3d';
 import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
 import { ReferenceParser } from 't3d/addons/loaders/glTF/parsers/ReferenceParser.js';
 import { Validator } from 't3d/addons/loaders/glTF/parsers/Validator.js';
@@ -16,6 +16,7 @@ import { SceneParser } from 't3d/addons/loaders/glTF/parsers/SceneParser.js';
 import { AnimationParser } from 't3d/addons/loaders/glTF/parsers/AnimationParser.js';
 import { GLTFUtils } from 't3d/addons/loaders/glTF/GLTFUtils.js';
 import { ALPHA_MODES, ATTRIBUTES, ACCESSOR_COMPONENT_TYPES, WEBGL_DRAW_MODES } from 't3d/addons/loaders/glTF/Constants.js';
+import { InstancedPBRMaterial, InstancedBasicMaterial } from 't3d/addons/materials/InstancedMaterial.js';
 import { KHR_materials_pbrSpecularGlossiness } from 't3d/addons/loaders/glTF/extensions/KHR_materials_pbrSpecularGlossiness.js';
 import { KHR_materials_clearcoat } from 't3d/addons/loaders/glTF/extensions/KHR_materials_clearcoat.js';
 import { Raycaster } from 't3d/addons/Raycaster.js';
@@ -2728,60 +2729,6 @@ class I3DMParser {
 
 }
 
-const instancingParsVert = `
-    #ifdef USE_INSTANCING
-        attribute mat4 instanceMatrix;
-    #endif
-`;
-
-const instancingPositionVert = `
-    #ifdef USE_INSTANCING
-        transformed = (instanceMatrix * vec4(transformed, 1.0)).xyz;
-    #endif
-`;
-
-const instancingNormalVert = `
-    #ifdef USE_INSTANCING
-        #ifdef USE_INSTANCING
-            objectNormal = (transposeMat4(inverseMat4(instanceMatrix)) * vec4(objectNormal, 0.0)).xyz;
-        #endif
-
-        #ifdef USE_TANGENT
-            objectTangent = (transposeMat4(inverseMat4(instanceMatrix)) * vec4(objectTangent, 0.0)).xyz;
-        #endif
-    #endif
-`;
-
-class InstancedPBRMaterial extends PBRMaterial {
-
-	constructor() {
-		super();
-		this.type = MATERIAL_TYPE.SHADER;
-		this.shaderName = 'TILE_I_PBR';
-		this.vertexShader = vertexShader$1;
-		this.fragmentShader = ShaderLib.pbr_frag;
-		this.defines.USE_INSTANCING = true;
-	}
-
-}
-
-InstancedPBRMaterial.prototype.isInstancedPBRMaterial = true;
-
-let vertexShader$1 = ShaderLib.pbr_vert;
-
-vertexShader$1 = vertexShader$1.replace('#include <logdepthbuf_pars_vert>', `
-    #include <logdepthbuf_pars_vert>
-    ${instancingParsVert}
-`);
-vertexShader$1 = vertexShader$1.replace('#include <pvm_vert>', `
-    ${instancingPositionVert}
-    #include <pvm_vert>
-`);
-vertexShader$1 = vertexShader$1.replace('#include <normal_vert>', `
-    ${instancingNormalVert}
-    #include <normal_vert>
-`);
-
 class MaterialParser {
 
 	static parse(context, loader) {
@@ -3342,36 +3289,6 @@ class KHR_techniques_webgl_i extends KHR_techniques_webgl {
 	}
 
 }
-
-class InstancedBasicMaterial extends BasicMaterial {
-
-	constructor() {
-		super();
-		this.type = MATERIAL_TYPE.SHADER;
-		this.shaderName = 'TILE_I_BASIC';
-		this.vertexShader = vertexShader;
-		this.fragmentShader = ShaderLib.basic_frag;
-		this.defines.USE_INSTANCING = true;
-	}
-
-}
-
-InstancedBasicMaterial.prototype.isInstancedBasicMaterial = true;
-
-let vertexShader = ShaderLib.basic_vert;
-
-vertexShader = vertexShader.replace('#include <logdepthbuf_pars_vert>', `
-    #include <logdepthbuf_pars_vert>
-    ${instancingParsVert}
-`);
-vertexShader = vertexShader.replace('#include <pvm_vert>', `
-    ${instancingPositionVert}
-    #include <pvm_vert>
-`);
-vertexShader = vertexShader.replace('#include <normal_vert>', `
-    ${instancingNormalVert}
-    #include <normal_vert>
-`);
 
 class KHR_materials_unlit_i {
 
@@ -12356,4 +12273,4 @@ Camera.prototype.updateProjectionMatrix = function() {
 	return this;
 };
 
-export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, EnvironmentControls, GlobeControls, I3DMLoader, ImplicitTilingPlugin, InstancedBasicMaterial, InstancedPBRMaterial, OBB, PNTSLoader, QuantizedMeshPlugin, ReorientationPlugin, TMSTilesPlugin, TileGLTFLoader, Tiles3D, TilesFadePlugin, XYZTilesPlugin };
+export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, EnvironmentControls, GlobeControls, I3DMLoader, ImplicitTilingPlugin, OBB, PNTSLoader, QuantizedMeshPlugin, ReorientationPlugin, TMSTilesPlugin, TileGLTFLoader, Tiles3D, TilesFadePlugin, XYZTilesPlugin };

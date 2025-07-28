@@ -2,9 +2,6 @@ export * from './Tiles3D.js';
 
 export * from './math/OBB.js';
 
-export * from './materials/InstancedBasicMaterial.js';
-export * from './materials/InstancedPBRMaterial.js';
-
 export * from './loaders/B3DMLoader.js';
 export * from './loaders/CMPTLoader.js';
 export * from './loaders/TileGLTFLoader.js';

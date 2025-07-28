@@ -1,6 +1,6 @@
 import { Color3 } from 't3d';
 import { KHR_materials_pbrSpecularGlossiness } from 't3d/addons/loaders/glTF/extensions/KHR_materials_pbrSpecularGlossiness.js';
-import { InstancedPBRMaterial } from '../../materials/InstancedPBRMaterial.js';
+import { InstancedPBRMaterial } from 't3d/addons/materials/InstancedMaterial.js';
 
 export class KHR_materials_pbrSpecularGlossiness_i extends KHR_materials_pbrSpecularGlossiness {
 

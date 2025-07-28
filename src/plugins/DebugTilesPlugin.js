@@ -1,9 +1,8 @@
 import { BasicMaterial, Color3, DRAW_MODE, Object3D, PBRMaterial, PointsMaterial, SHADING_TYPE, Sphere } from 't3d';
 import { Box3Helper } from 't3d/addons/objects/Box3Helper.js';
 import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
+import { InstancedPBRMaterial, InstancedBasicMaterial } from 't3d/addons/materials/InstancedMaterial.js';
 import { EllipsoidRegionHelper } from './objects/EllipsoidRegionHelper.js';
-import { InstancedPBRMaterial } from '../materials/InstancedPBRMaterial.js';
-import { InstancedBasicMaterial } from '../materials/InstancedBasicMaterial.js';
 import { traverseSet, traverseAncestors } from '../utilities/traverseFunctions.js';
 
 const ORIGINAL_MATERIAL = Symbol('ORIGINAL_MATERIAL');

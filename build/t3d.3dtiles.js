@@ -4221,51 +4221,96 @@
 		}
 	}
 
-	const instancingParsVert = `
-		#ifdef USE_INSTANCING
-				attribute mat4 instanceMatrix;
-		#endif
+	const instancing_pars_vert = `
+#ifdef USE_INSTANCING
+	attribute mat4 instanceMatrix;
+	uniform mat4 instanceOffset;
+#endif
 `;
-	const instancingPositionVert = `
-		#ifdef USE_INSTANCING
-				transformed = (instanceMatrix * vec4(transformed, 1.0)).xyz;
-		#endif
+	const instancing_position_vert = `
+#ifdef USE_INSTANCING
+	mat4 instancingMatrix = inverseMat4(instanceOffset) * instanceMatrix * instanceOffset;
+	transformed = (instancingMatrix * vec4(transformed, 1.0)).xyz;
+#endif
 `;
-	const instancingNormalVert = `
-		#ifdef USE_INSTANCING
-				#ifdef USE_INSTANCING
-						objectNormal = (transposeMat4(inverseMat4(instanceMatrix)) * vec4(objectNormal, 0.0)).xyz;
-				#endif
+	const instancing_normal_vert = `
+#ifdef USE_INSTANCING
+	mat4 instancingNormalMatrix = transposeMat4(inverseMat4(instancingMatrix));
 
-				#ifdef USE_TANGENT
-						objectTangent = (transposeMat4(inverseMat4(instanceMatrix)) * vec4(objectTangent, 0.0)).xyz;
-				#endif
-		#endif
+	objectNormal = (instancingNormalMatrix * vec4(objectNormal, 0.0)).xyz;
+
+	#ifdef USE_TANGENT
+		objectTangent = (instancingNormalMatrix * vec4(objectTangent, 0.0)).xyz;
+	#endif
+#endif
 `;
 
+	// InstancedPBRMaterial
+
+	let pbr_vert = t3d.ShaderLib.pbr_vert;
+	pbr_vert = pbr_vert.replace('#include <logdepthbuf_pars_vert>', `
+#include <logdepthbuf_pars_vert>
+${instancing_pars_vert}
+`);
+	pbr_vert = pbr_vert.replace('#include <pvm_vert>', `
+${instancing_position_vert}
+#include <pvm_vert>
+`);
+	pbr_vert = pbr_vert.replace('#include <normal_vert>', `
+${instancing_normal_vert}
+#include <normal_vert>
+`);
 	class InstancedPBRMaterial extends t3d.PBRMaterial {
-		constructor() {
+		constructor(sourceMaterial) {
 			super();
 			this.type = t3d.MATERIAL_TYPE.SHADER;
-			this.shaderName = 'TILE_I_PBR';
-			this.vertexShader = vertexShader$1;
+			if (sourceMaterial) {
+				this.copy(sourceMaterial);
+			}
+			this.shaderName = 'InstancedPBR';
+			this.vertexShader = pbr_vert;
 			this.fragmentShader = t3d.ShaderLib.pbr_frag;
 			this.defines.USE_INSTANCING = true;
+			this.uniforms.instanceOffset = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
 		}
 	}
-	InstancedPBRMaterial.prototype.isInstancedPBRMaterial = true;
-	let vertexShader$1 = t3d.ShaderLib.pbr_vert;
-	vertexShader$1 = vertexShader$1.replace('#include <logdepthbuf_pars_vert>', `
-		#include <logdepthbuf_pars_vert>
-		${instancingParsVert}
+
+	// InstancedBasicMaterial
+
+	let basic_vert = t3d.ShaderLib.basic_vert;
+	basic_vert = basic_vert.replace('#include <logdepthbuf_pars_vert>', `
+	#include <logdepthbuf_pars_vert>
+	${instancing_pars_vert}
 `);
-	vertexShader$1 = vertexShader$1.replace('#include <pvm_vert>', `
-		${instancingPositionVert}
-		#include <pvm_vert>
+	basic_vert = basic_vert.replace('#include <pvm_vert>', `
+	${instancing_position_vert}
+	#include <pvm_vert>
 `);
-	vertexShader$1 = vertexShader$1.replace('#include <normal_vert>', `
-		${instancingNormalVert}
-		#include <normal_vert>
+	class InstancedBasicMaterial extends t3d.BasicMaterial {
+		constructor(sourceMaterial) {
+			super();
+			this.type = t3d.MATERIAL_TYPE.SHADER;
+			if (sourceMaterial) {
+				this.copy(sourceMaterial);
+			}
+			this.shaderName = 'InstancedBasic';
+			this.vertexShader = basic_vert;
+			this.fragmentShader = t3d.ShaderLib.basic_frag;
+			this.defines.USE_INSTANCING = true;
+			this.uniforms.instanceOffset = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+		}
+	}
+
+	// InstancedDepthMaterial
+
+	let depth_vert = t3d.ShaderLib.depth_vert;
+	depth_vert = depth_vert.replace('#include <logdepthbuf_pars_vert>', `
+	#include <logdepthbuf_pars_vert>
+	${instancing_pars_vert}
+`);
+	depth_vert = depth_vert.replace('#include <pvm_vert>', `
+	${instancing_position_vert}
+	#include <pvm_vert>
 `);
 
 	class MaterialParser {
@@ -4766,31 +4811,6 @@
 			return new InstancedPBRMaterial();
 		}
 	}
-
-	class InstancedBasicMaterial extends t3d.BasicMaterial {
-		constructor() {
-			super();
-			this.type = t3d.MATERIAL_TYPE.SHADER;
-			this.shaderName = 'TILE_I_BASIC';
-			this.vertexShader = vertexShader;
-			this.fragmentShader = t3d.ShaderLib.basic_frag;
-			this.defines.USE_INSTANCING = true;
-		}
-	}
-	InstancedBasicMaterial.prototype.isInstancedBasicMaterial = true;
-	let vertexShader = t3d.ShaderLib.basic_vert;
-	vertexShader = vertexShader.replace('#include <logdepthbuf_pars_vert>', `
-		#include <logdepthbuf_pars_vert>
-		${instancingParsVert}
-`);
-	vertexShader = vertexShader.replace('#include <pvm_vert>', `
-		${instancingPositionVert}
-		#include <pvm_vert>
-`);
-	vertexShader = vertexShader.replace('#include <normal_vert>', `
-		${instancingNormalVert}
-		#include <normal_vert>
-`);
 
 	class KHR_materials_unlit_i {
 		static getMaterial() {
@@ -13660,8 +13680,6 @@
 	exports.GlobeControls = GlobeControls;
 	exports.I3DMLoader = I3DMLoader;
 	exports.ImplicitTilingPlugin = ImplicitTilingPlugin;
-	exports.InstancedBasicMaterial = InstancedBasicMaterial;
-	exports.InstancedPBRMaterial = InstancedPBRMaterial;
 	exports.OBB = OBB;
 	exports.PNTSLoader = PNTSLoader;
 	exports.QuantizedMeshPlugin = QuantizedMeshPlugin;

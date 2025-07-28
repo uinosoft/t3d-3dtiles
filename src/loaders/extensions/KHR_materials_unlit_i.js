@@ -1,4 +1,4 @@
-import { InstancedBasicMaterial } from '../../materials/InstancedBasicMaterial.js';
+import { InstancedBasicMaterial } from 't3d/addons/materials/InstancedMaterial.js';
 
 export class KHR_materials_unlit_i {
 

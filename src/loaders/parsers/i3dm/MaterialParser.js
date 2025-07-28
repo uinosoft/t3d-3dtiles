@@ -5,7 +5,7 @@ import {
 } from 't3d';
 import { ALPHA_MODES } from 't3d/addons/loaders/glTF/Constants.js';
 
-import { InstancedPBRMaterial } from '../../../materials/InstancedPBRMaterial.js'; // @parser-modification - instanced materials
+import { InstancedPBRMaterial } from 't3d/addons/materials/InstancedMaterial.js'; // @parser-modification - instanced materials
 
 export class MaterialParser {
 
