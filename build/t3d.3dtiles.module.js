@@ -2381,7 +2381,6 @@ class LRUCache {
 		this.loadedSet = new Set();
 
 		this._unloadPriorityCallback = null;
-		this.computeMemoryUsageCallback = () => null;
 
 		const itemSet = this.itemSet;
 		this.defaultPriorityCallback = item => itemSet.get(item);
@@ -2393,7 +2392,18 @@ class LRUCache {
 	}
 
 	getMemoryUsage(item) {
-		return this.bytesMap.get(item) ?? null;
+		return this.bytesMap.get(item) || 0;
+	}
+
+	setMemoryUsage(item, bytes) {
+		const { bytesMap, itemSet } = this;
+		if (!itemSet.has(item)) {
+			return;
+		}
+
+		this.cachedBytes -= bytesMap.get(item) || 0;
+		bytesMap.set(item, bytes);
+		this.cachedBytes += bytes;
 	}
 
 	add(item, removeCb) {
@@ -2409,16 +2419,10 @@ class LRUCache {
 		const usedSet = this.usedSet;
 		const itemList = this.itemList;
 		const callbacks = this.callbacks;
-		const bytesMap = this.bytesMap;
 		itemList.push(item);
 		usedSet.add(item);
 		itemSet.set(item, Date.now());
 		callbacks.set(item, removeCb);
-
-		// computeMemoryUsageCallback can return "null" if memory usage is not known, yet
-		const bytes = this.computeMemoryUsageCallback(item);
-		this.cachedBytes += bytes || 0;
-		bytesMap.set(item, bytes);
 
 		return true;
 	}
@@ -2466,20 +2470,6 @@ class LRUCache {
 				loadedSet.delete(item);
 			}
 		}
-	}
-
-	updateMemoryUsage(item) {
-		const itemSet = this.itemSet;
-		const bytesMap = this.bytesMap;
-		if (!itemSet.has(item)) {
-			return;
-		}
-
-		this.cachedBytes -= bytesMap.get(item) || 0;
-
-		const bytes = this.computeMemoryUsageCallback(item);
-		bytesMap.set(item, bytes);
-		this.cachedBytes += bytes;
 	}
 
 	markUsed(item) {
@@ -4817,8 +4807,6 @@ class Tiles3D extends Object3D {
 
 		this.$cameras = new CameraList();
 
-		this.lruCache.computeMemoryUsageCallback = tile => tile.cached.bytesUsed ?? null;
-
 		const b3dmLoader = new B3DMLoader(manager);
 		const i3dmLoader = new I3DMLoader(manager);
 		const pntsLoader = new PNTSLoader(manager);
@@ -5045,6 +5033,11 @@ class Tiles3D extends Object3D {
 			visible: 0
 		};
 		this.frameCount = 0;
+	}
+
+	// Overrideable
+	calculateBytesUsed(scene, tile) {
+		return 0;
 	}
 
 	dispatchEvent(...args) {
@@ -5516,6 +5509,32 @@ class Tiles3D extends Object3D {
 	}
 
 	// Private Functions
+	// returns the total bytes used for by the given tile as reported by all plugins
+	getBytesUsed(tile) {
+		let bytes = 0;
+		this.invokeAllPlugins(plugin => {
+			if (plugin.calculateBytesUsed) {
+				bytes += plugin.calculateBytesUsed(tile, tile.cached.scene) || 0;
+			}
+		});
+
+		return bytes;
+	}
+
+	// force a recalculation of the tile or all tiles if no tile is provided
+	recalculateBytesUsed(tile = null) {
+		const { lruCache, processedTiles } = this;
+		if (tile === null) {
+			lruCache.itemSet.forEach(item => {
+				if (processedTiles.has(item)) {
+					lruCache.setMemoryUsage(item, this.getBytesUsed(item));
+				}
+			});
+		} else {
+			lruCache.setMemoryUsage(tile, this.getBytesUsed(tile));
+		}
+	}
+
 	preprocessTileSet(json, url, parent = null) {
 		const version = json.asset.version;
 		const [major, minor] = version.split('.').map(v => parseInt(v));
@@ -5652,6 +5671,7 @@ class Tiles3D extends Object3D {
 			this.dispatchEvent(_tilesLoadStartEvent);
 		}
 
+		lruCache.setMemoryUsage(tile, this.getBytesUsed(tile));
 		this.cachedSinceLoadComplete.add(tile);
 		stats.inCacheSinceLoad++;
 		stats.inCache++;
@@ -5719,16 +5739,16 @@ class Tiles3D extends Object3D {
 
 				// If the memory of the item hasn't been registered yet then that means the memory usage hasn't
 				// been accounted for by the cache yet so we need to check if it fits or if we should remove it.
-				if (lruCache.getMemoryUsage(tile) === null) {
-					if (lruCache.isFull() && lruCache.computeMemoryUsageCallback(tile) > 0) {
-						// And if the cache is full due to newly loaded memory then lets discard this tile - it will
-						// be loaded again later from the disk cache if needed.
-						lruCache.remove(tile);
-					} else {
-						// Otherwise update the item to the latest known value
-						lruCache.updateMemoryUsage(tile);
-					}
+				const bytesUsed = this.getBytesUsed(tile);
+				if (lruCache.getMemoryUsage(tile) === 0 && bytesUsed > 0 && lruCache.isFull()) {
+					// And if the cache is full due to newly loaded memory then lets discard this tile - it will
+					// be loaded again later from the disk cache if needed.
+					lruCache.remove(tile);
+					return;
 				}
+
+				// update memory
+				lruCache.setMemoryUsage(tile, bytesUsed);
 
 				// dispatch an event indicating that this model has completed and that a new
 				// call to "update" is needed.
