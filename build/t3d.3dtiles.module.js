@@ -3304,6 +3304,72 @@ class HeaderParser {
 
 }
 
+function parseBinArray(buffer, arrayStart, count, type, componentType, propertyName) {
+	let stride;
+	switch (type) {
+		case 'SCALAR':
+			stride = 1;
+			break;
+
+		case 'VEC2':
+			stride = 2;
+			break;
+
+		case 'VEC3':
+			stride = 3;
+			break;
+
+		case 'VEC4':
+			stride = 4;
+			break;
+
+		default:
+			throw new Error(`FeatureTable : Feature type not provided for "${propertyName}".`);
+	}
+
+	let data;
+	const arrayLength = count * stride;
+
+	switch (componentType) {
+		case 'BYTE':
+			data = new Int8Array(buffer, arrayStart, arrayLength);
+			break;
+
+		case 'UNSIGNED_BYTE':
+			data = new Uint8Array(buffer, arrayStart, arrayLength);
+			break;
+
+		case 'SHORT':
+			data = new Int16Array(buffer, arrayStart, arrayLength);
+			break;
+
+		case 'UNSIGNED_SHORT':
+			data = new Uint16Array(buffer, arrayStart, arrayLength);
+			break;
+
+		case 'INT':
+			data = new Int32Array(buffer, arrayStart, arrayLength);
+			break;
+
+		case 'UNSIGNED_INT':
+			data = new Uint32Array(buffer, arrayStart, arrayLength);
+			break;
+
+		case 'FLOAT':
+			data = new Float32Array(buffer, arrayStart, arrayLength);
+			break;
+
+		case 'DOUBLE':
+			data = new Float64Array(buffer, arrayStart, arrayLength);
+			break;
+
+		default:
+			throw new Error(`FeatureTable : Feature component type not provided for "${propertyName}".`);
+	}
+
+	return data;
+}
+
 class FeatureTable {
 
 	constructor(buffer, start, headerLength, binLength) {
@@ -3314,7 +3380,7 @@ class FeatureTable {
 		let header = null;
 		if (headerLength !== 0) {
 			const headerData = new Uint8Array(buffer, start, headerLength);
-			header = JSON.parse(GLTFUtils.decodeText(headerData));
+			header = JSON.parse(arrayToString(headerData));
 		} else {
 			header = {};
 		}
@@ -3347,58 +3413,10 @@ class FeatureTable {
 				throw new Error('FeatureTable: Specified type does not match expected type.');
 			}
 
-			let stride;
-			switch (featureType) {
-				case 'SCALAR':
-					stride = 1;
-					break;
-				case 'VEC2':
-					stride = 2;
-					break;
-				case 'VEC3':
-					stride = 3;
-					break;
-				case 'VEC4':
-					stride = 4;
-					break;
-				default:
-					throw new Error(`FeatureTable: Feature type not provided for "${key}".`);
-			}
-
-			let data;
 			const arrayStart = binOffset + byteOffset;
-			const arrayLength = count * stride;
+			const data = parseBinArray(buffer, arrayStart, count, featureType, featureComponentType, key);
 
-			switch (featureComponentType) {
-				case 'BYTE':
-					data = new Int8Array(buffer, arrayStart, arrayLength);
-					break;
-				case 'UNSIGNED_BYTE':
-					data = new Uint8Array(buffer, arrayStart, arrayLength);
-					break;
-				case 'SHORT':
-					data = new Int16Array(buffer, arrayStart, arrayLength);
-					break;
-				case 'UNSIGNED_SHORT':
-					data = new Uint16Array(buffer, arrayStart, arrayLength);
-					break;
-				case 'INT':
-					data = new Int32Array(buffer, arrayStart, arrayLength);
-					break;
-				case 'UNSIGNED_INT':
-					data = new Uint32Array(buffer, arrayStart, arrayLength);
-					break;
-				case 'FLOAT':
-					data = new Float32Array(buffer, arrayStart, arrayLength);
-					break;
-				case 'DOUBLE':
-					data = new Float64Array(buffer, arrayStart, arrayLength);
-					break;
-				default:
-					throw new Error(`FeatureTable: Feature component type not provided for "${key}".`);
-			}
-
-			const dataEnd = arrayStart + arrayLength * data.BYTES_PER_ELEMENT;
+			const dataEnd = arrayStart + data.byteLength;
 			if (dataEnd > binOffset + binLength) {
 				throw new Error('FeatureTable: Feature data read outside binary body length.');
 			}
@@ -3407,18 +3425,158 @@ class FeatureTable {
 		}
 	}
 
+	getBuffer(byteOffset, byteLength) {
+		const { buffer, binOffset } = this;
+		return buffer.slice(binOffset + byteOffset, binOffset + byteOffset + byteLength);
+	}
+
+}
+
+class BatchTableHierarchyExtension {
+
+	constructor(batchTable) {
+		this.batchTable = batchTable;
+
+		const extensionHeader = batchTable.header.extensions['3DTILES_batch_table_hierarchy'];
+
+		this.classes = extensionHeader.classes;
+		for (const classDef of this.classes) {
+			const instances = classDef.instances;
+			for (const property in instances) {
+				classDef.instances[property] = this._parseProperty(instances[property], classDef.length, property);
+			}
+		}
+
+		this.instancesLength = extensionHeader.instancesLength;
+
+		this.classIds = this._parseProperty(extensionHeader.classIds, this.instancesLength, 'classIds');
+
+		if (extensionHeader.parentCounts) {
+			this.parentCounts = this._parseProperty(extensionHeader.parentCounts, this.instancesLength, 'parentCounts');
+		} else {
+			this.parentCounts = new Array(this.instancesLength).fill(1);
+		}
+
+		if (extensionHeader.parentIds) {
+			const parentIdsLength = this.parentCounts.reduce((a, b) => a + b, 0);
+			this.parentIds = this._parseProperty(extensionHeader.parentIds, parentIdsLength, 'parentIds');
+		} else {
+			this.parentIds = null;
+		}
+
+		this.instancesIds = [];
+		const classCounter = {};
+		for (const classId of this.classIds) {
+			classCounter[classId] = classCounter[classId] ?? 0;
+			this.instancesIds.push(classCounter[classId]);
+			classCounter[classId]++;
+		}
+	}
+
+	_parseProperty(property, propertyLength, propertyName) {
+		if (Array.isArray(property)) {
+			return property;
+		} else {
+			const { buffer, binOffset } = this.batchTable;
+
+			const byteOffset = property.byteOffset;
+			const componentType = property.componentType || 'UNSIGNED_SHORT';
+
+			const arrayStart = binOffset + byteOffset;
+
+			return parseBinArray(buffer, arrayStart, propertyLength, 'SCALAR', componentType, propertyName);
+		}
+	}
+
+	getDataFromId(id, target = {}) {
+		// Get properties inherited from parents
+
+		const parentCount = this.parentCounts[id];
+
+		if (this.parentIds && parentCount > 0) {
+			let parentIdsOffset = 0;
+			for (let i = 0; i < id; i++) {
+				parentIdsOffset += this.parentCounts[i];
+			}
+
+			for (let i = 0; i < parentCount; i++) {
+				const parentId = this.parentIds[parentIdsOffset + i];
+				if (parentId !== id) {
+					this.getDataFromId(parentId, target);
+				}
+			}
+		}
+
+		// Get properties proper to this instance
+
+		const classId = this.classIds[id];
+		const instances = this.classes[classId].instances;
+		const className = this.classes[classId].name;
+		const instanceId = this.instancesIds[id];
+
+		for (const key in instances) {
+			target[className] = target[className] || {};
+			target[className][key] = instances[key][instanceId];
+		}
+
+		return target;
+	}
+
 }
 
 class BatchTable extends FeatureTable {
 
-	constructor(buffer, batchSize, start, headerLength, binLength) {
+	get batchSize() {
+		console.warn('BatchTable.batchSize has been deprecated and replaced with BatchTable.count.');
+		return this.count;
+	}
+
+	constructor(buffer, count, start, headerLength, binLength) {
 		super(buffer, start, headerLength, binLength);
-		this.batchSize = batchSize;
+		this.count = count;
+
+		this.extensions = {};
+		const extensions = this.header.extensions;
+		if (extensions) {
+			if (extensions['3DTILES_batch_table_hierarchy']) {
+				this.extensions['3DTILES_batch_table_hierarchy'] = new BatchTableHierarchyExtension(this);
+			}
+		}
 	}
 
 	getData(key, componentType = null, type = null) {
-		return super.getData(key, this.batchSize, componentType, type);
+		console.warn('BatchTable: BatchTable.getData is deprecated. Use BatchTable.getDataFromId to get all' +
+			'properties for an id or BatchTable.getPropertyArray for getting an array of value for a property.');
+		return super.getData(key, this.count, componentType, type);
 	}
+
+	getDataFromId(id, target = {}) {
+		if (id < 0 || id >= this.count) {
+			throw new Error(`BatchTable: id value "${id}" out of bounds for "${this.count}" features number.`);
+		}
+
+		for (const key of this.getKeys()) {
+			if (key !== 'extensions') {
+				target[key] = super.getData(key, this.count)[id];
+			}
+		}
+
+		for (const extensionName in this.extensions) {
+			const extension = this.extensions[extensionName];
+
+			if (extension.getDataFromId instanceof Function) {
+				target[extensionName] = target[extensionName] || {};
+				extension.getDataFromId(id, target[extensionName]);
+			}
+		}
+
+		return target;
+	}
+
+	getPropertyArray(key) {
+		return super.getData(key, this.count);
+	}
+
 
 }
 
