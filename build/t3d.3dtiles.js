@@ -13873,8 +13873,7 @@ ${instancing_normal_vert}
 	};
 	t3d.MathUtils.DEG2RAD = Math.PI / 180;
 	t3d.MathUtils.RAD2DEG = 180 / Math.PI;
-	let oldMethod;
-	oldMethod = t3d.Camera.prototype.setOrtho;
+	const _setOrtho = t3d.Camera.prototype.setOrtho;
 	t3d.Camera.prototype.setOrtho = function (left, right, bottom, top, near, far) {
 		this.left = left;
 		this.right = right;
@@ -13885,9 +13884,9 @@ ${instancing_normal_vert}
 		this.zoom = 1;
 		this.isPerspectiveCamera = false;
 		this.isOrthographicCamera = true;
-		oldMethod.call(this, left, right, bottom, top, near, far);
+		_setOrtho.call(this, left, right, bottom, top, near, far);
 	};
-	oldMethod = t3d.Camera.prototype.setPerspective;
+	const _setPerspective = t3d.Camera.prototype.setPerspective;
 	t3d.Camera.prototype.setPerspective = function (fov, aspect, near, far) {
 		this.fov = fov;
 		this.aspect = aspect;
@@ -13895,7 +13894,7 @@ ${instancing_normal_vert}
 		this.far = far;
 		this.isPerspectiveCamera = true;
 		this.isOrthographicCamera = false;
-		oldMethod.call(this, fov, aspect, near, far);
+		_setPerspective.call(this, fov, aspect, near, far);
 	};
 	t3d.Camera.prototype.updateProjectionMatrix = function () {
 		if (this.isOrthographicCamera) {

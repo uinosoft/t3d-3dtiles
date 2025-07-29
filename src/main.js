@@ -22,7 +22,7 @@ export { XYZTilesPlugin, TMSTilesPlugin } from './plugins/images/EPSGTilesPlugin
 
 export { LoadParser as DebugLoadParser } from './loaders/parsers/LoadParser.js';
 
-// Exporting some prototype methods for Matrix4, Vector3, and Object3D classes
+// Exporting some prototype methods for Matrix4, Vector3, Camera and Object3D classes
 
 import { Vector3, Quaternion, Triangle, Object3D, MathUtils, Camera } from 't3d';
 
@@ -58,9 +58,7 @@ Object3D.prototype.removeFromParent = function() {
 MathUtils.DEG2RAD = Math.PI / 180;
 MathUtils.RAD2DEG = 180 / Math.PI;
 
-let oldMethod;
-
-oldMethod = Camera.prototype.setOrtho;
+const _setOrtho = Camera.prototype.setOrtho;
 Camera.prototype.setOrtho = function(left, right, bottom, top, near, far) {
 	this.left = left;
 	this.right = right;
@@ -74,10 +72,10 @@ Camera.prototype.setOrtho = function(left, right, bottom, top, near, far) {
 	this.isPerspectiveCamera = false;
 	this.isOrthographicCamera = true;
 
-	oldMethod.call(this, left, right, bottom, top, near, far);
+	_setOrtho.call(this, left, right, bottom, top, near, far);
 };
 
-oldMethod = Camera.prototype.setPerspective;
+const _setPerspective = Camera.prototype.setPerspective;
 Camera.prototype.setPerspective = function(fov, aspect, near, far) {
 	this.fov = fov;
 	this.aspect = aspect;
@@ -87,7 +85,7 @@ Camera.prototype.setPerspective = function(fov, aspect, near, far) {
 	this.isPerspectiveCamera = true;
 	this.isOrthographicCamera = false;
 
-	oldMethod.call(this, fov, aspect, near, far);
+	_setPerspective.call(this, fov, aspect, near, far);
 };
 
 Camera.prototype.updateProjectionMatrix = function() {
