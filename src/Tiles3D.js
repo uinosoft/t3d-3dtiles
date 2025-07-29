@@ -5,7 +5,7 @@ import { raycastTraverse, raycastTraverseFirstHit } from './utilities/raycastTra
 import { CameraList } from './utilities/CameraList.js';
 import { LRUCache } from './core/renderer/utilities/LRUCache.js';
 import { PriorityQueue } from './core/renderer/utilities/PriorityQueue.js';
-import { markUsedTiles, markUsedSetLeaves, markVisibleTiles, toggleTiles, traverseSet } from './utilities/traverseFunctions.js';
+import { markUsedTiles, markUsedSetLeaves, markVisibleTiles, toggleTiles, traverseSet } from './core/renderer/tiles/traverseFunctions.js';
 import { UNLOADED, LOADING, PARSING, LOADED, FAILED } from './core/renderer/constants.js';
 import { WGS84_ELLIPSOID } from './math/GeoConstants.js';
 import { throttle } from './core/renderer/utilities/throttle.js';

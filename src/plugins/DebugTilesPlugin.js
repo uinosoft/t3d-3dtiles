@@ -3,7 +3,7 @@ import { Box3Helper } from 't3d/addons/objects/Box3Helper.js';
 import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
 import { InstancedPBRMaterial, InstancedBasicMaterial } from 't3d/addons/materials/InstancedMaterial.js';
 import { EllipsoidRegionHelper } from './objects/EllipsoidRegionHelper.js';
-import { traverseSet, traverseAncestors } from '../utilities/traverseFunctions.js';
+import { traverseSet, traverseAncestors } from '../core/renderer/tiles/traverseFunctions.js';
 
 const ORIGINAL_MATERIAL = Symbol('ORIGINAL_MATERIAL');
 const HAS_RANDOM_COLOR = Symbol('HAS_RANDOM_COLOR');

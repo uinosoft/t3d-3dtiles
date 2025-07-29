@@ -1,4 +1,4 @@
-import { traverseSet } from '../../../utilities/traverseFunctions.js';
+import { traverseSet } from '../../renderer/tiles/traverseFunctions.js';
 
 const TILES_MAP_URL = 'https://tile.googleapis.com/v1/createSession';
 
