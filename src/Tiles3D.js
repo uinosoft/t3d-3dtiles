@@ -115,6 +115,10 @@ export class Tiles3D extends Object3D {
 		return total === 0 ? 1.0 : 1.0 - loading / total;
 	}
 
+	get group() {
+		return this;
+	}
+
 	constructor(url, manager = new LoadingManager()) {
 		super();
 
@@ -716,7 +720,6 @@ export class Tiles3D extends Object3D {
 
 		tile.__wasSetVisible = false;
 		tile.__visible = false;
-		tile.__childrenWereVisible = false;
 		tile.__allChildrenLoaded = false;
 
 		tile.__wasSetActive = false;
