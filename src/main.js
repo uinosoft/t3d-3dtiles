@@ -1,6 +1,6 @@
 export { ImplicitTilingPlugin } from './core/plugins/ImplicitTilingPlugin.js';
 
-export * from './Tiles3D.js';
+export * from './TilesRenderer.js';
 
 export * from './math/OBB.js';
 

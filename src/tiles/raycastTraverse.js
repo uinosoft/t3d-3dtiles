@@ -46,12 +46,12 @@ function isTileInitialized(tile) {
 
 // Returns the closest hit when traversing the tree
 export function raycastTraverseFirstHit(renderer, tile, ray, localRay = null) {
-	const { activeTiles } = renderer;
+	const { group, activeTiles } = renderer;
 
 	// get the ray in the local group frame
 	if (localRay === null) {
 		localRay = _localRay;
-		localRay.copy(ray).applyMatrix4(_mat.copy(renderer.worldMatrix).inverse());
+		localRay.copy(ray).applyMatrix4(_mat.copy(group.worldMatrix).inverse());
 	}
 
 	// get a set of intersections so we intersect the nearest one first
@@ -67,7 +67,7 @@ export function raycastTraverseFirstHit(renderer, tile, ray, localRay = null) {
 		// track the tile and hit distance for sorting
 		const boundingVolume = child.cached.boundingVolume;
 		if (boundingVolume.intersectRay(localRay, _vec) !== null) {
-			_vec.applyMatrix4(renderer.worldMatrix);
+			_vec.applyMatrix4(group.worldMatrix);
 			array.push({
 				distance: _vec.distanceToSquared(ray.origin),
 				tile: child
@@ -119,13 +119,13 @@ export function raycastTraverse(renderer, tile, ray, intersects, localRay = null
 		return;
 	}
 
-	const { activeTiles } = renderer;
+	const { group, activeTiles } = renderer;
 	const { boundingVolume } = tile.cached;
 
 	// get the ray in the local group frame
 	if (localRay === null) {
 		localRay = _localRay;
-		localRay.copy(ray).applyMatrix4(_mat.copy(renderer.worldMatrix).inverse());
+		localRay.copy(ray).applyMatrix4(_mat.copy(group.worldMatrix).inverse());
 	}
 
 	// exit early if the tile isn't used or the bounding volume is not intersected

@@ -179,19 +179,20 @@ export class DebugTilesPlugin {
 		}
 
 		// initialize groups
+		const tilesGroup = tiles.group;
 		this.boxGroup = new Object3D();
 		this.boxGroup.name = 'DebugTilesPlugin.boxGroup';
-		tiles.add(this.boxGroup);
+		tilesGroup.add(this.boxGroup);
 		this.boxGroup.updateMatrix();
 
 		this.sphereGroup = new Object3D();
 		this.sphereGroup.name = 'DebugTilesPlugin.sphereGroup';
-		tiles.add(this.sphereGroup);
+		tilesGroup.add(this.sphereGroup);
 		this.sphereGroup.updateMatrix();
 
 		this.regionGroup = new Object3D();
 		this.regionGroup.name = 'DebugTilesPlugin.regionGroup';
-		tiles.add(this.regionGroup);
+		tilesGroup.add(this.regionGroup);
 		this.regionGroup.updateMatrix();
 
 		// register events

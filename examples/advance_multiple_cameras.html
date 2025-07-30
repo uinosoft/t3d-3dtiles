@@ -33,7 +33,7 @@
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { CameraHelper } from 't3d/addons/objects/CameraHelper.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
-		import { Tiles3D, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
+		import { TilesRenderer, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
 		import { Pane } from 'tweakpane';
 
 		let width = window.innerWidth || 2;
@@ -86,17 +86,17 @@
 
 		// Create 3D tiles
 
-		const tiles3D = new Tiles3D('https://raw.githubusercontent.com/NASA-AMMOS/3DTilesSampleData/master/msl-dingo-gap/0528_0260184_to_s64o256_colorize/scene-tileset.json');
-		scene.add(tiles3D);
+		const tiles = new TilesRenderer('https://raw.githubusercontent.com/NASA-AMMOS/3DTilesSampleData/master/msl-dingo-gap/0528_0260184_to_s64o256_colorize/scene-tileset.json');
+		scene.add(tiles.group);
 
-		tiles3D.registerPlugin(new ReorientationPlugin({ up: '-z' }));
-		tiles3D.registerPlugin(new DebugTilesPlugin());
+		tiles.registerPlugin(new ReorientationPlugin({ up: '-z' }));
+		tiles.registerPlugin(new DebugTilesPlugin());
 
 		const dracoLoader = new DRACOLoader();
 		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
-		tiles3D.setDRACOLoader(dracoLoader);
+		tiles.setDRACOLoader(dracoLoader);
 		
-		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+		tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 		// GUI
 
@@ -110,7 +110,7 @@
 		}
 
 		setMainCamera(params.mainCamera);
-		tiles3D.addCamera(cameras[0].camera);
+		tiles.addCamera(cameras[0].camera);
 
 		const pane = new Pane();
 
@@ -128,15 +128,15 @@
 		for (let i = 0; i < 3; i++) {
 			activityFolder.addBinding(params, `camera${i + 1}`, { label: `Camera ${i + 1}` }).on('change', ({ value }) => {
 				if (value) {
-					tiles3D.addCamera(cameras[i].camera);
+					tiles.addCamera(cameras[i].camera);
 				} else {
-					tiles3D.removeCamera(cameras[i].camera);
+					tiles.removeCamera(cameras[i].camera);
 				}
 			});
 		}
 
 		const debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });
-		const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+		const debugTilesPlugin = tiles.getPluginByName('DEBUG_TILES_PLUGIN');
 		debugFolder.addBinding(debugTilesPlugin, 'displayBoxBounds', { label: 'Display Box Bounds' });
 		debugFolder.addBinding(debugTilesPlugin, 'colorMode', {
 			label: 'Color Mode',
@@ -145,9 +145,9 @@
 
 		const monitorFolder = pane.addFolder({ title: 'Tiles Monitor', expanded: true });
 		const monitorOptions = { readonly: true, format: v => v.toFixed(0) };
-		monitorFolder.addBinding(tiles3D.stats, 'downloading', monitorOptions);
-		monitorFolder.addBinding(tiles3D.stats, 'parsing', monitorOptions);
-		monitorFolder.addBinding(tiles3D.stats, 'visible', monitorOptions);
+		monitorFolder.addBinding(tiles.stats, 'downloading', monitorOptions);
+		monitorFolder.addBinding(tiles.stats, 'parsing', monitorOptions);
+		monitorFolder.addBinding(tiles.stats, 'visible', monitorOptions);
 
 		//
 
@@ -156,7 +156,7 @@
 
 			cameras.forEach(camera => camera.controller.update());
 
-			tiles3D.update();
+			tiles.update();
 
 			cameras.forEach((camera, i) => camera.helper.visible = i !== params.mainCamera && params[`camera${i + 1}`]);
 			cameras[params.mainCamera].camera.rect.set(0, 0, 1, 1);
@@ -180,7 +180,7 @@
 			});
 
 			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
-			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			canvas.style.width = width + 'px';
 			canvas.style.height = height + 'px';

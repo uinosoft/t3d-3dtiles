@@ -1735,13 +1735,14 @@
 	// Returns the closest hit when traversing the tree
 	function raycastTraverseFirstHit(renderer, tile, ray, localRay = null) {
 		const {
+			group,
 			activeTiles
 		} = renderer;
 
 		// get the ray in the local group frame
 		if (localRay === null) {
 			localRay = _localRay;
-			localRay.copy(ray).applyMatrix4(_mat.copy(renderer.worldMatrix).inverse());
+			localRay.copy(ray).applyMatrix4(_mat.copy(group.worldMatrix).inverse());
 		}
 
 		// get a set of intersections so we intersect the nearest one first
@@ -1756,7 +1757,7 @@
 			// track the tile and hit distance for sorting
 			const boundingVolume = child.cached.boundingVolume;
 			if (boundingVolume.intersectRay(localRay, _vec$5) !== null) {
-				_vec$5.applyMatrix4(renderer.worldMatrix);
+				_vec$5.applyMatrix4(group.worldMatrix);
 				array.push({
 					distance: _vec$5.distanceToSquared(ray.origin),
 					tile: child
@@ -1805,6 +1806,7 @@
 			return;
 		}
 		const {
+			group,
 			activeTiles
 		} = renderer;
 		const {
@@ -1814,7 +1816,7 @@
 		// get the ray in the local group frame
 		if (localRay === null) {
 			localRay = _localRay;
-			localRay.copy(ray).applyMatrix4(_mat.copy(renderer.worldMatrix).inverse());
+			localRay.copy(ray).applyMatrix4(_mat.copy(group.worldMatrix).inverse());
 		}
 
 		// exit early if the tile isn't used or the bounding volume is not intersected
@@ -5962,6 +5964,63 @@ ${instancing_normal_vert}
 		}
 	}
 
+	// Specialization of "Group" that only updates world matrices of children if
+	// the transform has changed since the last update and ignores the "force"
+	// parameter under the assumption that the children tiles will not move.
+	const tempMat = new t3d.Matrix4();
+	class TilesGroup extends t3d.Object3D {
+		constructor(tilesRenderer) {
+			super();
+			this.isTilesGroup = true;
+			this.name = 'TilesRenderer.TilesGroup';
+			this.tilesRenderer = tilesRenderer;
+			this.matrixWorldInverse = new t3d.Matrix4();
+		}
+		raycast(ray, intersects) {
+			// returning "false" ends raycast traversal
+			if (this.tilesRenderer.optimizeRaycast) {
+				this.tilesRenderer.raycast(ray, intersects);
+				return false;
+			}
+			return true;
+		}
+		updateMatrix(force) {
+			if (this.matrixAutoUpdate || this.matrixNeedsUpdate) {
+				this.matrix.transform(this.position, this.scale, this.quaternion);
+				this.matrixNeedsUpdate = false;
+				this.worldMatrixNeedsUpdate = true;
+			}
+			if (this.worldMatrixNeedsUpdate || force) {
+				if (this.parent === null) {
+					tempMat.copy(this.matrix);
+				} else {
+					tempMat.multiplyMatrices(this.parent.worldMatrix, this.matrix);
+				}
+				this.worldMatrixNeedsUpdate = false;
+				if (!matrixEquals(tempMat, this.worldMatrix)) {
+					this.worldMatrix.copy(tempMat);
+
+					// update children
+					// the children will not have to change unless the parent group has updated
+					const children = this.children;
+					for (let i = 0, l = children.length; i < l; i++) {
+						children[i].updateMatrix();
+					}
+				}
+			}
+		}
+	}
+	const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
+		const te = matrixA.elements;
+		const me = matrixB.elements;
+		for (let i = 0; i < 16; i++) {
+			if (Math.abs(te[i] - me[i]) > epsilon) {
+				return false;
+			}
+		}
+		return true;
+	};
+
 	const _updateBeforeEvent = {
 		type: 'update-before'
 	};
@@ -5976,7 +6035,6 @@ ${instancing_normal_vert}
 	};
 	const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
 	const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
-	const tempMat = new t3d.Matrix4();
 	const viewErrorTarget = {
 		inView: false,
 		error: Infinity
@@ -5988,16 +6046,6 @@ ${instancing_normal_vert}
 			c.frustumCulled = c[INITIAL_FRUSTUM_CULLED] && toInitialValue;
 		});
 	}
-	const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
-		const te = matrixA.elements;
-		const me = matrixB.elements;
-		for (let i = 0; i < 16; i++) {
-			if (Math.abs(te[i] - me[i]) > epsilon) {
-				return false;
-			}
-		}
-		return true;
-	};
 
 	// priority queue sort function that takes two tiles to compare. Returning 1 means
 	// "tile a" is loaded first.
@@ -6044,7 +6092,7 @@ ${instancing_normal_vert}
 		}
 		return 0;
 	};
-	class Tiles3D extends t3d.Object3D {
+	class TilesRenderer {
 		get root() {
 			const rootTileSet = this.rootTileSet;
 			return rootTileSet ? rootTileSet.root : null;
@@ -6058,11 +6106,8 @@ ${instancing_normal_vert}
 			const total = stats.inCacheSinceLoad + (isLoading ? 1 : 0);
 			return total === 0 ? 1.0 : 1.0 - loading / total;
 		}
-		get group() {
-			return this;
-		}
 		constructor(url, manager = new t3d.LoadingManager()) {
-			super();
+			this.group = new TilesGroup(this);
 			this.ellipsoid = WGS84_ELLIPSOID.clone();
 
 			// options
@@ -6143,12 +6188,13 @@ ${instancing_normal_vert}
 			const gltfLoader = new TileGLTFLoader(manager);
 			this._loaders = new Map([['b3dm', b3dmLoader], ['i3dm', i3dmLoader], ['pnts', pntsLoader], ['cmpt', cmptLoader], ['gltf', gltfLoader]]);
 			this._upRotationMatrix = new t3d.Matrix4();
+			this.optimizeRaycast = true;
 		}
 
 		// Plugins
 		registerPlugin(plugin) {
 			if (plugin[PLUGIN_REGISTERED] === true) {
-				throw new Error('Tiles3D: A plugin can only be registered to a single tile set');
+				throw new Error('TilesRenderer: A plugin can only be registered to a single tile set');
 			}
 
 			// insert the plugin based on the priority registered on the plugin
@@ -6249,7 +6295,7 @@ ${instancing_normal_vert}
 				return;
 			}
 			this.dispatchEvent(_updateBeforeEvent);
-			this.$cameras.updateInfos(this.worldMatrix);
+			this.$cameras.updateInfos(this.group.worldMatrix);
 			stats.inFrustum = 0;
 			stats.used = 0;
 			stats.active = 0;
@@ -6327,6 +6373,7 @@ ${instancing_normal_vert}
 				visible: 0
 			};
 			this.frameCount = 0;
+			this.group.removeFromParent();
 		}
 
 		// Overrideable
@@ -6420,7 +6467,7 @@ ${instancing_normal_vert}
 			// wait for the tile to load
 			const result = await promise;
 			if (result === null) {
-				throw new Error(`Tiles3D: Content type "${fileType}" not supported.`);
+				throw new Error(`TilesRenderer: Content type "${fileType}" not supported.`);
 			}
 
 			// get the scene data
@@ -6642,14 +6689,15 @@ ${instancing_normal_vert}
 		}
 		setTileVisible(tile, visible) {
 			const scene = tile.cached.scene;
+			const group = this.group;
 			if (visible) {
 				if (scene) {
-					this.add(scene);
+					group.add(scene);
 					scene.updateMatrix(true);
 				}
 			} else {
 				if (scene) {
-					this.remove(scene);
+					group.remove(scene);
 				}
 			}
 			visible ? this.visibleTiles.add(tile) : this.visibleTiles.delete(tile);
@@ -6776,9 +6824,9 @@ ${instancing_normal_vert}
 		preprocessTileSet(json, url, parent = null) {
 			const version = json.asset.version;
 			const [major, minor] = version.split('.').map(v => parseInt(v));
-			console.assert(major <= 1, 'Tiles3D: asset.version is expected to be a 1.x or a compatible version.');
+			console.assert(major <= 1, 'TilesRenderer: asset.version is expected to be a 1.x or a compatible version.');
 			if (major === 1 && minor > 0) {
-				console.warn('Tiles3D: tiles versions at 1.1 or higher have limited support. Some new extensions and features may not be supported.');
+				console.warn('TilesRenderer: tiles versions at 1.1 or higher have limited support. Some new extensions and features may not be supported.');
 			}
 
 			// remove the last file path path-segment from the URL including the trailing slash
@@ -6798,7 +6846,7 @@ ${instancing_normal_vert}
 				} else if (res.ok) {
 					return res.json();
 				} else {
-					throw new Error(`Tiles3D: Failed to load tileset "${processedUrl}" with status ${res.status} : ${res.statusText}`);
+					throw new Error(`TilesRenderer: Failed to load tileset "${processedUrl}" with status ${res.status} : ${res.statusText}`);
 				}
 			}).then(root => {
 				// cache the gltf tile set rotation matrix
@@ -7005,7 +7053,7 @@ ${instancing_normal_vert}
 						stats.downloading--;
 					}
 					stats.failed++;
-					console.error(`Tiles3D: Failed to load tile at url "${tile.content.uri}".`);
+					console.error(`TilesRenderer: Failed to load tile at url "${tile.content.uri}".`);
 					console.error(error);
 					tile.__loadingState = FAILED;
 					lruCache.setLoaded(tile, true);
@@ -7157,33 +7205,6 @@ ${instancing_normal_vert}
 					callback(scene, tile);
 				}
 			}, null, false);
-		}
-
-		// override Object3D methods
-		updateMatrix(force) {
-			if (this.matrixAutoUpdate || this.matrixNeedsUpdate) {
-				this.matrix.transform(this.position, this.scale, this.quaternion);
-				this.matrixNeedsUpdate = false;
-				this.worldMatrixNeedsUpdate = true;
-			}
-			if (this.worldMatrixNeedsUpdate || force) {
-				if (this.parent === null) {
-					tempMat.copy(this.matrix);
-				} else {
-					tempMat.multiplyMatrices(this.parent.worldMatrix, this.matrix);
-				}
-				this.worldMatrixNeedsUpdate = false;
-				if (!matrixEquals(tempMat, this.worldMatrix)) {
-					this.worldMatrix.copy(tempMat);
-
-					// update children
-					// the children will not have to change unless the parent group has updated
-					const children = this.children;
-					for (let i = 0, l = children.length; i < l; i++) {
-						children[i].updateMatrix();
-					}
-				}
-			}
 		}
 	}
 
@@ -7620,7 +7641,7 @@ ${instancing_normal_vert}
 			console.warn('EnvironmentControls: "setTilesRenderer" has been deprecated. Use "setScene" and "setEllipsoid", instead.');
 			this.tilesRenderer = tilesRenderer;
 			if (this.tilesRenderer !== null) {
-				this.setScene(this.tilesRenderer);
+				this.setScene(this.tilesRenderer.group);
 			}
 		}
 		attach(domElement) {
@@ -13353,17 +13374,18 @@ ${instancing_normal_vert}
 			}
 
 			// initialize groups
+			const tilesGroup = tiles.group;
 			this.boxGroup = new t3d.Object3D();
 			this.boxGroup.name = 'DebugTilesPlugin.boxGroup';
-			tiles.add(this.boxGroup);
+			tilesGroup.add(this.boxGroup);
 			this.boxGroup.updateMatrix();
 			this.sphereGroup = new t3d.Object3D();
 			this.sphereGroup.name = 'DebugTilesPlugin.sphereGroup';
-			tiles.add(this.sphereGroup);
+			tilesGroup.add(this.sphereGroup);
 			this.sphereGroup.updateMatrix();
 			this.regionGroup = new t3d.Object3D();
 			this.regionGroup.name = 'DebugTilesPlugin.regionGroup';
-			tiles.add(this.regionGroup);
+			tilesGroup.add(this.regionGroup);
 			this.regionGroup.updateMatrix();
 
 			// register events
@@ -13878,59 +13900,62 @@ ${instancing_normal_vert}
 						this.transformLatLonHeightToOrigin(cart.lat, cart.lon, cart.height);
 					} else {
 						// lastly fall back to orienting the up direction to +Y
-						tiles.euler.set(0, 0, 0);
+						const group = tiles.group;
+						group.euler.set(0, 0, 0);
 						switch (up) {
 							case 'x':
 							case '+x':
-								tiles.euler.z = Math.PI / 2;
+								group.euler.z = Math.PI / 2;
 								break;
 							case '-x':
-								tiles.euler.z = -Math.PI / 2;
+								group.euler.z = -Math.PI / 2;
 								break;
 							case 'y':
 							case '+y':
 								break;
 							case '-y':
-								tiles.euler.z = Math.PI;
+								group.euler.z = Math.PI;
 								break;
 							case 'z':
 							case '+z':
-								tiles.euler.x = -Math.PI / 2;
+								group.euler.x = -Math.PI / 2;
 								break;
 							case '-z':
-								tiles.euler.x = Math.PI / 2;
+								group.euler.x = Math.PI / 2;
 								break;
 						}
-						tiles.position.copy(sphere.center).applyEuler(tiles.euler).multiplyScalar(-1);
+						group.position.copy(sphere.center).applyEuler(group.euler).multiplyScalar(-1);
 					}
 				}
 				if (!recenter) {
-					tiles.position.setScalar(0);
+					tiles.group.position.setScalar(0);
 				}
 				tiles.removeEventListener('load-tile-set', this._callback);
 			};
 			tiles.addEventListener('load-tile-set', this._callback);
 		}
 		transformLatLonHeightToOrigin(lat, lon, height = 0) {
-			const tiles = this.tiles;
 			const {
+				group,
 				ellipsoid
-			} = tiles;
+			} = this.tiles;
 
 			// get ENU orientation (Z facing north and X facing west) and position
-			ellipsoid.getRotationMatrixFromAzElRoll(lat, lon, 0, 0, 0, tiles.matrix, OBJECT_FRAME);
+			ellipsoid.getRotationMatrixFromAzElRoll(lat, lon, 0, 0, 0, group.matrix, OBJECT_FRAME);
 			ellipsoid.getCartographicToPosition(lat, lon, height, vec);
 
 			// adjust the tiles matrix
-			tiles.matrix.setPosition(vec).invert().decompose(tiles.position, tiles.quaternion, tiles.scale);
-			tiles.updateMatrix();
+			group.matrix.setPosition(vec).invert().decompose(group.position, group.quaternion, group.scale);
+			group.updateMatrix();
 		}
 		dispose() {
-			const tiles = this.tiles;
-			tiles.position.setScalar(0);
-			tiles.quaternion.identity();
-			tiles.scale.set(1, 1, 1);
-			tiles.addEventListener('load-tile-set', this._callback);
+			const {
+				group
+			} = this.tiles;
+			group.position.setScalar(0);
+			group.quaternion.identity();
+			group.scale.set(1, 1, 1);
+			this.tiles.addEventListener('load-tile-set', this._callback);
 		}
 	}
 	const sphere = new t3d.Sphere();
@@ -14024,8 +14049,8 @@ ${instancing_normal_vert}
 	exports.ReorientationPlugin = ReorientationPlugin;
 	exports.TMSTilesPlugin = TMSTilesPlugin;
 	exports.TileGLTFLoader = TileGLTFLoader;
-	exports.Tiles3D = Tiles3D;
 	exports.TilesFadePlugin = TilesFadePlugin;
+	exports.TilesRenderer = TilesRenderer;
 	exports.XYZTilesPlugin = XYZTilesPlugin;
 
 }));

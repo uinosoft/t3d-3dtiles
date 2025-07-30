@@ -30,7 +30,7 @@
 		import * as t3d from 't3d';
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
-		import { Tiles3D, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin, GlobeControls } from 't3d-3dtiles';
+		import { TilesRenderer, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin, GlobeControls } from 't3d-3dtiles';
 		import ionAccessToken from './ionAccessToken.js';
 		import { Pane } from 'tweakpane';
 
@@ -55,47 +55,47 @@
 		camera.setPerspective(45 / 180 * Math.PI, width / height, 10, 10000000);
 		scene.add(camera);
 
-		let controller;
+		const controller = new GlobeControls(scene, camera, canvas);
 
 		// Create 3D tiles
 
 		const ionParams = { ionAssetId: '2684829', ionAccessToken };
-		let tiles3D;
+		let tiles;
 
 		async function fetchIonAsset(ionAssetId, ionAccessToken) {
-			tiles3D = new Tiles3D();
-			scene.add(tiles3D);
+			tiles = new TilesRenderer();
+			scene.add(tiles.group);
 
-			tiles3D.registerPlugin(new CesiumIonAuthPlugin({
+			tiles.registerPlugin(new CesiumIonAuthPlugin({
 				apiToken: ionAccessToken,
 				assetId: ionAssetId,
 				autoRefreshToken: true
 			}));
-			tiles3D.registerPlugin(new ReorientationPlugin());
-			tiles3D.registerPlugin(new DebugTilesPlugin());
-			tiles3D.registerPlugin(new TilesFadePlugin());
+			tiles.registerPlugin(new ReorientationPlugin());
+			tiles.registerPlugin(new DebugTilesPlugin());
+			tiles.registerPlugin(new TilesFadePlugin());
 
 			const dracoLoader = new DRACOLoader();
 			dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
-			tiles3D.setDRACOLoader(dracoLoader);
+			tiles.setDRACOLoader(dracoLoader);
 		
-			tiles3D.addCamera(camera);
-			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles.addCamera(camera);
+			tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
-			controller = new GlobeControls(scene, camera, canvas, tiles3D);
+			controller.setEllipsoid(tiles.ellipsoid, tiles.group);
 			controller.pivotMesh.material.uniforms.resolution = [width, height];
 
 			const pane = new Pane();
 
 			const debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });
-			const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+			const debugTilesPlugin = tiles.getPluginByName('DEBUG_TILES_PLUGIN');
 			debugFolder.addBinding(debugTilesPlugin, 'displayBoxBounds', { label: 'Display Box Bounds' });
 
 			const monitorFolder = pane.addFolder({ title: 'Tiles Monitor' });
 			const monitorOptions = { readonly: true, format: v => v.toFixed(0) };
-			monitorFolder.addBinding(tiles3D.stats, 'downloading', monitorOptions);
-			monitorFolder.addBinding(tiles3D.stats, 'parsing', monitorOptions);
-			monitorFolder.addBinding(tiles3D.stats, 'visible', monitorOptions);
+			monitorFolder.addBinding(tiles.stats, 'downloading', monitorOptions);
+			monitorFolder.addBinding(tiles.stats, 'parsing', monitorOptions);
+			monitorFolder.addBinding(tiles.stats, 'visible', monitorOptions);
 		}
 
 		fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
@@ -105,13 +105,13 @@
 		function loop(count) {
 			requestAnimationFrame(loop);
 
-			controller && controller.update();
+			controller.update();
 
 			camera.updateMatrix();
 			scene.anchorMatrix.copy(camera.worldMatrix);
 
-			if (tiles3D) {
-				tiles3D.update();
+			if (tiles) {
+				tiles.update();
 			}
 
 			forwardRenderer.render(scene, camera);
@@ -126,8 +126,8 @@
 
 			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
-			if (tiles3D) {
-				tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			if (tiles) {
+				tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 				controller.pivotMesh.material.uniforms.resolution = [width, height];
 			}
 

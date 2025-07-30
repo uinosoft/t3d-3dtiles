@@ -35,7 +35,7 @@
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
 		import { KTX2Loader } from 't3d/addons/loaders/KTX2Loader.js';
-		import { Tiles3D, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
+		import { TilesRenderer, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
 		import ionAccessToken from './ionAccessToken.js';
 		import { Pane } from 'tweakpane';
 		import * as KTXParse from 'ktx-parse';
@@ -78,38 +78,38 @@
 		// Create 3D tiles
 
 		const ionParams = { ionAssetId: '354759', ionAccessToken };
-		let tiles3D;
+		let tiles;
 
 		async function fetchIonAsset(ionAssetId, ionAccessToken) {
-			tiles3D = new Tiles3D();
-			scene.add(tiles3D);
+			tiles = new TilesRenderer();
+			scene.add(tiles.group);
 
-			tiles3D.registerPlugin(new CesiumIonAuthPlugin({
+			tiles.registerPlugin(new CesiumIonAuthPlugin({
 				apiToken: ionAccessToken,
 				assetId: ionAssetId
 			}));
-			tiles3D.registerPlugin(new ReorientationPlugin());
-			tiles3D.registerPlugin(new DebugTilesPlugin());
+			tiles.registerPlugin(new ReorientationPlugin());
+			tiles.registerPlugin(new DebugTilesPlugin());
 
 			const dracoLoader = new DRACOLoader();
 			dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
-			tiles3D.setDRACOLoader(dracoLoader);
+			tiles.setDRACOLoader(dracoLoader);
 
 			const zstdDecoder = new ZSTDDecoder().init();
 			KTX2Loader.setKTXParser(KTXParse).setZSTDDecoder(zstdDecoder);
 			const ktx2Loader = new KTX2Loader()
 				.setTranscoderPath('./libs/basis/')
 				.detectSupport(forwardRenderer);
-			tiles3D.setKTX2Loader(ktx2Loader);
+			tiles.setKTX2Loader(ktx2Loader);
 		
-			tiles3D.addCamera(camera);
-			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles.addCamera(camera);
+			tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			optionsFolder = pane.addFolder({ title: 'Tiles Options', expanded: false });
-			optionsFolder.addBinding(tiles3D, 'errorTarget', { label: 'Error Target', min: 0, step: 1 });
+			optionsFolder.addBinding(tiles, 'errorTarget', { label: 'Error Target', min: 0, step: 1 });
 
 			debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });
-			const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+			const debugTilesPlugin = tiles.getPluginByName('DEBUG_TILES_PLUGIN');
 			debugFolder.addBinding(debugTilesPlugin, 'displayBoxBounds', { label: 'Display Box Bounds' });
 			debugFolder.addBinding(debugTilesPlugin, 'displaySphereBounds', { label: 'Display Sphere Bounds' });
 			debugFolder.addBinding(debugTilesPlugin, 'colorMode', {
@@ -118,7 +118,7 @@
 			});
 
 			monitorFolder = pane.addFolder({ title: 'Tiles Monitor', expanded: true });
-			monitorFolder.addBinding(tiles3D.stats, 'downloading', {
+			monitorFolder.addBinding(tiles.stats, 'downloading', {
 				readonly: true,
 				view: 'graph',
 				min: 0,
@@ -126,7 +126,7 @@
 				step: 1,
 				label: 'Downloading'
 			});
-			monitorFolder.addBinding(tiles3D.stats, 'parsing', {
+			monitorFolder.addBinding(tiles.stats, 'parsing', {
 				readonly: true,
 				view: 'graph',
 				min: 0,
@@ -134,7 +134,7 @@
 				step: 1,
 				label: 'Parsing'
 			});
-			monitorFolder.addBinding(tiles3D.stats, 'visible', {
+			monitorFolder.addBinding(tiles.stats, 'visible', {
 				readonly: true,
 				view: 'graph',
 				min: 0,
@@ -145,10 +145,9 @@
 		}
 
 		function destroyTiles3D() {
-			if (tiles3D) {
-				scene.remove(tiles3D);
-				tiles3D.dispose();
-				tiles3D = null;
+			if (tiles) {
+				tiles.dispose();
+				tiles = null;
 			}
 			if (optionsFolder) {
 				optionsFolder.dispose();
@@ -188,8 +187,8 @@
 
 			controller.update();
 
-			if (tiles3D) {
-				tiles3D.update();
+			if (tiles) {
+				tiles.update();
 			}
 
 			forwardRenderer.render(scene, camera);
@@ -204,8 +203,8 @@
 
 			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
-			if (tiles3D) {
-				tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			if (tiles) {
+				tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 			}
 
 			canvas.style.width = width + 'px';

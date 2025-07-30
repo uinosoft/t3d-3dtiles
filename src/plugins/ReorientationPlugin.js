@@ -44,38 +44,39 @@ export class ReorientationPlugin {
 					this.transformLatLonHeightToOrigin(cart.lat, cart.lon, cart.height);
 				} else {
 					// lastly fall back to orienting the up direction to +Y
-					tiles.euler.set(0, 0, 0);
+					const group = tiles.group;
+					group.euler.set(0, 0, 0);
 					switch (up) {
 						case 'x': case '+x':
-							tiles.euler.z = Math.PI / 2;
+							group.euler.z = Math.PI / 2;
 							break;
 						case '-x':
-							tiles.euler.z = -Math.PI / 2;
+							group.euler.z = -Math.PI / 2;
 							break;
 
 						case 'y': case '+y':
 							break;
 						case '-y':
-							tiles.euler.z = Math.PI;
+							group.euler.z = Math.PI;
 							break;
 
 						case 'z': case '+z':
-							tiles.euler.x = -Math.PI / 2;
+							group.euler.x = -Math.PI / 2;
 							break;
 						case '-z':
-							tiles.euler.x = Math.PI / 2;
+							group.euler.x = Math.PI / 2;
 							break;
 					}
 
-					tiles.position
+					group.position
 						.copy(sphere.center)
-						.applyEuler(tiles.euler)
+						.applyEuler(group.euler)
 						.multiplyScalar(-1);
 				}
 			}
 
 			if (!recenter) {
-				tiles.position.setScalar(0);
+				tiles.group.position.setScalar(0);
 			}
 
 			tiles.removeEventListener('load-tile-set', this._callback);
@@ -85,29 +86,28 @@ export class ReorientationPlugin {
 	}
 
 	transformLatLonHeightToOrigin(lat, lon, height = 0) {
-		const tiles = this.tiles;
-		const { ellipsoid } = tiles;
+		const { group, ellipsoid } = this.tiles;
 
 		// get ENU orientation (Z facing north and X facing west) and position
-		ellipsoid.getRotationMatrixFromAzElRoll(lat, lon, 0, 0, 0, tiles.matrix, OBJECT_FRAME);
+		ellipsoid.getRotationMatrixFromAzElRoll(lat, lon, 0, 0, 0, group.matrix, OBJECT_FRAME);
 		ellipsoid.getCartographicToPosition(lat, lon, height, vec);
 
 		// adjust the tiles matrix
-		tiles.matrix
+		group.matrix
 			.setPosition(vec)
 			.invert()
-			.decompose(tiles.position, tiles.quaternion, tiles.scale);
-		tiles.updateMatrix();
+			.decompose(group.position, group.quaternion, group.scale);
+		group.updateMatrix();
 	}
 
 	dispose() {
-		const tiles = this.tiles;
+		const { group } = this.tiles;
 
-		tiles.position.setScalar(0);
-		tiles.quaternion.identity();
-		tiles.scale.set(1, 1, 1);
+		group.position.setScalar(0);
+		group.quaternion.identity();
+		group.scale.set(1, 1, 1);
 
-		tiles.addEventListener('load-tile-set', this._callback);
+		this.tiles.addEventListener('load-tile-set', this._callback);
 	}
 
 }

@@ -6,23 +6,23 @@ import { LineSegment } from './LineSegment.js';
  * Get the closest intersection point between a path and the 3D Tiles.
  * The path is defined by a line segment with a distance threshold,
  * so the actual area is a capsule.
- * @param {Object} tiles3D - The 3D Tiles Object.
+ * @param {Object} tiles - The 3D Tiles Renderer.
  * @param {LineSegment} lineSegment - The line segment.
  * @param {Number} minDistance - The distance threshold.
  * @return {Object|null} - The intersection object or null.
  */
-export function getIntersectWithPath(tiles3D, lineSegment, minDistance) {
+export function getIntersectWithPath(tiles, lineSegment, minDistance) {
 	// Get obb in tiles root space
 	const obb = _lineSegment_1.copy(lineSegment)
-		.applyMatrix4(_mat4_1.getInverse(tiles3D.worldMatrix))
+		.applyMatrix4(_mat4_1.getInverse(tiles.group.worldMatrix))
 		.getOBB(minDistance, _obb_1);
 	// TODO: obb.applyMatrix4 has bug, so don't use this until it's fixed
 	// const obb = lineSegment.getOBB(minDistance, _obb_1);
-	// obb.applyMatrix4(_mat4_1.getInverse(tiles3D.worldMatrix));
+	// obb.applyMatrix4(_mat4_1.getInverse(tiles.group.worldMatrix));
 
 	let intersectWithTile = null;
 
-	tiles3D.activeTiles.forEach(tile => {
+	tiles.activeTiles.forEach(tile => {
 		if (!intersectsOBB(tile.cached.boundingVolume, obb)) return;
 
 		// TODO: traverse scene

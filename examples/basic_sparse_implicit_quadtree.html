@@ -32,7 +32,7 @@
 		import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
-		import { Tiles3D, ReorientationPlugin, DebugTilesPlugin, ImplicitTilingPlugin } from 't3d-3dtiles';
+		import { TilesRenderer, ReorientationPlugin, DebugTilesPlugin, ImplicitTilingPlugin } from 't3d-3dtiles';
 		import { Pane } from 'tweakpane';
 
 		let width = window.innerWidth || 2;
@@ -69,32 +69,32 @@
 
 		// Create 3D tiles
 
-		const tiles3D = new Tiles3D('https://raw.githubusercontent.com/CesiumGS/3d-tiles-samples/main/1.1/SparseImplicitQuadtree/tileset.json');
-		scene.add(tiles3D);
+		const tiles = new TilesRenderer('https://raw.githubusercontent.com/CesiumGS/3d-tiles-samples/main/1.1/SparseImplicitQuadtree/tileset.json');
+		scene.add(tiles.group);
 
-		tiles3D.registerPlugin(new ImplicitTilingPlugin());
-		tiles3D.registerPlugin(new ReorientationPlugin());
-		tiles3D.registerPlugin(new DebugTilesPlugin({
+		tiles.registerPlugin(new ImplicitTilingPlugin());
+		tiles.registerPlugin(new ReorientationPlugin());
+		tiles.registerPlugin(new DebugTilesPlugin({
 			displayParentBounds: true,
 			displayBoxBounds: true
 		}));
 
 		const dracoLoader = new DRACOLoader();
 		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
-		tiles3D.setDRACOLoader(dracoLoader);
+		tiles.setDRACOLoader(dracoLoader);
 		
-		tiles3D.addCamera(camera);
-		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+		tiles.addCamera(camera);
+		tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 		// GUI
 
 		const pane = new Pane();
 
 		const optionsFolder = pane.addFolder({ title: 'Tiles Options', expanded: false });
-		optionsFolder.addBinding(tiles3D, 'errorTarget', { label: 'Error Target', min: 0, step: 1 });
+		optionsFolder.addBinding(tiles, 'errorTarget', { label: 'Error Target', min: 0, step: 1 });
 
 		const debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });
-		const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+		const debugTilesPlugin = tiles.getPluginByName('DEBUG_TILES_PLUGIN');
 		debugFolder.addBinding(debugTilesPlugin, 'displayBoxBounds', { label: 'Display Box Bounds' });
 		debugFolder.addBinding(debugTilesPlugin, 'colorMode', {
 			label: 'Color Mode',
@@ -103,9 +103,9 @@
 
 		const monitorFolder = pane.addFolder({ title: 'Tiles Monitor' });
 		const monitorOptions = { readonly: true, format: v => v.toFixed(0) };
-		monitorFolder.addBinding(tiles3D.stats, 'downloading', monitorOptions);
-		monitorFolder.addBinding(tiles3D.stats, 'parsing', monitorOptions);
-		monitorFolder.addBinding(tiles3D.stats, 'visible', monitorOptions);
+		monitorFolder.addBinding(tiles.stats, 'downloading', monitorOptions);
+		monitorFolder.addBinding(tiles.stats, 'parsing', monitorOptions);
+		monitorFolder.addBinding(tiles.stats, 'visible', monitorOptions);
 
 		//
 
@@ -114,7 +114,7 @@
 
 			controller.update();
 
-			tiles3D.update();
+			tiles.update();
 
 			forwardRenderer.render(scene, camera);
 		}
@@ -127,7 +127,7 @@
 			camera.setPerspective(45 / 180 * Math.PI, width / height, 0.1, 1000);
 
 			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
-			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			canvas.style.width = width + 'px';
 			canvas.style.height = height + 'px';

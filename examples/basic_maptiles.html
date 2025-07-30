@@ -30,7 +30,7 @@
 	<script type="module">
 		import * as t3d from 't3d';
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
-		import { Tiles3D, XYZTilesPlugin, DebugTilesPlugin, TilesFadePlugin, GlobeControls, EnvironmentControls } from 't3d-3dtiles';
+		import { TilesRenderer, XYZTilesPlugin, DebugTilesPlugin, TilesFadePlugin, GlobeControls, EnvironmentControls } from 't3d-3dtiles';
 		import { Pane } from 'tweakpane';
 
 		let width = window.innerWidth || 2;
@@ -69,8 +69,8 @@
 				controls.dispose();
 			}
 
-			tiles = new Tiles3D('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
-			scene.add(tiles);
+			tiles = new TilesRenderer('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+			scene.add(tiles.group);
 
 			tiles.registerPlugin(new TilesFadePlugin({ maximumFadeOutTiles: 200 }));
 			tiles.registerPlugin(new DebugTilesPlugin());
@@ -105,16 +105,16 @@
 				camera.far = 10000;
 				camera.updateProjectionMatrix();
 			} else {
-				tiles.euler.x = -Math.PI / 2;
+				tiles.group.euler.x = -Math.PI / 2;
 		
 				controls = new GlobeControls(scene, camera, canvas);
+				controls.setEllipsoid(tiles.ellipsoid, tiles.group);
 				controls.enableDamping = true;
 				controls.camera.position.set(0, 0, 1.75 * 1e7);
 				controls.camera.quaternion.identity();
 				controls.minDistance = 150;
 			}
 			controls.pivotMesh.material.uniforms.resolution = [width, height];
-			controls.setTilesRenderer(tiles);
 
 			if (debugFolder) {
 				debugFolder.dispose();

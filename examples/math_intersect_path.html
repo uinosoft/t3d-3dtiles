@@ -37,7 +37,7 @@
 		import { Raycaster } from 't3d/addons/Raycaster.js';
 		import { SphereHelper } from 't3d/addons/objects/SphereHelper.js';
 
-		import { Tiles3D, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin, OBB } from 't3d-3dtiles';
+		import { TilesRenderer, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin, OBB } from 't3d-3dtiles';
 		
 		import { LineSegment } from './jsm/math/LineSegment.js';
 		import { getIntersectWithPath } from './jsm/math/Intersects.js';
@@ -83,19 +83,19 @@
 
 		// Create 3D tiles
 
-		const tiles3D = new Tiles3D('https://storage.googleapis.com/ogc-3d-tiles/ayutthaya/tiledWithSkirts/tileset.json');
-		scene.add(tiles3D);
+		const tiles = new TilesRenderer('https://storage.googleapis.com/ogc-3d-tiles/ayutthaya/tiledWithSkirts/tileset.json');
+		scene.add(tiles.group);
 
 		const dracoLoader = new DRACOLoader();
 		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
-		tiles3D.setDRACOLoader(dracoLoader);
+		tiles.setDRACOLoader(dracoLoader);
 
-		tiles3D.addCamera(camera);
-		tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+		tiles.addCamera(camera);
+		tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
-		tiles3D.registerPlugin(new ReorientationPlugin());
-		tiles3D.registerPlugin(new DebugTilesPlugin());
-		tiles3D.registerPlugin(new TilesFadePlugin());
+		tiles.registerPlugin(new ReorientationPlugin());
+		tiles.registerPlugin(new DebugTilesPlugin());
+		tiles.registerPlugin(new TilesFadePlugin());
 
 		// Path, Path Helpers and Controls
 
@@ -153,7 +153,7 @@
 			}
 		});
 
-		tiles3D.addEventListener('load-model', ({ scene, tile }) => {
+		tiles.addEventListener('load-model', ({ scene, tile }) => {
 			doIntersect();
 		});
 
@@ -171,7 +171,7 @@
 			if (!force && (new Date().getTime() - timing < 100)) return;
 			timing = new Date().getTime();
 		
-			const intersect = getIntersectWithPath(tiles3D, lineSegment, params.thresholdDistance);
+			const intersect = getIntersectWithPath(tiles, lineSegment, params.thresholdDistance);
 
 			if (intersect) {
 				lineSegmentHelper.setLineColor(0xff0000);
@@ -184,7 +184,7 @@
 				params.minDistance = intersect.distance.toFixed(2);
 
 				intersect.tile.cached.boundingVolume.getBoundingSphere(sphereHelper.sphere)
-					.applyMatrix4(tiles3D.worldMatrix);
+					.applyMatrix4(tiles.group.worldMatrix);
 				scene.add(sphereHelper);
 			} else {
 				lineSegmentHelper.setLineColor(0x00ff00);
@@ -213,17 +213,17 @@
 		pane.addBinding(obbHelper, 'visible', { label: 'Path Box' });
 
 		const optionsFolder = pane.addFolder({ title: 'Tiles Options', expanded: false });
-		optionsFolder.addBinding(tiles3D, 'errorTarget', { label: 'Error Target', min: 0, step: 1 });
+		optionsFolder.addBinding(tiles, 'errorTarget', { label: 'Error Target', min: 0, step: 1 });
 
 		const debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });
-		const debugTilesPlugin = tiles3D.getPluginByName('DEBUG_TILES_PLUGIN');
+		const debugTilesPlugin = tiles.getPluginByName('DEBUG_TILES_PLUGIN');
 		debugFolder.addBinding(debugTilesPlugin, 'displayBoxBounds', { label: 'Display Box Bounds' });
 
 		const monitorFolder = pane.addFolder({ title: 'Tiles Monitor', expanded: true });
 		const monitorOptions = { readonly: true, format: v => v.toFixed(0) };
-		monitorFolder.addBinding(tiles3D.stats, 'downloading', monitorOptions);
-		monitorFolder.addBinding(tiles3D.stats, 'parsing', monitorOptions);
-		monitorFolder.addBinding(tiles3D.stats, 'visible', monitorOptions);
+		monitorFolder.addBinding(tiles.stats, 'downloading', monitorOptions);
+		monitorFolder.addBinding(tiles.stats, 'parsing', monitorOptions);
+		monitorFolder.addBinding(tiles.stats, 'visible', monitorOptions);
 
 		const fpsGraph = monitorFolder.addBlade({
 			view: 'fpsgraph',
@@ -238,7 +238,7 @@
 
 			fpsGraph.begin();
 
-			tiles3D.update();
+			tiles.update();
 			controller.update();
 
 			transformControls.update();
@@ -256,7 +256,7 @@
 			camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 10000);
 
 			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
-			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			canvas.style.width = width + 'px';
 			canvas.style.height = height + 'px';
