@@ -65,7 +65,6 @@
 		scene.add(camera);
 
 		const controller = new GlobeControls(scene, camera, canvas);
-		controller.pivotMesh.material.uniforms.resolution = [width, height];
 
 		// Create 3D tiles
 
@@ -137,7 +136,6 @@
 
 			if (tiles) {
 				tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
-				controller.pivotMesh.material.uniforms.resolution = [width, height];
 			}
 
 			canvas.style.width = width + 'px';

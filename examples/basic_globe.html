@@ -84,7 +84,6 @@
 			tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			controller.setEllipsoid(tiles.ellipsoid, tiles.group);
-			controller.pivotMesh.material.uniforms.resolution = [width, height];
 
 			const pane = new Pane();
 
@@ -128,7 +127,6 @@
 
 			if (tiles) {
 				tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
-				controller.pivotMesh.material.uniforms.resolution = [width, height];
 			}
 
 			canvas.style.width = width + 'px';

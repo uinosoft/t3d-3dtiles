@@ -7225,7 +7225,6 @@ ${instancing_normal_vert}
 	const pivotShader = {
 		name: 'PivotPoint',
 		uniforms: {
-			resolution: [512, 512],
 			size: 15,
 			thickness: 2,
 			opacity: 1
@@ -7240,19 +7239,19 @@ ${instancing_normal_vert}
 		uniform float pixelRatio;
 		uniform float size;
 		uniform float thickness;
-		uniform vec2 resolution;
+		uniform vec2 u_RenderTargetSize;
 
 		varying vec2 v_Uv;
 
 		void main() {
 			v_Uv = a_Uv;
 
-			float aspect = resolution.x / resolution.y;
+			float aspect = u_RenderTargetSize.x / u_RenderTargetSize.y;
 			vec2 offset = a_Uv * 2.0 - vec2(1.0);
 			offset.y *= aspect;
 
 			vec4 screenPoint = u_ProjectionView * u_Model * vec4(a_Position, 1.0);
-			screenPoint.xy += offset * (size + thickness) * screenPoint.w / resolution.x;
+			screenPoint.xy += offset * (size + thickness) * screenPoint.w / u_RenderTargetSize.x;
 
 			gl_Position = screenPoint;
 		}
