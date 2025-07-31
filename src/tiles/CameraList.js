@@ -1,6 +1,9 @@
 import { Vector2, Vector3, Matrix4 } from 't3d';
 import { FastFrustum } from '../math/FastFrustum.js';
 
+const _mat4_1 = new Matrix4();
+const _vec3_1 = new Vector3();
+
 export class CameraList {
 
 	constructor() {
@@ -36,19 +39,12 @@ export class CameraList {
 		this._resolution.set(width, height);
 	}
 
-	updateInfos(originMatrix) {
+	updateInfos(group) {
 		const cameras = this._cameras;
-		const cameraCount = cameras.length;
 		const infos = this._infos;
 		const resolution = this._resolution;
 
-		if (cameraCount === 0) {
-			console.warn('CameraList.updateInfos(): No camera added.');
-			return;
-		}
-
 		// automatically scale the array of infos to match the cameras
-
 		while (infos.length > cameras.length) {
 			infos.pop();
 		}
@@ -64,26 +60,18 @@ export class CameraList {
 			});
 		}
 
-		// get inverse scale of origin matrix
-
-		_mat4_1.copy(originMatrix).inverse();
-
-		const invScaleX = _vec3_1.setFromMatrixColumn(_mat4_1, 0).getLength();
-		const invScaleY = _vec3_1.setFromMatrixColumn(_mat4_1, 1).getLength();
-		const invScaleZ = _vec3_1.setFromMatrixColumn(_mat4_1, 2).getLength();
-
-		if (Math.abs(Math.max(invScaleX - invScaleY, invScaleX - invScaleZ)) > 1e-6) {
-			console.warn('CameraList.updateInfos(): Non uniform scale used for tile which may cause issues when calculating screen space error.');
+		// extract scale of group container
+		_vec3_1.setFromMatrixScale(group.worldMatrixInverse);
+		if (Math.abs(Math.max(_vec3_1.x - _vec3_1.y, _vec3_1.x - _vec3_1.z)) > 1e-6) {
+			console.warn('TilesRenderer : Non uniform scale used for tile which may cause issues when calculating screen space error.');
 		}
 
-		const invScale = invScaleX;
-		const invOriginMatrix = _mat4_1;
-
-		// update the camera infos
-
+		// store the camera cameraInfo in the 3d tiles root frame
 		for (let i = 0, l = infos.length; i < l; i++) {
 			const camera = cameras[i];
 			const info = infos[i];
+			const frustum = info.frustum;
+			const position = info.position;
 
 			const cameraResolutionX = resolution.x * (camera.rect.z - camera.rect.x);
 			const cameraResolutionY = resolution.y * (camera.rect.w - camera.rect.y);
@@ -108,15 +96,14 @@ export class CameraList {
 				info.sseDenominator = (2 / projection[5]) / cameraResolutionY;
 			}
 
-			info.invScale = invScale;
-
 			// get frustum in origin space
-			_mat4_2.copy(originMatrix).premultiply(camera.projectionViewMatrix);
-			info.frustum.setFromMatrix(_mat4_2);
-			info.frustum.updateCache();
+			_mat4_1.copy(group.worldMatrix).premultiply(camera.projectionViewMatrix);
+
+			frustum.setFromMatrix(_mat4_1);
+			frustum.updateCache();
 
 			// get camera position in origin space
-			info.position.setFromMatrixPosition(camera.worldMatrix).applyMatrix4(invOriginMatrix);
+			position.setFromMatrixPosition(camera.worldMatrix).applyMatrix4(group.worldMatrixInverse);
 		}
 	}
 
@@ -125,7 +112,3 @@ export class CameraList {
 	}
 
 }
-
-const _mat4_1 = new Matrix4();
-const _mat4_2 = new Matrix4();
-const _vec3_1 = new Vector3();

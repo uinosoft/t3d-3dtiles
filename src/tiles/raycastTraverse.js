@@ -1,9 +1,8 @@
-import { Matrix4, Ray, Vector3 } from 't3d';
+import { Ray, Vector3 } from 't3d';
 
 const _localRay = new Ray();
 const _vec = new Vector3();
 const _hitArray = [];
-const _mat = new Matrix4();
 
 function distanceSort(a, b) {
 	return a.distance - b.distance;
@@ -51,7 +50,7 @@ export function raycastTraverseFirstHit(renderer, tile, ray, localRay = null) {
 	// get the ray in the local group frame
 	if (localRay === null) {
 		localRay = _localRay;
-		localRay.copy(ray).applyMatrix4(_mat.copy(group.worldMatrix).inverse());
+		localRay.copy(ray).applyMatrix4(group.worldMatrixInverse);
 	}
 
 	// get a set of intersections so we intersect the nearest one first
@@ -125,7 +124,7 @@ export function raycastTraverse(renderer, tile, ray, intersects, localRay = null
 	// get the ray in the local group frame
 	if (localRay === null) {
 		localRay = _localRay;
-		localRay.copy(ray).applyMatrix4(_mat.copy(group.worldMatrix).inverse());
+		localRay.copy(ray).applyMatrix4(group.worldMatrixInverse);
 	}
 
 	// exit early if the tile isn't used or the bounding volume is not intersected

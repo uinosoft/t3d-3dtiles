@@ -84,7 +84,7 @@
 			tiles.parseQueue.maxJobs = 3;
 		
 			tiles.addCamera(camera);
-			tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			if (params.planar) {
 				tiles.errorTarget = 1;
@@ -166,7 +166,7 @@
 			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			if (tiles) {
-				tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+				tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
 			}
 
 			canvas.style.width = width + 'px';

@@ -3975,7 +3975,7 @@ class TilesGroup extends Object3D {
 		this.isTilesGroup = true;
 		this.name = 'TilesRenderer.TilesGroup';
 		this.tilesRenderer = tilesRenderer;
-		this.matrixWorldInverse = new Matrix4();
+		this.worldMatrixInverse = new Matrix4();
 	}
 
 	raycast(ray, intersects) {
@@ -4006,6 +4006,7 @@ class TilesGroup extends Object3D {
 
 			if (!matrixEquals(tempMat, this.worldMatrix)) {
 				this.worldMatrix.copy(tempMat);
+				this.worldMatrixInverse.copy(tempMat).invert();
 
 				// update children
 				// the children will not have to change unless the parent group has updated
@@ -4035,7 +4036,6 @@ const matrixEquals = (matrixA, matrixB, epsilon = Number.EPSILON) => {
 const _localRay = new Ray();
 const _vec$6 = new Vector3();
 const _hitArray = [];
-const _mat = new Matrix4();
 
 function distanceSort(a, b) {
 	return a.distance - b.distance;
@@ -4082,7 +4082,7 @@ function raycastTraverseFirstHit(renderer, tile, ray, localRay = null) {
 	// get the ray in the local group frame
 	if (localRay === null) {
 		localRay = _localRay;
-		localRay.copy(ray).applyMatrix4(_mat.copy(group.worldMatrix).inverse());
+		localRay.copy(ray).applyMatrix4(group.worldMatrixInverse);
 	}
 
 	// get a set of intersections so we intersect the nearest one first
@@ -4155,7 +4155,7 @@ function raycastTraverse(renderer, tile, ray, intersects, localRay = null) {
 	// get the ray in the local group frame
 	if (localRay === null) {
 		localRay = _localRay;
-		localRay.copy(ray).applyMatrix4(_mat.copy(group.worldMatrix).inverse());
+		localRay.copy(ray).applyMatrix4(group.worldMatrixInverse);
 	}
 
 	// exit early if the tile isn't used or the bounding volume is not intersected
@@ -4592,7 +4592,7 @@ class TileOBB extends OBB {
 		this.toBoundingBoxWithTransform(
 			this._originBox, this._originBoxTransform
 		);
-		this._originBoxTransformInverse.copy(this._originBoxTransform).inverse();
+		this._originBoxTransformInverse.copy(this._originBoxTransform).invert();
 	}
 
 	containsPoint(point) {
@@ -4997,7 +4997,7 @@ class EllipsoidRegion extends Ellipsoid {
 		);
 
 		// transform the points into the local frame
-		_invMatrix$2.setFromMatrix3(target.rotation).inverse();
+		_invMatrix$2.setFromMatrix3(target.rotation).invert();
 
 		const points = this._getPoints(true);
 
@@ -5315,10 +5315,13 @@ function findIntersectionPoint(plane1, plane2, plane3, target) {
 	target.set(-plane1.constant, -plane2.constant, -plane3.constant);
 
 	// Solve for X by applying the inverse matrix to B
-	target.applyMatrix3(A.inverse());
+	target.applyMatrix3(A.invert());
 
 	return target;
 }
+
+const _mat4_1 = new Matrix4();
+const _vec3_1 = new Vector3();
 
 class CameraList {
 
@@ -5355,19 +5358,12 @@ class CameraList {
 		this._resolution.set(width, height);
 	}
 
-	updateInfos(originMatrix) {
+	updateInfos(group) {
 		const cameras = this._cameras;
-		const cameraCount = cameras.length;
 		const infos = this._infos;
 		const resolution = this._resolution;
 
-		if (cameraCount === 0) {
-			console.warn('CameraList.updateInfos(): No camera added.');
-			return;
-		}
-
 		// automatically scale the array of infos to match the cameras
-
 		while (infos.length > cameras.length) {
 			infos.pop();
 		}
@@ -5383,26 +5379,18 @@ class CameraList {
 			});
 		}
 
-		// get inverse scale of origin matrix
-
-		_mat4_1.copy(originMatrix).inverse();
-
-		const invScaleX = _vec3_1.setFromMatrixColumn(_mat4_1, 0).getLength();
-		const invScaleY = _vec3_1.setFromMatrixColumn(_mat4_1, 1).getLength();
-		const invScaleZ = _vec3_1.setFromMatrixColumn(_mat4_1, 2).getLength();
-
-		if (Math.abs(Math.max(invScaleX - invScaleY, invScaleX - invScaleZ)) > 1e-6) {
-			console.warn('CameraList.updateInfos(): Non uniform scale used for tile which may cause issues when calculating screen space error.');
+		// extract scale of group container
+		_vec3_1.setFromMatrixScale(group.worldMatrixInverse);
+		if (Math.abs(Math.max(_vec3_1.x - _vec3_1.y, _vec3_1.x - _vec3_1.z)) > 1e-6) {
+			console.warn('TilesRenderer : Non uniform scale used for tile which may cause issues when calculating screen space error.');
 		}
 
-		const invScale = invScaleX;
-		const invOriginMatrix = _mat4_1;
-
-		// update the camera infos
-
+		// store the camera cameraInfo in the 3d tiles root frame
 		for (let i = 0, l = infos.length; i < l; i++) {
 			const camera = cameras[i];
 			const info = infos[i];
+			const frustum = info.frustum;
+			const position = info.position;
 
 			const cameraResolutionX = resolution.x * (camera.rect.z - camera.rect.x);
 			const cameraResolutionY = resolution.y * (camera.rect.w - camera.rect.y);
@@ -5427,15 +5415,14 @@ class CameraList {
 				info.sseDenominator = (2 / projection[5]) / cameraResolutionY;
 			}
 
-			info.invScale = invScale;
-
 			// get frustum in origin space
-			_mat4_2.copy(originMatrix).premultiply(camera.projectionViewMatrix);
-			info.frustum.setFromMatrix(_mat4_2);
-			info.frustum.updateCache();
+			_mat4_1.copy(group.worldMatrix).premultiply(camera.projectionViewMatrix);
+
+			frustum.setFromMatrix(_mat4_1);
+			frustum.updateCache();
 
 			// get camera position in origin space
-			info.position.setFromMatrixPosition(camera.worldMatrix).applyMatrix4(invOriginMatrix);
+			position.setFromMatrixPosition(camera.worldMatrix).applyMatrix4(group.worldMatrixInverse);
 		}
 	}
 
@@ -5444,10 +5431,6 @@ class CameraList {
 	}
 
 }
-
-const _mat4_1 = new Matrix4();
-const _mat4_2 = new Matrix4();
-const _vec3_1 = new Vector3();
 
 // TODO
 
@@ -5674,7 +5657,7 @@ class TilesRenderer extends TilesRendererBase {
 		return success;
 	}
 
-	resize(width, height) {
+	setResolution(width, height) {
 		this.$cameras.setResolution(width, height);
 	}
 
@@ -5744,7 +5727,7 @@ class TilesRenderer extends TilesRendererBase {
 
 		this.dispatchEvent(_updateBeforeEvent);
 
-		this.$cameras.updateInfos(this.group.worldMatrix);
+		this.$cameras.updateInfos(this.group);
 
 		super.update();
 
@@ -5778,7 +5761,7 @@ class TilesRenderer extends TilesRendererBase {
 			transform.premultiply(parentTile.cached.transform);
 		}
 
-		const transformInverse = new Matrix4().copy(transform).inverse();
+		const transformInverse = new Matrix4().copy(transform).invert();
 		const boundingVolume = new TileBoundingVolume();
 		if ('sphere' in tile.boundingVolume) {
 			boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);

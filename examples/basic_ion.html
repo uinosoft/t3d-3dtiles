@@ -103,7 +103,7 @@
 			tiles.setKTX2Loader(ktx2Loader);
 		
 			tiles.addCamera(camera);
-			tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			optionsFolder = pane.addFolder({ title: 'Tiles Options', expanded: false });
 			optionsFolder.addBinding(tiles, 'errorTarget', { label: 'Error Target', min: 0, step: 1 });
@@ -204,7 +204,7 @@
 			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			if (tiles) {
-				tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+				tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
 			}
 
 			canvas.style.width = width + 'px';

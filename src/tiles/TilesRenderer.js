@@ -190,7 +190,7 @@ export class TilesRenderer extends TilesRendererBase {
 		return success;
 	}
 
-	resize(width, height) {
+	setResolution(width, height) {
 		this.$cameras.setResolution(width, height);
 	}
 
@@ -260,7 +260,7 @@ export class TilesRenderer extends TilesRendererBase {
 
 		this.dispatchEvent(_updateBeforeEvent);
 
-		this.$cameras.updateInfos(this.group.worldMatrix);
+		this.$cameras.updateInfos(this.group);
 
 		super.update();
 
@@ -294,7 +294,7 @@ export class TilesRenderer extends TilesRendererBase {
 			transform.premultiply(parentTile.cached.transform);
 		}
 
-		const transformInverse = new Matrix4().copy(transform).inverse();
+		const transformInverse = new Matrix4().copy(transform).invert();
 		const boundingVolume = new TileBoundingVolume();
 		if ('sphere' in tile.boundingVolume) {
 			boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);

@@ -11,7 +11,7 @@ export class TilesGroup extends Object3D {
 		this.isTilesGroup = true;
 		this.name = 'TilesRenderer.TilesGroup';
 		this.tilesRenderer = tilesRenderer;
-		this.matrixWorldInverse = new Matrix4();
+		this.worldMatrixInverse = new Matrix4();
 	}
 
 	raycast(ray, intersects) {
@@ -42,6 +42,7 @@ export class TilesGroup extends Object3D {
 
 			if (!matrixEquals(tempMat, this.worldMatrix)) {
 				this.worldMatrix.copy(tempMat);
+				this.worldMatrixInverse.copy(tempMat).invert();
 
 				// update children
 				// the children will not have to change unless the parent group has updated

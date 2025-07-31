@@ -25,7 +25,7 @@ export class TileOBB extends OBB {
 		this.toBoundingBoxWithTransform(
 			this._originBox, this._originBoxTransform
 		);
-		this._originBoxTransformInverse.copy(this._originBoxTransform).inverse();
+		this._originBoxTransformInverse.copy(this._originBoxTransform).invert();
 	}
 
 	containsPoint(point) {

@@ -96,7 +96,7 @@
 		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
 		tiles.setDRACOLoader(dracoLoader);
 		
-		tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+		tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 		// GUI
 
@@ -180,7 +180,7 @@
 			});
 
 			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
-			tiles.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			canvas.style.width = width + 'px';
 			canvas.style.height = height + 'px';

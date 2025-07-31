@@ -5469,7 +5469,7 @@ ${instancing_normal_vert}
 			this.isTilesGroup = true;
 			this.name = 'TilesRenderer.TilesGroup';
 			this.tilesRenderer = tilesRenderer;
-			this.matrixWorldInverse = new t3d.Matrix4();
+			this.worldMatrixInverse = new t3d.Matrix4();
 		}
 		raycast(ray, intersects) {
 			// returning "false" ends raycast traversal
@@ -5494,6 +5494,7 @@ ${instancing_normal_vert}
 				this.worldMatrixNeedsUpdate = false;
 				if (!matrixEquals(tempMat, this.worldMatrix)) {
 					this.worldMatrix.copy(tempMat);
+					this.worldMatrixInverse.copy(tempMat).invert();
 
 					// update children
 					// the children will not have to change unless the parent group has updated
@@ -5519,7 +5520,6 @@ ${instancing_normal_vert}
 	const _localRay = new t3d.Ray();
 	const _vec$6 = new t3d.Vector3();
 	const _hitArray = [];
-	const _mat = new t3d.Matrix4();
 	function distanceSort(a, b) {
 		return a.distance - b.distance;
 	}
@@ -5565,7 +5565,7 @@ ${instancing_normal_vert}
 		// get the ray in the local group frame
 		if (localRay === null) {
 			localRay = _localRay;
-			localRay.copy(ray).applyMatrix4(_mat.copy(group.worldMatrix).inverse());
+			localRay.copy(ray).applyMatrix4(group.worldMatrixInverse);
 		}
 
 		// get a set of intersections so we intersect the nearest one first
@@ -5639,7 +5639,7 @@ ${instancing_normal_vert}
 		// get the ray in the local group frame
 		if (localRay === null) {
 			localRay = _localRay;
-			localRay.copy(ray).applyMatrix4(_mat.copy(group.worldMatrix).inverse());
+			localRay.copy(ray).applyMatrix4(group.worldMatrixInverse);
 		}
 
 		// exit early if the tile isn't used or the bounding volume is not intersected
@@ -6007,7 +6007,7 @@ ${instancing_normal_vert}
 			this.getPoints(this._points);
 			this.getPlanes(this._planes);
 			this.toBoundingBoxWithTransform(this._originBox, this._originBoxTransform);
-			this._originBoxTransformInverse.copy(this._originBoxTransform).inverse();
+			this._originBoxTransformInverse.copy(this._originBoxTransform).invert();
 		}
 		containsPoint(point) {
 			_vec3_1$3.copy(point).applyMatrix4(this._originBoxTransformInverse);
@@ -6335,7 +6335,7 @@ ${instancing_normal_vert}
 			target.rotation.set(_orthoX.x, _orthoY.x, _orthoZ.x, _orthoX.y, _orthoY.y, _orthoZ.y, _orthoX.z, _orthoY.z, _orthoZ.z);
 
 			// transform the points into the local frame
-			_invMatrix$2.setFromMatrix3(target.rotation).inverse();
+			_invMatrix$2.setFromMatrix3(target.rotation).invert();
 			const points = this._getPoints(true);
 
 			// get the center of the region
@@ -6580,10 +6580,12 @@ ${instancing_normal_vert}
 		target.set(-plane1.constant, -plane2.constant, -plane3.constant);
 
 		// Solve for X by applying the inverse matrix to B
-		target.applyMatrix3(A.inverse());
+		target.applyMatrix3(A.invert());
 		return target;
 	}
 
+	const _mat4_1 = new t3d.Matrix4();
+	const _vec3_1$1 = new t3d.Vector3();
 	class CameraList {
 		constructor() {
 			this._cameras = [];
@@ -6610,18 +6612,12 @@ ${instancing_normal_vert}
 		setResolution(width, height) {
 			this._resolution.set(width, height);
 		}
-		updateInfos(originMatrix) {
+		updateInfos(group) {
 			const cameras = this._cameras;
-			const cameraCount = cameras.length;
 			const infos = this._infos;
 			const resolution = this._resolution;
-			if (cameraCount === 0) {
-				console.warn('CameraList.updateInfos(): No camera added.');
-				return;
-			}
 
 			// automatically scale the array of infos to match the cameras
-
 			while (infos.length > cameras.length) {
 				infos.pop();
 			}
@@ -6639,23 +6635,18 @@ ${instancing_normal_vert}
 				});
 			}
 
-			// get inverse scale of origin matrix
-
-			_mat4_1.copy(originMatrix).inverse();
-			const invScaleX = _vec3_1$1.setFromMatrixColumn(_mat4_1, 0).getLength();
-			const invScaleY = _vec3_1$1.setFromMatrixColumn(_mat4_1, 1).getLength();
-			const invScaleZ = _vec3_1$1.setFromMatrixColumn(_mat4_1, 2).getLength();
-			if (Math.abs(Math.max(invScaleX - invScaleY, invScaleX - invScaleZ)) > 1e-6) {
-				console.warn('CameraList.updateInfos(): Non uniform scale used for tile which may cause issues when calculating screen space error.');
+			// extract scale of group container
+			_vec3_1$1.setFromMatrixScale(group.worldMatrixInverse);
+			if (Math.abs(Math.max(_vec3_1$1.x - _vec3_1$1.y, _vec3_1$1.x - _vec3_1$1.z)) > 1e-6) {
+				console.warn('TilesRenderer : Non uniform scale used for tile which may cause issues when calculating screen space error.');
 			}
-			const invScale = invScaleX;
-			const invOriginMatrix = _mat4_1;
 
-			// update the camera infos
-
+			// store the camera cameraInfo in the 3d tiles root frame
 			for (let i = 0, l = infos.length; i < l; i++) {
 				const camera = cameras[i];
 				const info = infos[i];
+				const frustum = info.frustum;
+				const position = info.position;
 				const cameraResolutionX = resolution.x * (camera.rect.z - camera.rect.x);
 				const cameraResolutionY = resolution.y * (camera.rect.w - camera.rect.y);
 				if (cameraResolutionX === 0 || cameraResolutionY === 0) {
@@ -6676,24 +6667,20 @@ ${instancing_normal_vert}
 					// the vertical FOV is used to populate matrix element 5.
 					info.sseDenominator = 2 / projection[5] / cameraResolutionY;
 				}
-				info.invScale = invScale;
 
 				// get frustum in origin space
-				_mat4_2.copy(originMatrix).premultiply(camera.projectionViewMatrix);
-				info.frustum.setFromMatrix(_mat4_2);
-				info.frustum.updateCache();
+				_mat4_1.copy(group.worldMatrix).premultiply(camera.projectionViewMatrix);
+				frustum.setFromMatrix(_mat4_1);
+				frustum.updateCache();
 
 				// get camera position in origin space
-				info.position.setFromMatrixPosition(camera.worldMatrix).applyMatrix4(invOriginMatrix);
+				position.setFromMatrixPosition(camera.worldMatrix).applyMatrix4(group.worldMatrixInverse);
 			}
 		}
 		getInfos() {
 			return this._infos;
 		}
 	}
-	const _mat4_1 = new t3d.Matrix4();
-	const _mat4_2 = new t3d.Matrix4();
-	const _vec3_1$1 = new t3d.Vector3();
 
 	// TODO
 
@@ -6888,7 +6875,7 @@ ${instancing_normal_vert}
 			}
 			return success;
 		}
-		resize(width, height) {
+		setResolution(width, height) {
 			this.$cameras.setResolution(width, height);
 		}
 		removeCamera(camera) {
@@ -6962,7 +6949,7 @@ ${instancing_normal_vert}
 				return;
 			}
 			this.dispatchEvent(_updateBeforeEvent);
-			this.$cameras.updateInfos(this.group.worldMatrix);
+			this.$cameras.updateInfos(this.group);
 			super.update();
 			this.dispatchEvent(_updateAfterEvent);
 
@@ -6989,7 +6976,7 @@ ${instancing_normal_vert}
 			if (parentTile) {
 				transform.premultiply(parentTile.cached.transform);
 			}
-			const transformInverse = new t3d.Matrix4().copy(transform).inverse();
+			const transformInverse = new t3d.Matrix4().copy(transform).invert();
 			const boundingVolume = new TileBoundingVolume();
 			if ('sphere' in tile.boundingVolume) {
 				boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);

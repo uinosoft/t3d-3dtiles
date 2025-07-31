@@ -48,7 +48,7 @@ export class EllipsoidRegion extends Ellipsoid {
 		);
 
 		// transform the points into the local frame
-		_invMatrix.setFromMatrix3(target.rotation).inverse();
+		_invMatrix.setFromMatrix3(target.rotation).invert();
 
 		const points = this._getPoints(true);
 

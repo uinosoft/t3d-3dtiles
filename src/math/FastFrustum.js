@@ -43,7 +43,7 @@ function findIntersectionPoint(plane1, plane2, plane3, target) {
 	target.set(-plane1.constant, -plane2.constant, -plane3.constant);
 
 	// Solve for X by applying the inverse matrix to B
-	target.applyMatrix3(A.inverse());
+	target.applyMatrix3(A.invert());
 
 	return target;
 }
