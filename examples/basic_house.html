@@ -72,7 +72,6 @@
 		// Create 3D tiles
 
 		const tiles = new TilesRenderer('https://storage.googleapis.com/ogc-3d-tiles/house3/tileset.json');
-		tiles.errorThreshold = 60;
 		tiles.maxDepth = 15;
 		scene.add(tiles.group);
 
@@ -93,11 +92,8 @@
 		const pane = new Pane();
 
 		const optionsFolder = pane.addFolder({ title: 'Tiles Options', expanded: false });
-		optionsFolder.addBinding(tiles, 'loadSiblings', { label: 'Load Siblings' });
-		optionsFolder.addBinding(tiles, 'stopAtEmptyTiles', { label: 'Stop at Empty Tiles' });
 		optionsFolder.addBinding(tiles, 'displayActiveTiles', { label: 'Display Active Tiles' });
 		optionsFolder.addBinding(tiles, 'errorTarget', { label: 'Error Target', min: 0, step: 1 });
-		optionsFolder.addBinding(tiles, 'errorThreshold', { label: 'Error Threshold', min: 0, step: 1 });
 		optionsFolder.addBinding(tiles, 'maxDepth', { label: 'Max Depth', min: 1, step: 1 });
 
 		const debugFolder = pane.addFolder({ title: 'Tiles Debug', expanded: false });

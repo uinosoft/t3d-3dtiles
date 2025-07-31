@@ -1,55 +1,21 @@
-import { EventDispatcher, LoadingManager, Matrix4, Vector3 } from 't3d';
-import { TileBoundingVolume } from './math/TileBoundingVolume.js';
-import { getUrlExtension } from './core/renderer/utilities/urlExtension.js';
-import { raycastTraverse, raycastTraverseFirstHit } from './tiles/raycastTraverse.js';
-import { CameraList } from './utilities/CameraList.js';
-import { LRUCache } from './core/renderer/utilities/LRUCache.js';
-import { PriorityQueue } from './core/renderer/utilities/PriorityQueue.js';
-import { markUsedTiles, markUsedSetLeaves, markVisibleTiles, toggleTiles, traverseSet } from './core/renderer/tiles/traverseFunctions.js';
-import { UNLOADED, LOADING, PARSING, LOADED, FAILED } from './core/renderer/constants.js';
-import { WGS84_ELLIPSOID } from './math/GeoConstants.js';
-import { throttle } from './core/renderer/utilities/throttle.js';
-import { B3DMLoader } from './loaders/B3DMLoader.js';
-import { I3DMLoader } from './loaders/I3DMLoader.js';
-import { PNTSLoader } from './loaders/PNTSLoader.js';
-import { CMPTLoader } from './loaders/CMPTLoader.js';
-import { TileGLTFLoader } from './loaders/TileGLTFLoader.js';
-import { readMagicBytes } from './core/renderer/utilities/readMagicBytes.js';
-import { TilesGroup } from './tiles/TilesGroup.js';
-
-const _updateBeforeEvent = { type: 'update-before' };
-const _updateAfterEvent = { type: 'update-after' };
-const _tilesLoadStartEvent = { type: 'tiles-load-start' };
-const _tilesLoadEndEvent = { type: 'tiles-load-end' };
+import { getUrlExtension } from '../utilities/urlExtension.js';
+import { LRUCache } from '../utilities/LRUCache.js';
+import { PriorityQueue } from '../utilities/PriorityQueue.js';
+import { markUsedTiles, toggleTiles, markVisibleTiles, markUsedSetLeaves, traverseSet } from './traverseFunctions.js';
+import { FAILED, LOADED, LOADING, PARSING, UNLOADED } from '../constants.js';
+import { throttle } from '../utilities/throttle.js';
 
 const PLUGIN_REGISTERED = Symbol('PLUGIN_REGISTERED');
-
-const INITIAL_FRUSTUM_CULLED = Symbol('INITIAL_FRUSTUM_CULLED');
-
-const viewErrorTarget = {
-	inView: false,
-	error: Infinity
-};
-
-const X_AXIS = new Vector3(1, 0, 0);
-const Y_AXIS = new Vector3(0, 1, 0);
-
-function updateFrustumCulled(object, toInitialValue) {
-	object.traverse(c => {
-		c.frustumCulled = c[INITIAL_FRUSTUM_CULLED] && toInitialValue;
-	});
-}
 
 // priority queue sort function that takes two tiles to compare. Returning 1 means
 // "tile a" is loaded first.
 const priorityCallback = (a, b) => {
-	if (a.__depthFromRenderedParent !== b.__depthFromRenderedParent) {
-		// load shallower tiles first using "depth from rendered parent" to help
-		// even out depth disparities caused by non-content parent tiles
-		return a.__depthFromRenderedParent > b.__depthFromRenderedParent ? -1 : 1;
-	} else if (a.__inFrustum !== b.__inFrustum) {
-		// load tiles that are in the frustum at the current depth
-		return a.__inFrustum ? 1 : -1;
+	const aPriority = a.priority || 0;
+	const bPriority = b.priority || 0;
+
+	if (aPriority !== bPriority) {
+		// lower priority value sorts first
+		return aPriority > bPriority ? 1 : -1;
 	} else if (a.__used !== b.__used) {
 		// load tiles that have been used
 		return a.__used ? 1 : -1;
@@ -60,6 +26,8 @@ const priorityCallback = (a, b) => {
 		// and finally visible tiles which have equal error (ex: if geometricError === 0)
 		// should prioritize based on distance.
 		return a.__distanceFromCamera > b.__distanceFromCamera ? -1 : 1;
+	} else if (a.__depthFromRenderedParent !== b.__depthFromRenderedParent) {
+		return a.__depthFromRenderedParent > b.__depthFromRenderedParent ? -1 : 1;
 	}
 
 	return 0;
@@ -68,15 +36,21 @@ const priorityCallback = (a, b) => {
 // lru cache unload callback that takes two tiles to compare. Returning 1 means "tile a"
 // is unloaded first.
 const lruPriorityCallback = (a, b) => {
-	if (a.__depthFromRenderedParent !== b.__depthFromRenderedParent) {
-		// dispose of deeper tiles first
+	const aPriority = a.priority || 0;
+	const bPriority = b.priority || 0;
+
+	if (aPriority !== bPriority) {
+		// lower priority value sorts first
+		return aPriority > bPriority ? 1 : -1;
+	} else if (a.__lastFrameVisited !== b.__lastFrameVisited) {
+		// dispose of least recent tiles first
+		return a.__lastFrameVisited > b.__lastFrameVisited ? -1 : 1;
+	} else if (a.__depthFromRenderedParent !== b.__depthFromRenderedParent) {
+		// dispose of deeper tiles first so parents are not disposed before children
 		return a.__depthFromRenderedParent > b.__depthFromRenderedParent ? 1 : -1;
 	} else if (a.__loadingState !== b.__loadingState) {
 		// dispose of tiles that are earlier along in the loading process first
 		return a.__loadingState > b.__loadingState ? -1 : 1;
-	} else if (a.__lastFrameVisited !== b.__lastFrameVisited) {
-		// dispose of least recent tiles first
-		return a.__lastFrameVisited > b.__lastFrameVisited ? -1 : 1;
 	} else if (a.__hasUnrenderableContent !== b.__hasUnrenderableContent) {
 		// dispose of external tile sets last
 		return a.__hasUnrenderableContent ? -1 : 1;
@@ -88,11 +62,11 @@ const lruPriorityCallback = (a, b) => {
 	return 0;
 };
 
-export class TilesRenderer {
+export class TilesRendererBase {
 
 	get root() {
-		const rootTileSet = this.rootTileSet;
-		return rootTileSet ? rootTileSet.root : null;
+		const tileSet = this.rootTileSet;
+		return tileSet ? tileSet.root : null;
 	}
 
 	get loadProgress() {
@@ -102,33 +76,48 @@ export class TilesRenderer {
 		return total === 0 ? 1.0 : 1.0 - loading / total;
 	}
 
-	constructor(url, manager = new LoadingManager()) {
-		this.group = new TilesGroup(this);
+	get errorThreshold() {
+		return this._errorThreshold;
+	}
 
-		this.ellipsoid = WGS84_ELLIPSOID.clone();
+	set errorThreshold(v) {
+		console.warn('TilesRenderer: The "errorThreshold" option has been deprecated.');
+		this._errorThreshold = v;
+	}
 
-		// options
-
+	constructor(url = null) {
+		// state
+		this.rootLoadingState = UNLOADED;
+		this.rootTileSet = null;
+		this.rootURL = url;
 		this.fetchOptions = {};
-		this.errorTarget = 6.0;
-		this.errorThreshold = Infinity;
-		this.loadSiblings = true;
-		this.displayActiveTiles = false;
-		this.maxDepth = Infinity;
-		this.stopAtEmptyTiles = true;
+		this.plugins = [];
+		this.queuedTiles = [];
+		this.cachedSinceLoadComplete = new Set();
+		this.isLoading = false;
 
-		this.preprocessURL = null;
-		manager.setURLModifier(url => {
-			if (this.preprocessURL) {
-				return this.preprocessURL(url);
-			} else {
-				return url;
-			}
-		});
-		this.manager = manager;
+		const lruCache = new LRUCache();
+		lruCache.unloadPriorityCallback = lruPriorityCallback;
 
-		// stats
+		const downloadQueue = new PriorityQueue();
+		downloadQueue.maxJobs = 25;
+		downloadQueue.priorityCallback = priorityCallback;
 
+		const parseQueue = new PriorityQueue();
+		parseQueue.maxJobs = 5;
+		parseQueue.priorityCallback = priorityCallback;
+
+		const processNodeQueue = new PriorityQueue();
+		processNodeQueue.maxJobs = 25;
+
+		this.processedTiles = new WeakSet();
+		this.visibleTiles = new Set();
+		this.activeTiles = new Set();
+		this.usedSet = new Set();
+		this.lruCache = lruCache;
+		this.downloadQueue = downloadQueue;
+		this.parseQueue = parseQueue;
+		this.processNodeQueue = processNodeQueue;
 		this.stats = {
 			inCacheSinceLoad: 0,
 			inCache: 0,
@@ -140,7 +129,6 @@ export class TilesRenderer {
 			active: 0,
 			visible: 0
 		};
-
 		this.frameCount = 0;
 
 		// callbacks
@@ -148,64 +136,11 @@ export class TilesRenderer {
 			this.dispatchEvent({ type: 'needs-update' });
 		});
 
-		this.activeTiles = new Set();
-		this.visibleTiles = new Set();
-		this.usedSet = new Set();
-
-		this.rootLoadingState = UNLOADED;
-
-		// internals
-
-		this.rootURL = url;
-		this.rootTileSet = null;
-
-		this._autoDisableRendererCulling = true;
-
-		this.plugins = [];
-		this.queuedTiles = [];
-		this.cachedSinceLoadComplete = new Set();
-		this.isLoading = false;
-
-		const lruCache = new LRUCache();
-		lruCache.unloadPriorityCallback = lruPriorityCallback;
-
-		const downloadQueue = new PriorityQueue();
-		downloadQueue.maxJobs = 10;
-		downloadQueue.priorityCallback = priorityCallback;
-
-		const parseQueue = new PriorityQueue();
-		parseQueue.maxJobs = 1;
-		parseQueue.priorityCallback = priorityCallback;
-
-		const processNodeQueue = new PriorityQueue();
-		processNodeQueue.maxJobs = 25;
-		processNodeQueue.priorityCallback = priorityCallback;
-		processNodeQueue.log = true;
-
-		this.lruCache = lruCache;
-		this.downloadQueue = downloadQueue;
-		this.parseQueue = parseQueue;
-		this.processNodeQueue = processNodeQueue;
-
-		this.$cameras = new CameraList();
-
-		const b3dmLoader = new B3DMLoader(manager);
-		const i3dmLoader = new I3DMLoader(manager);
-		const pntsLoader = new PNTSLoader(manager);
-		const cmptLoader = new CMPTLoader(manager);
-		const gltfLoader = new TileGLTFLoader(manager);
-
-		this._loaders = new Map([
-			['b3dm', b3dmLoader],
-			['i3dm', i3dmLoader],
-			['pnts', pntsLoader],
-			['cmpt', cmptLoader],
-			['gltf', gltfLoader]
-		]);
-
-		this._upRotationMatrix = new Matrix4();
-
-		this.optimizeRaycast = true;
+		// options
+		this.errorTarget = 16.0;
+		this._errorThreshold = Infinity;
+		this.displayActiveTiles = false;
+		this.maxDepth = Infinity;
 	}
 
 	// Plugins
@@ -269,7 +204,7 @@ export class TilesRenderer {
 	}
 
 	queueTileForDownload(tile) {
-		if (tile.__loadingState !== UNLOADED) {
+		if (tile.__loadingState !== UNLOADED || this.lruCache.isFull()) {
 			return;
 		}
 
@@ -283,10 +218,8 @@ export class TilesRenderer {
 		this.lruCache.markUsed(tile);
 	}
 
-	// Public API
 	update() {
 		const { lruCache, usedSet, stats, root, downloadQueue, parseQueue, processNodeQueue } = this;
-
 		if (this.rootLoadingState === UNLOADED) {
 			this.rootLoadingState = LOADING;
 			this.invokeOnePlugin(plugin => plugin.loadRootTileSet && plugin.loadRootTileSet())
@@ -295,10 +228,10 @@ export class TilesRenderer {
 					if (processedUrl !== null) {
 						this.invokeAllPlugins(plugin => processedUrl = plugin.preprocessURL ? plugin.preprocessURL(processedUrl, null) : processedUrl);
 					}
-
 					this.rootLoadingState = LOADED;
 					this.rootTileSet = root;
-
+					this.dispatchEvent({ type: 'needs-update' });
+					this.dispatchEvent({ type: 'load-content' });
 					this.dispatchEvent({
 						type: 'load-tile-set',
 						tileSet: root,
@@ -322,10 +255,6 @@ export class TilesRenderer {
 		if (!root) {
 			return;
 		}
-
-		this.dispatchEvent(_updateBeforeEvent);
-
-		this.$cameras.updateInfos(this.group.worldMatrix);
 
 		stats.inFrustum = 0;
 		stats.used = 0;
@@ -352,6 +281,7 @@ export class TilesRenderer {
 
 		queuedTiles.length = 0;
 
+		// start the downloads
 		this.lruCache.scheduleUnload();
 
 		// if all tasks have finished and we've been marked as actively loading then fire the completion event
@@ -360,11 +290,9 @@ export class TilesRenderer {
 			this.cachedSinceLoadComplete.clear();
 			stats.inCacheSinceLoad = 0;
 
-			this.dispatchEvent(_tilesLoadEndEvent);
+			this.dispatchEvent({ type: 'tiles-load-end' });
 			this.isLoading = false;
 		}
-
-		this.dispatchEvent(_updateAfterEvent);
 	}
 
 	resetFailedTiles() {
@@ -417,8 +345,6 @@ export class TilesRenderer {
 			visible: 0
 		};
 		this.frameCount = 0;
-
-		this.group.removeFromParent();
 	}
 
 	// Overrideable
@@ -426,168 +352,16 @@ export class TilesRenderer {
 		return 0;
 	}
 
-	dispatchEvent(...args) {
-		EventDispatcher.prototype.dispatchEvent.call(this, ...args);
+	dispatchEvent(e) {
+		// event to be overriden for dispatching via an event system
 	}
 
 	fetchData(url, options) {
 		return fetch(url, options);
 	}
 
-	async parseTile(buffer, tile, extension, uri, abortSignal) {
-		const cached = tile.cached;
-		const uriSplits = uri.split(/[\\\/]/g); // eslint-disable-line no-useless-escape
-		uriSplits.pop();
-		const workingPath = uriSplits.join('/');
-		const fetchOptions = this.fetchOptions;
-
-		let promise = null;
-
-		const cachedTransform = cached.transform;
-		const upRotationMatrix = this._upRotationMatrix;
-		const fileType = (readMagicBytes(buffer) || extension).toLowerCase();
-
-		switch (fileType) {
-			case 'b3dm': {
-				promise = this._loaders.get('b3dm').load(uri, {
-					fetchOptions,
-					path: workingPath,
-					buffer,
-					adjustmentTransform: upRotationMatrix.clone()
-				});
-				break;
-			}
-			case 'pnts': {
-				promise = this._loaders.get('pnts').load(uri, {
-					fetchOptions,
-					path: workingPath,
-					buffer
-				});
-				break;
-			}
-			case 'i3dm': {
-				promise = this._loaders.get('i3dm').load(uri, {
-					fetchOptions,
-					path: workingPath,
-					buffer,
-					adjustmentTransform: upRotationMatrix.clone()
-				});
-				break;
-			}
-			case 'cmpt': {
-				promise = this._loaders.get('i3dm').load(uri, {
-					fetchOptions,
-					path: workingPath,
-					buffer,
-					adjustmentTransform: upRotationMatrix.clone()
-				});
-				break;
-			}
-			case 'gltf':
-			case 'glb': {
-				promise = this._loaders.get('gltf').load(uri, {
-					fetchOptions,
-					path: workingPath,
-					buffer
-				}).then(result => {
-					// apply the local up-axis correction rotation
-					// GLTFLoader seems to never set a transformation on the root scene object so
-					// any transformations applied to it can be assumed to be applied after load
-					// (such as applying RTC_CENTER) meaning they should happen _after_ the z-up
-					// rotation fix which is why "multiply" happens here.
-					const { root: scene } = result;
-					scene.matrix
-						.multiply(upRotationMatrix)
-						.decompose(scene.position, scene.quaternion, scene.scale);
-					return result;
-				});
-				break;
-			}
-			default: {
-				promise = this.invokeOnePlugin(plugin => plugin.parseToMesh && plugin.parseToMesh(buffer, tile, extension, uri, abortSignal));
-				break;
-			}
-		}
-
-		// wait for the tile to load
-		const result = await promise;
-		if (result === null) {
-			throw new Error(`TilesRenderer: Content type "${fileType}" not supported.`);
-		}
-
-		// get the scene data
-		let scene;
-		let metadata;
-		if (result.isObject3D) {
-			scene = result;
-			metadata = null;
-		} else {
-			scene = result.root;
-			metadata = result;
-		}
-
-		// wait for extra processing by plugins if needed
-		await this.invokeAllPlugins(plugin => {
-			return plugin.processTileModel && plugin.processTileModel(scene, tile);
-		});
-
-		// ensure the matrix is up to date in case the scene has a transform applied
-		scene.updateMatrix();
-		scene.matrix.premultiply(cachedTransform);
-		scene.matrix.decompose(scene.position, scene.quaternion, scene.scale);
-		scene.traverse(c => {
-			c[INITIAL_FRUSTUM_CULLED] = c.frustumCulled;
-		});
-		updateFrustumCulled(scene, !this.autoDisableRendererCulling);
-
-		// collect all original geometries, materials, etc to be disposed of later
-		const materials = [];
-		const geometry = [];
-		const textures = [];
-		scene.traverse(c => {
-			if (c.geometry) {
-				geometry.push(c.geometry);
-			}
-
-			if (c.material) {
-				const material = c.material;
-				materials.push(c.material);
-
-				for (const key in material) {
-					const value = material[key];
-					if (value && value.isTexture) {
-						textures.push(value);
-					}
-				}
-			}
-		});
-
-		// exit early if a new request has already started
-		if (abortSignal.aborted) {
-			// dispose of any image bitmaps that have been opened.
-			// TODO: share this code with the "disposeTile" code below, possibly allow for the tiles
-			// renderer base to trigger a disposal of unneeded data
-			for (let i = 0, l = textures.length; i < l; i++) {
-				const texture = textures[i];
-
-				if (texture.image instanceof ImageBitmap) {
-					texture.image.close();
-				}
-
-				texture.dispose();
-			}
-
-			return;
-		}
-
-		cached.materials = materials;
-		cached.geometry = geometry;
-		cached.textures = textures;
-		cached.scene = scene;
-		cached.metadata = metadata;
-		// cached.bytesUsed = estimateBytesUsed(scene);
-		cached.featureTable = result.featureTable;
-		cached.batchTable = result.batchTable;
+	parseTile(buffer, tile, extension) {
+		return null;
 	}
 
 	disposeTile(tile) {
@@ -601,56 +375,10 @@ export class TilesRenderer {
 			this.invokeOnePlugin(plugin => plugin.setTileActive && plugin.setTileActive(tile, false));
 			tile.__active = false;
 		}
-
-		// This could get called before the tile has finished downloading
-		const cached = tile.cached;
-		if (cached.scene) {
-			const materials = cached.materials;
-			const geometry = cached.geometry;
-			const textures = cached.textures;
-			const parent = cached.scene.parent;
-
-			for (let i = 0, l = geometry.length; i < l; i++) {
-				geometry[i].dispose();
-			}
-
-			for (let i = 0, l = materials.length; i < l; i++) {
-				materials[i].dispose();
-			}
-
-			for (let i = 0, l = textures.length; i < l; i++) {
-				const texture = textures[i];
-
-				if (texture.image instanceof ImageBitmap) {
-					texture.image.close();
-				}
-
-				texture.dispose();
-			}
-
-			if (parent) {
-				parent.remove(cached.scene);
-			}
-
-			this.dispatchEvent({
-				type: 'dispose-model',
-				scene: cached.scene,
-				tile
-			});
-
-			cached.scene = null;
-			cached.materials = null;
-			cached.textures = null;
-			cached.geometry = null;
-			cached.metadata = null;
-		}
 	}
 
 	preprocessNode(tile, tileSetDir, parentTile = null) {
-		if (tile.contents) {
-			// TODO: multiple contents (1.1) are not supported yet
-			tile.content = tile.contents[0];
-		}
+		this.processedTiles.add(tile);
 
 		if (tile.content) {
 			// Fix old file formats
@@ -732,47 +460,6 @@ export class TilesRenderer {
 		this.invokeAllPlugins(plugin => {
 			plugin !== this && plugin.preprocessNode && plugin.preprocessNode(tile, tileSetDir, parentTile);
 		});
-
-		// cached
-
-		const transform = new Matrix4();
-		if (tile.transform) {
-			transform.fromArray(tile.transform);
-		}
-
-		if (parentTile) {
-			transform.premultiply(parentTile.cached.transform);
-		}
-
-		const transformInverse = new Matrix4().copy(transform).inverse();
-		const boundingVolume = new TileBoundingVolume();
-		if ('sphere' in tile.boundingVolume) {
-			boundingVolume.setSphereData(tile.boundingVolume.sphere, transform);
-		}
-		if ('box' in tile.boundingVolume) {
-			boundingVolume.setOBBData(tile.boundingVolume.box, transform);
-		}
-		if ('region' in tile.boundingVolume) {
-			boundingVolume.setRegionData(this.ellipsoid, ...tile.boundingVolume.region);
-		}
-
-		tile.cached = {
-			transform,
-			transformInverse,
-
-			active: false,
-
-			boundingVolume,
-
-			metadata: null,
-			scene: null,
-			geometry: null,
-			materials: null,
-			textures: null,
-
-			featureTable: null,
-			batchTable: null
-		};
 	}
 
 	setTileActive(tile, active) {
@@ -780,95 +467,12 @@ export class TilesRenderer {
 	}
 
 	setTileVisible(tile, visible) {
-		const scene = tile.cached.scene;
-		const group = this.group;
-
-		if (visible) {
-			if (scene) {
-				group.add(scene);
-				scene.updateMatrix(true);
-			}
-		} else {
-			if (scene) {
-				group.remove(scene);
-			}
-		}
-
 		visible ? this.visibleTiles.add(tile) : this.visibleTiles.delete(tile);
-
-		this.dispatchEvent({
-			type: 'tile-visibility-change',
-			scene,
-			tile,
-			visible
-		});
 	}
 
 	calculateTileViewError(tile, target) {
 		// retrieve whether the tile is visible, screen space error, and distance to camera
 		// set "inView", "error", "distance"
-
-		const cached = tile.cached;
-		const cameraInfo = this.$cameras.getInfos();
-		const boundingVolume = cached.boundingVolume;
-
-		let inView = false;
-		let inViewError = -Infinity;
-		let inViewDistance = Infinity;
-		let maxError = -Infinity;
-		let minDistance = Infinity;
-
-		for (let i = 0, l = cameraInfo.length; i < l; i++) {
-			// calculate the camera error
-			const info = cameraInfo[i];
-			let error;
-			let distance;
-			if (info.isOrthographic) {
-				const pixelSize = info.pixelSize;
-				error = tile.geometricError / pixelSize;
-				distance = Infinity;
-			} else {
-				const sseDenominator = info.sseDenominator;
-				distance = boundingVolume.distanceToPoint(info.position);
-				error = tile.geometricError / (distance * sseDenominator);
-			}
-
-			// Track which camera frustums this tile is in so we can use it
-			// to ignore the error calculations for cameras that can't see it
-			const frustum = cameraInfo[i].frustum;
-			if (boundingVolume.intersectsFrustum(frustum)) {
-				inView = true;
-				inViewError = Math.max(inViewError, error);
-				inViewDistance = Math.min(inViewDistance, distance);
-			}
-
-			maxError = Math.max(maxError, error);
-			minDistance = Math.min(minDistance, distance);
-		}
-
-		// check the plugin visibility
-		this.invokeAllPlugins(plugin => {
-			if (plugin !== this && plugin.calculateTileViewError) {
-				plugin.calculateTileViewError(tile, viewErrorTarget);
-				if (viewErrorTarget.inView) {
-					inView = true;
-					inViewError = Math.max(inViewError, viewErrorTarget.error);
-				}
-
-				maxError = Math.max(maxError, viewErrorTarget.error);
-			}
-		});
-
-		// If the tiles are out of view then use the global distance and error calculated
-		if (inView) {
-			target.inView = true;
-			target.error = inViewError;
-			target.distanceToCamera = inViewDistance;
-		} else {
-			target.inView = false;
-			target.error = maxError;
-			target.distanceToCamera = minDistance;
-		}
 	}
 
 	ensureChildrenArePreprocessed(tile, immediate = false) {
@@ -957,38 +561,9 @@ export class TilesRenderer {
 				}
 			})
 			.then(root => {
-				// cache the gltf tile set rotation matrix
-				const { asset, extensions = {} } = root;
-				const upAxis = asset && asset.gltfUpAxis || 'y';
-				switch (upAxis.toLowerCase()) {
-					case 'x':
-						this._upRotationMatrix.makeRotationAxis(Y_AXIS, -Math.PI / 2);
-						break;
-
-					case 'y':
-						this._upRotationMatrix.makeRotationAxis(X_AXIS, Math.PI / 2);
-						break;
-					default:
-						this._upRotationMatrix.identity();
-						break;
-				}
-
-				// update the ellipsoid based on the extension
-				if ('3DTILES_ellipsoid' in extensions) {
-					const ext = extensions['3DTILES_ellipsoid'];
-					const { ellipsoid } = this;
-					ellipsoid.name = ext.body;
-					if (ext.radii) {
-						ellipsoid.radius.set(...ext.radii);
-					} else {
-						ellipsoid.radius.set(1, 1, 1);
-					}
-				}
-
 				this.preprocessTileSet(root, processedUrl);
-
 				return root;
-			});
+			}); ;
 
 		return pr;
 	}
@@ -1054,7 +629,7 @@ export class TilesRenderer {
 		// check if this is the beginning of a new set of tiles to load and dispatch and event
 		if (!this.isLoading) {
 			this.isLoading = true;
-			this.dispatchEvent(_tilesLoadStartEvent);
+			this.dispatchEvent({ type: 'tiles-load-start' });
 		}
 
 		lruCache.setMemoryUsage(tile, this.getBytesUsed(tile));
@@ -1218,136 +793,6 @@ export class TilesRenderer {
 		}
 
 		return pending.length === 0 ? null : Promise.all(pending);
-	}
-
-	//
-	get autoDisableRendererCulling() {
-		return this._autoDisableRendererCulling;
-	}
-
-	set autoDisableRendererCulling(value) {
-		if (this._autoDisableRendererCulling !== value) {
-			this._autoDisableRendererCulling = value;
-			this.forEachLoadedModel(scene => {
-				updateFrustumCulled(scene, !value);
-			});
-		}
-	}
-
-	setDRACOLoader(dracoLoader) {
-		this._loaders.get('b3dm').setDRACOLoader(dracoLoader);
-		this._loaders.get('i3dm').setDRACOLoader(dracoLoader);
-		this._loaders.get('cmpt').setDRACOLoader(dracoLoader);
-		this._loaders.get('gltf').setDRACOLoader(dracoLoader);
-	}
-
-	setKTX2Loader(ktx2Loader) {
-		this._loaders.get('b3dm').setKTX2Loader(ktx2Loader);
-		this._loaders.get('i3dm').setKTX2Loader(ktx2Loader);
-		this._loaders.get('cmpt').setKTX2Loader(ktx2Loader);
-		this._loaders.get('gltf').setKTX2Loader(ktx2Loader);
-	}
-
-	addEventListener(...args) {
-		EventDispatcher.prototype.addEventListener.call(this, ...args);
-	}
-
-	hasEventListener(...args) {
-		EventDispatcher.prototype.hasEventListener.call(this, ...args);
-	}
-
-	removeEventListener(...args) {
-		EventDispatcher.prototype.removeEventListener.call(this, ...args);
-	}
-
-	addCamera(camera) {
-		const success = this.$cameras.add(camera);
-		if (success) {
-			this.dispatchEvent({ type: 'add-camera', camera });
-		}
-		return success;
-	}
-
-	removeCamera(camera) {
-		const success = this.$cameras.remove(camera);
-		if (success) {
-			this.dispatchEvent({ type: 'delete-camera', camera });
-		}
-		return success;
-	}
-
-	resize(width, height) {
-		this.$cameras.setResolution(width, height);
-	}
-
-	raycast(ray, intersects) {
-		if (!this.root) {
-			return null;
-		}
-
-		raycastTraverse(this, this.root, ray, intersects);
-	}
-
-	raycastFirst(ray) {
-		if (!this.root) {
-			return null;
-		}
-
-		return raycastTraverseFirstHit(this, this.root, ray);
-	}
-
-	getBoundingBox(box) {
-		if (!this.root) {
-			return false;
-		}
-
-		const boundingVolume = this.root.cached.boundingVolume;
-
-		if (boundingVolume) {
-			boundingVolume.getBoundingBox(box);
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	getOrientedBoundingBox(targetBox, targetMatrix) {
-		if (!this.root) {
-			return false;
-		}
-
-		const boundingVolume = this.root.cached.boundingVolume;
-
-		if (boundingVolume) {
-			boundingVolume.getOrientedBoundingBox(targetBox, targetMatrix);
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	getBoundingSphere(sphere) {
-		if (!this.root) {
-			return false;
-		}
-
-		const boundingVolume = this.root.cached.boundingVolume;
-
-		if (boundingVolume) {
-			boundingVolume.getBoundingSphere(sphere);
-			return true;
-		} else {
-			return false;
-		}
-	}
-
-	forEachLoadedModel(callback) {
-		this.traverse(tile => {
-			const scene = tile.cached && tile.cached.scene;
-			if (scene) {
-				callback(scene, tile);
-			}
-		}, null, false);
 	}
 
 }
