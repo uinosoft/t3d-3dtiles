@@ -35,7 +35,7 @@
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
 		import { Raycaster } from 't3d/addons/Raycaster.js';
 
-		import { TilesRenderer, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin } from 't3d-3dtiles';
+		import { TilesRenderer, ReorientationPlugin, DebugTilesPlugin, GLTFExtensionsPlugin, TilesFadePlugin } from 't3d-3dtiles';
 
 		import { Pane } from 'tweakpane';
 		import * as EssentialsPlugin from '@tweakpane/plugin-essentials';
@@ -79,16 +79,15 @@
 		const tiles = new TilesRenderer('https://storage.googleapis.com/ogc-3d-tiles/ayutthaya/tiledWithSkirts/tileset.json');
 		scene.add(tiles.group);
 
-		const dracoLoader = new DRACOLoader();
-		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
-		tiles.setDRACOLoader(dracoLoader);
-		
-		tiles.addCamera(camera);
-		tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
-
 		tiles.registerPlugin(new ReorientationPlugin());
 		tiles.registerPlugin(new DebugTilesPlugin());
 		tiles.registerPlugin(new TilesFadePlugin());
+		tiles.registerPlugin(new GLTFExtensionsPlugin({
+			dracoLoader: new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/')
+		}));
+
+		tiles.addCamera(camera);
+		tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 		// Ray casting
 

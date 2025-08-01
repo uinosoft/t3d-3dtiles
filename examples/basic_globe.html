@@ -30,7 +30,7 @@
 		import * as t3d from 't3d';
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
-		import { TilesRenderer, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin, GlobeControls } from 't3d-3dtiles';
+		import { TilesRenderer, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin, TilesFadePlugin, GLTFExtensionsPlugin, GlobeControls } from 't3d-3dtiles';
 		import ionAccessToken from './ionAccessToken.js';
 		import { Pane } from 'tweakpane';
 
@@ -76,10 +76,9 @@
 			tiles.registerPlugin(new ReorientationPlugin());
 			tiles.registerPlugin(new DebugTilesPlugin());
 			tiles.registerPlugin(new TilesFadePlugin());
-
-			const dracoLoader = new DRACOLoader();
-			dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
-			tiles.setDRACOLoader(dracoLoader);
+			tiles.registerPlugin(new GLTFExtensionsPlugin({
+				dracoLoader: new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/')
+			}));
 		
 			tiles.addCamera(camera);
 			tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);

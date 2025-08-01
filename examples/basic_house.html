@@ -32,7 +32,7 @@
 		import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
-		import { TilesRenderer, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
+		import { TilesRenderer, ReorientationPlugin, DebugTilesPlugin, GLTFExtensionsPlugin } from 't3d-3dtiles';
 		import { Pane } from 'tweakpane';
 
 		let width = window.innerWidth || 2;
@@ -79,10 +79,9 @@
 		tiles.registerPlugin(new DebugTilesPlugin({
 			displayBoxBounds: true
 		}));
-
-		const dracoLoader = new DRACOLoader();
-		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
-		tiles.setDRACOLoader(dracoLoader);
+		tiles.registerPlugin(new GLTFExtensionsPlugin({
+			dracoLoader: new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/')
+		}));
 
 		tiles.addCamera(camera);
 		tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);

@@ -635,18 +635,4 @@ export class TilesRenderer extends TilesRendererBase {
 		this.group.removeFromParent();
 	}
 
-	setDRACOLoader(dracoLoader) {
-		this._loaders.get('b3dm').setDRACOLoader(dracoLoader);
-		this._loaders.get('i3dm').setDRACOLoader(dracoLoader);
-		this._loaders.get('cmpt').setDRACOLoader(dracoLoader);
-		this._loaders.get('gltf').setDRACOLoader(dracoLoader);
-	}
-
-	setKTX2Loader(ktx2Loader) {
-		this._loaders.get('b3dm').setKTX2Loader(ktx2Loader);
-		this._loaders.get('i3dm').setKTX2Loader(ktx2Loader);
-		this._loaders.get('cmpt').setKTX2Loader(ktx2Loader);
-		this._loaders.get('gltf').setKTX2Loader(ktx2Loader);
-	}
-
 }

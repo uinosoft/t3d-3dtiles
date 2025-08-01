@@ -6226,20 +6226,6 @@ class TilesRenderer extends TilesRendererBase {
 		this.group.removeFromParent();
 	}
 
-	setDRACOLoader(dracoLoader) {
-		this._loaders.get('b3dm').setDRACOLoader(dracoLoader);
-		this._loaders.get('i3dm').setDRACOLoader(dracoLoader);
-		this._loaders.get('cmpt').setDRACOLoader(dracoLoader);
-		this._loaders.get('gltf').setDRACOLoader(dracoLoader);
-	}
-
-	setKTX2Loader(ktx2Loader) {
-		this._loaders.get('b3dm').setKTX2Loader(ktx2Loader);
-		this._loaders.get('i3dm').setKTX2Loader(ktx2Loader);
-		this._loaders.get('cmpt').setKTX2Loader(ktx2Loader);
-		this._loaders.get('gltf').setKTX2Loader(ktx2Loader);
-	}
-
 }
 
 class PivotPointMesh extends Mesh {
@@ -12656,6 +12642,41 @@ class DebugTilesPlugin {
 
 }
 
+class GLTFExtensionsPlugin {
+
+	constructor(options) {
+		options = {
+			dracoLoader: null,
+			ktxLoader: null,
+			...options
+		};
+
+		this.tiles = null;
+
+		this.dracoLoader = options.dracoLoader;
+		this.ktxLoader = options.ktxLoader;
+	}
+
+	init(tiles) {
+		this.tiles = tiles;
+
+		if (this.dracoLoader) {
+			tiles._loaders.get('b3dm').setDRACOLoader(this.dracoLoader);
+			tiles._loaders.get('i3dm').setDRACOLoader(this.dracoLoader);
+			tiles._loaders.get('cmpt').setDRACOLoader(this.dracoLoader);
+			tiles._loaders.get('gltf').setDRACOLoader(this.dracoLoader);
+		}
+
+		if (this.ktxLoader) {
+			this._loaders.get('b3dm').setKTX2Loader(this.ktxLoader);
+			this._loaders.get('i3dm').setKTX2Loader(this.ktxLoader);
+			this._loaders.get('cmpt').setKTX2Loader(this.ktxLoader);
+			this._loaders.get('gltf').setKTX2Loader(this.ktxLoader);
+		}
+	}
+
+}
+
 class ReorientationPlugin {
 
 	constructor(options) {
@@ -12867,4 +12888,4 @@ Camera.prototype.updateProjectionMatrix = function() {
 	return this;
 };
 
-export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, EnvironmentControls, GlobeControls, I3DMLoader, ImplicitTilingPlugin, OBB, PNTSLoader, QuantizedMeshPlugin, ReorientationPlugin, TMSTilesPlugin, TileGLTFLoader, TilesFadePlugin, TilesRenderer, XYZTilesPlugin };
+export { B3DMLoader, CMPTLoader, CesiumIonAuthPlugin, LoadParser as DebugLoadParser, DebugTilesPlugin, EnvironmentControls, GLTFExtensionsPlugin, GlobeControls, I3DMLoader, ImplicitTilingPlugin, OBB, PNTSLoader, QuantizedMeshPlugin, ReorientationPlugin, TMSTilesPlugin, TileGLTFLoader, TilesFadePlugin, TilesRenderer, XYZTilesPlugin };

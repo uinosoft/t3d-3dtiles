@@ -35,7 +35,7 @@
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
 		import { KTX2Loader } from 't3d/addons/loaders/KTX2Loader.js';
-		import { TilesRenderer, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
+		import { TilesRenderer, CesiumIonAuthPlugin, ReorientationPlugin, DebugTilesPlugin, GLTFExtensionsPlugin } from 't3d-3dtiles';
 		import ionAccessToken from './ionAccessToken.js';
 		import { Pane } from 'tweakpane';
 		import * as KTXParse from 'ktx-parse';
@@ -90,10 +90,9 @@
 			}));
 			tiles.registerPlugin(new ReorientationPlugin());
 			tiles.registerPlugin(new DebugTilesPlugin());
-
-			const dracoLoader = new DRACOLoader();
-			dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
-			tiles.setDRACOLoader(dracoLoader);
+			tiles.registerPlugin(new GLTFExtensionsPlugin({
+				dracoLoader: new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/')
+			}));
 
 			const zstdDecoder = new ZSTDDecoder().init();
 			KTX2Loader.setKTXParser(KTXParse).setZSTDDecoder(zstdDecoder);

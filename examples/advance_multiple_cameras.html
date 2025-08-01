@@ -32,7 +32,6 @@
 		import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { CameraHelper } from 't3d/addons/objects/CameraHelper.js';
-		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
 		import { TilesRenderer, ReorientationPlugin, DebugTilesPlugin } from 't3d-3dtiles';
 		import { Pane } from 'tweakpane';
 
@@ -91,10 +90,6 @@
 
 		tiles.registerPlugin(new ReorientationPlugin({ up: '-z' }));
 		tiles.registerPlugin(new DebugTilesPlugin());
-
-		const dracoLoader = new DRACOLoader();
-		dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/');
-		tiles.setDRACOLoader(dracoLoader);
 		
 		tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
 

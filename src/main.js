@@ -16,6 +16,7 @@ export { EnvironmentControls } from './controls/EnvironmentControls.js';
 export { TilesFadePlugin } from './plugins/fade/TilesFadePlugin.js';
 export { CesiumIonAuthPlugin } from './plugins/CesiumIonAuthPlugin.js';
 export { DebugTilesPlugin } from './plugins/DebugTilesPlugin.js';
+export { GLTFExtensionsPlugin } from './plugins/GLTFExtensionsPlugin.js';
 export { ReorientationPlugin } from './plugins/ReorientationPlugin.js';
 export { QuantizedMeshPlugin } from './plugins/QuantizedMeshPlugin.js';
 export { XYZTilesPlugin, TMSTilesPlugin } from './plugins/images/EPSGTilesPlugin.js';
