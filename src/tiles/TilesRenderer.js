@@ -473,13 +473,14 @@ export class TilesRenderer extends TilesRendererBase {
 			return;
 		}
 
+		scene.batchTable = result.batchTable;
+		scene.featureTable = result.featureTable;
+
 		cached.materials = materials;
 		cached.geometry = geometry;
 		cached.textures = textures;
 		cached.scene = scene;
 		cached.metadata = metadata;
-		cached.featureTable = result.featureTable;
-		cached.batchTable = result.batchTable;
 	}
 
 	disposeTile(tile) {
