@@ -97,6 +97,16 @@
 			monitorFolder.addBinding(tiles.stats, 'downloading', monitorOptions);
 			monitorFolder.addBinding(tiles.stats, 'parsing', monitorOptions);
 			monitorFolder.addBinding(tiles.stats, 'visible', monitorOptions);
+			const memoryParam = Object.defineProperty({}, 'memory', {
+				get: () => tiles.lruCache.cachedBytes / 1024 / 1024
+			});
+			monitorFolder.addBinding(memoryParam, 'memory', {
+				readonly: true,
+				view: 'graph',
+				min: 0,
+				max: tiles.lruCache.maxBytesSize / 1024 / 1024 * 1.1,
+				label: 'Memory (MB)'
+			});
 		}
 
 		fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
