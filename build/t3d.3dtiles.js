@@ -9132,7 +9132,8 @@ ${instancing_normal_vert}
 
 			// used to scale the tilt transitions based on zoom intensity
 			const deltaAlpha = t3d.MathUtils.clamp(t3d.MathUtils.mapLinear(Math.abs(zoomDelta), 0, 20, 0, 1), 0, 1);
-			if (this._isNearControls() || zoomDelta > 0) {
+			const isNearControls = this._isNearControls();
+			if (isNearControls || zoomDelta > 0) {
 				this._updateZoomDirection();
 
 				// When zooming try to tilt the camera towards the center of the planet to avoid the globe
@@ -9236,8 +9237,8 @@ ${instancing_normal_vert}
 
 			// When the smallest fov spans 65% of the ellipsoid then we use the near controls
 			const ellipsoidRadius = Math.max(...ellipsoid.radius);
-			const fovHoriz = 2 * Math.atan(Math.tan(t3d.MathUtils.DEG2RAD * camera.fov * 0.5) * camera.aspect);
-			const distVert = ellipsoidRadius / Math.tan(t3d.MathUtils.DEG2RAD * camera.fov * 0.5);
+			const fovHoriz = 2 * Math.atan(Math.tan(camera.fov * 0.5) * camera.aspect);
+			const distVert = ellipsoidRadius / Math.tan(camera.fov * 0.5);
 			const distHoriz = ellipsoidRadius / Math.tan(fovHoriz * 0.5);
 			const dist = Math.max(distVert, distHoriz);
 			return dist;
@@ -9255,8 +9256,8 @@ ${instancing_normal_vert}
 
 			// allow for zooming out such that the ellipsoid is half the size of the largest fov
 			const ellipsoidRadius = Math.max(...ellipsoid.radius);
-			const fovHoriz = 2 * Math.atan(Math.tan(t3d.MathUtils.DEG2RAD * camera.fov * 0.5) * camera.aspect);
-			const distVert = ellipsoidRadius / Math.tan(t3d.MathUtils.DEG2RAD * camera.fov * 0.5);
+			const fovHoriz = 2 * Math.atan(Math.tan(camera.fov * 0.5) * camera.aspect);
+			const distVert = ellipsoidRadius / Math.tan(camera.fov * 0.5);
 			const distHoriz = ellipsoidRadius / Math.tan(fovHoriz * 0.5);
 			const dist = 2 * Math.max(distVert, distHoriz);
 			return dist;

@@ -8097,7 +8097,8 @@ class GlobeControls extends EnvironmentControls {
 
 		// used to scale the tilt transitions based on zoom intensity
 		const deltaAlpha = MathUtils.clamp(MathUtils.mapLinear(Math.abs(zoomDelta), 0, 20, 0, 1), 0, 1);
-		if (this._isNearControls() || zoomDelta > 0) {
+		const isNearControls = this._isNearControls();
+		if (isNearControls || zoomDelta > 0) {
 			this._updateZoomDirection();
 
 			// When zooming try to tilt the camera towards the center of the planet to avoid the globe
@@ -8204,8 +8205,8 @@ class GlobeControls extends EnvironmentControls {
 
 		// When the smallest fov spans 65% of the ellipsoid then we use the near controls
 		const ellipsoidRadius = Math.max(...ellipsoid.radius);
-		const fovHoriz = 2 * Math.atan(Math.tan(MathUtils.DEG2RAD * camera.fov * 0.5) * camera.aspect);
-		const distVert = ellipsoidRadius / Math.tan(MathUtils.DEG2RAD * camera.fov * 0.5);
+		const fovHoriz = 2 * Math.atan(Math.tan(camera.fov * 0.5) * camera.aspect);
+		const distVert = ellipsoidRadius / Math.tan(camera.fov * 0.5);
 		const distHoriz = ellipsoidRadius / Math.tan(fovHoriz * 0.5);
 		const dist = Math.max(distVert, distHoriz);
 
@@ -8221,8 +8222,8 @@ class GlobeControls extends EnvironmentControls {
 
 		// allow for zooming out such that the ellipsoid is half the size of the largest fov
 		const ellipsoidRadius = Math.max(...ellipsoid.radius);
-		const fovHoriz = 2 * Math.atan(Math.tan(MathUtils.DEG2RAD * camera.fov * 0.5) * camera.aspect);
-		const distVert = ellipsoidRadius / Math.tan(MathUtils.DEG2RAD * camera.fov * 0.5);
+		const fovHoriz = 2 * Math.atan(Math.tan(camera.fov * 0.5) * camera.aspect);
+		const distVert = ellipsoidRadius / Math.tan(camera.fov * 0.5);
 		const distHoriz = ellipsoidRadius / Math.tan(fovHoriz * 0.5);
 		const dist = 2 * Math.max(distVert, distHoriz);
 
