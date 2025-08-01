@@ -84,6 +84,12 @@
 			tiles = new TilesRenderer();
 			scene.add(tiles.group);
 
+			const zstdDecoder = new ZSTDDecoder().init();
+			KTX2Loader.setKTXParser(KTXParse).setZSTDDecoder(zstdDecoder);
+			const ktx2Loader = new KTX2Loader()
+				.setTranscoderPath('./libs/basis/')
+				.detectSupport(forwardRenderer);
+
 			tiles.registerPlugin(new CesiumIonAuthPlugin({
 				apiToken: ionAccessToken,
 				assetId: ionAssetId
@@ -91,15 +97,9 @@
 			tiles.registerPlugin(new ReorientationPlugin());
 			tiles.registerPlugin(new DebugTilesPlugin());
 			tiles.registerPlugin(new GLTFExtensionsPlugin({
-				dracoLoader: new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/')
+				dracoLoader: new DRACOLoader().setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.4.3/'),
+				ktx2Loader: ktx2Loader
 			}));
-
-			const zstdDecoder = new ZSTDDecoder().init();
-			KTX2Loader.setKTXParser(KTXParse).setZSTDDecoder(zstdDecoder);
-			const ktx2Loader = new KTX2Loader()
-				.setTranscoderPath('./libs/basis/')
-				.detectSupport(forwardRenderer);
-			tiles.setKTX2Loader(ktx2Loader);
 		
 			tiles.addCamera(camera);
 			tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
@@ -117,29 +117,19 @@
 			});
 
 			monitorFolder = pane.addFolder({ title: 'Tiles Monitor', expanded: true });
-			monitorFolder.addBinding(tiles.stats, 'downloading', {
-				readonly: true,
-				view: 'graph',
-				min: 0,
-				max: 200,
-				step: 1,
-				label: 'Downloading'
+			const monitorOptions = { readonly: true, format: v => v.toFixed(0) };
+			monitorFolder.addBinding(tiles.stats, 'downloading', monitorOptions);
+			monitorFolder.addBinding(tiles.stats, 'parsing', monitorOptions);
+			monitorFolder.addBinding(tiles.stats, 'visible', monitorOptions);
+			const memoryParam = Object.defineProperty({}, 'memory', {
+				get: () => tiles.lruCache.cachedBytes / 1024 / 1024
 			});
-			monitorFolder.addBinding(tiles.stats, 'parsing', {
+			monitorFolder.addBinding(memoryParam, 'memory', {
 				readonly: true,
 				view: 'graph',
 				min: 0,
-				max: 200,
-				step: 1,
-				label: 'Parsing'
-			});
-			monitorFolder.addBinding(tiles.stats, 'visible', {
-				readonly: true,
-				view: 'graph',
-				min: 0,
-				max: 200,
-				step: 1,
-				label: 'Visible'
+				max: tiles.lruCache.maxBytesSize / 1024 / 1024 * 1.1,
+				label: 'Memory (MB)'
 			});
 		}
 
