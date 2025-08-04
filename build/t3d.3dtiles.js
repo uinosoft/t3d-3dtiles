@@ -7958,7 +7958,7 @@ ${instancing_normal_vert}
 				const {
 					pointerTracker
 				} = this;
-				if (!this.enabled || pointerTracker.getPointerCount() === 0) {
+				if (!this.enabled) {
 					return;
 				}
 				e.preventDefault();
@@ -8078,10 +8078,7 @@ ${instancing_normal_vert}
 			};
 			const pointerleaveCallback = e => {
 				// exit early if the controls are disabled
-				const {
-					pointerTracker
-				} = this;
-				if (!this.enabled || pointerTracker.getPointerCount() === 0) {
+				if (!this.enabled) {
 					return;
 				}
 				this.resetState();

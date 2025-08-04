@@ -276,7 +276,7 @@ export class EnvironmentControls extends EventDispatcher {
 		const pointermoveCallback = e => {
 			// exit early if the controls are disabled
 			const { pointerTracker } = this;
-			if (!this.enabled || pointerTracker.getPointerCount() === 0) {
+			if (!this.enabled) {
 				return;
 			}
 
@@ -408,8 +408,7 @@ export class EnvironmentControls extends EventDispatcher {
 
 		const pointerleaveCallback = e => {
 			// exit early if the controls are disabled
-			const { pointerTracker } = this;
-			if (!this.enabled || pointerTracker.getPointerCount() === 0) {
+			if (!this.enabled) {
 				return;
 			}
 
