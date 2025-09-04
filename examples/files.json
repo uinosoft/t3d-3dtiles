@@ -9,6 +9,7 @@
 		"basic_ion_terrain",
 		"basic_globe",
 		"basic_globe_moon",
+		"basic_globe_mars",
 		"basic_maptiles"
 	],
 	"math": [
