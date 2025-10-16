@@ -61,7 +61,7 @@
 
 		const camera = new t3d.Camera();
 		camera.outputEncoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
-		camera.position.set(10, 10, 30);
+		camera.position.set(-10, 0, 0);
 		camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 100000);
 		scene.add(camera);
 
@@ -115,6 +115,7 @@
 		}
 
 		fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
+		let center;
 
 		function loop(count) {
 			requestAnimationFrame(loop);
@@ -125,6 +126,9 @@
 			tiles3D.children.forEach(gs => {
 				gs.traverse(child => {
 					if (child.isGaussianSplattingMesh) {
+						center = child.geometry.boundingSphere.center.clone().applyMatrix4(child.worldMatrix);
+						const distance = center.distanceTo(camera.position);
+						child.renderOrder = -distance;
 						child.update(camera, width, height);
 					}
 				});
