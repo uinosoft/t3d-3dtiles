@@ -1,5 +1,5 @@
 // t3d-3dtiles
-import { Vector3, Matrix3, Box3, Ray, Plane, Matrix4, Spherical, Sphere, Euler, MathUtils, Vector2, Frustum, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Quaternion, Attribute, Buffer, Color3, Mesh, Object3D, LoadingManager, EventDispatcher, PlaneGeometry, ShaderMaterial, MATERIAL_TYPE, ShaderLib, Texture2D, TEXTURE_FILTER, DefaultLoadingManager, PIXEL_FORMAT, PIXEL_TYPE, Triangle, LineMaterial, BoxGeometry, DRAW_MODE, Camera } from 't3d';
+import { Vector3, Matrix3, Box3, Ray, Plane, Matrix4, Spherical, Sphere, Euler, MathUtils, Vector2, Frustum, PBRMaterial, TEXEL_ENCODING_TYPE, DRAW_SIDE, Geometry, PointsMaterial, Material, BasicMaterial, VERTEX_COLOR, SHADING_TYPE, Quaternion, Attribute, Buffer, Color3, Mesh, Object3D, Bone, SkinnedMesh, Camera, LoadingManager, EventDispatcher, PlaneGeometry, ShaderMaterial, MATERIAL_TYPE, ShaderLib, Texture2D, TEXTURE_FILTER, DefaultLoadingManager, PIXEL_FORMAT, PIXEL_TYPE, Triangle, LineMaterial, BoxGeometry, DRAW_MODE } from 't3d';
 import { GLTFLoader } from 't3d/addons/loaders/glTF/GLTFLoader.js';
 import { ReferenceParser } from 't3d/addons/loaders/glTF/parsers/ReferenceParser.js';
 import { Validator } from 't3d/addons/loaders/glTF/parsers/Validator.js';
@@ -8,14 +8,14 @@ import { BufferViewParser } from 't3d/addons/loaders/glTF/parsers/BufferViewPars
 import { ImageParser } from 't3d/addons/loaders/glTF/parsers/ImageParser.js';
 import { TextureParser } from 't3d/addons/loaders/glTF/parsers/TextureParser.js';
 import { MaterialParser as MaterialParser$1 } from 't3d/addons/loaders/glTF/parsers/MaterialParser.js';
-import { AccessorParser } from 't3d/addons/loaders/glTF/parsers/AccessorParser.js';
-import { PrimitiveParser as PrimitiveParser$1 } from 't3d/addons/loaders/glTF/parsers/PrimitiveParser.js';
-import { NodeParser } from 't3d/addons/loaders/glTF/parsers/NodeParser.js';
+import { AccessorParser as AccessorParser$1 } from 't3d/addons/loaders/glTF/parsers/AccessorParser.js';
+import { PrimitiveParser as PrimitiveParser$2 } from 't3d/addons/loaders/glTF/parsers/PrimitiveParser.js';
+import { NodeParser as NodeParser$1 } from 't3d/addons/loaders/glTF/parsers/NodeParser.js';
 import { SkinParser } from 't3d/addons/loaders/glTF/parsers/SkinParser.js';
 import { SceneParser } from 't3d/addons/loaders/glTF/parsers/SceneParser.js';
 import { AnimationParser } from 't3d/addons/loaders/glTF/parsers/AnimationParser.js';
 import { GLTFUtils } from 't3d/addons/loaders/glTF/GLTFUtils.js';
-import { ALPHA_MODES, ATTRIBUTES, ACCESSOR_COMPONENT_TYPES, WEBGL_DRAW_MODES } from 't3d/addons/loaders/glTF/Constants.js';
+import { ALPHA_MODES, ATTRIBUTES, ACCESSOR_COMPONENT_TYPES, WEBGL_DRAW_MODES, ACCESSOR_TYPE_SIZES } from 't3d/addons/loaders/glTF/Constants.js';
 import { InstancedPBRMaterial, InstancedBasicMaterial } from 't3d/addons/materials/InstancedMaterial.js';
 import { KHR_materials_pbrSpecularGlossiness } from 't3d/addons/loaders/glTF/extensions/KHR_materials_pbrSpecularGlossiness.js';
 import { KHR_materials_clearcoat } from 't3d/addons/loaders/glTF/extensions/KHR_materials_clearcoat.js';
@@ -3714,9 +3714,9 @@ class B3DMLoader extends GLTFLoader {
 			ImageParser,
 			TextureParser,
 			MaterialParser$1,
-			AccessorParser,
-			PrimitiveParser$1,
-			NodeParser,
+			AccessorParser$1,
+			PrimitiveParser$2,
+			NodeParser$1,
 			SkinParser,
 			SceneParser,
 			AnimationParser,
@@ -3901,7 +3901,7 @@ class MaterialParser {
 
 }
 
-class PrimitiveParser {
+let PrimitiveParser$1 = class PrimitiveParser {
 
 	static parse(context, loader) {
 		const { gltf, accessors, materials, bufferViews } = context;
@@ -3929,7 +3929,7 @@ class PrimitiveParser {
 
 				let geometryPromise;
 
-				const geometryKey = createGeometryKey(gltfPrimitive);
+				const geometryKey = createGeometryKey$1(gltfPrimitive);
 				if (geometryPromiseCache.has(geometryKey)) {
 					geometryPromise = geometryPromiseCache.get(geometryKey);
 				} else {
@@ -3940,7 +3940,7 @@ class PrimitiveParser {
 					}
 
 					geometryPromise = geometryPromise.then(geometry => {
-						parseGeometryFromGLTFPrimitive(geometry, gltfPrimitive, gltf, accessors);
+						parseGeometryFromGLTFPrimitive$1(geometry, gltfPrimitive, gltf, accessors);
 						return geometry;
 					});
 
@@ -3952,6 +3952,938 @@ class PrimitiveParser {
 						mode,
 						geometry,
 						material: material === undefined ? new InstancedPBRMaterial() : materials[material], // @parser-modification - instanced materials
+						weights: (Object.keys(geometry.morphAttributes).length > 0 && gltfMesh.weights) ? gltfMesh.weights.slice(0) : undefined,
+						skinned: gltfMesh.isSkinned
+					};
+					assignFinalMaterial$1(primitive, materialCache);
+					return primitive;
+				});
+
+				primitivePromises.push(primitivePromise);
+			}
+			meshPromises.push(Promise.all(primitivePromises));
+		}
+
+		materialCache.clear();
+		geometryPromiseCache.clear();
+
+		return Promise.all(meshPromises).then(primitives => {
+			context.primitives = primitives;
+		});
+	}
+
+};
+
+function parseGeometryFromGLTFPrimitive$1(geometry, gltfPrimitive, gltf, accessors) {
+	const { attributes, indices, targets } = gltfPrimitive;
+
+	// set attributes
+
+	for (const attributeSemantic in attributes) {
+		const accessorIdx = attributes[attributeSemantic];
+
+		const attributeName = ATTRIBUTES[attributeSemantic] === undefined ? attributeSemantic : ATTRIBUTES[attributeSemantic];
+		// Skip attributes already provided by e.g. Draco extension.
+		if (attributeName in geometry.attributes) continue;
+
+		geometry.addAttribute(attributeName, accessors[accessorIdx]);
+	}
+
+	// set index
+
+	if (indices !== undefined && !geometry.index) {
+		geometry.setIndex(accessors[indices]);
+	}
+
+	// compute bounds
+
+	const { boundingBox, boundingSphere } = geometry;
+	if (attributes.POSITION !== undefined) {
+		const accessorIdx = attributes.POSITION;
+		const accessor = gltf.accessors[accessorIdx];
+
+		if (accessor.min && accessor.max) {
+			boundingBox.min.fromArray(accessor.min);
+			boundingBox.max.fromArray(accessor.max);
+
+			if (accessor.normalized) {
+				const boxScale = GLTFUtils.getNormalizedComponentScale(ACCESSOR_COMPONENT_TYPES[accessor.componentType]);
+				boundingBox.min.multiplyScalar(boxScale);
+				boundingBox.max.multiplyScalar(boxScale);
+			}
+		} else {
+			geometry.computeBoundingBox();
+		}
+	} else {
+		geometry.computeBoundingBox();
+	}
+	boundingBox.getCenter(boundingSphere.center);
+	boundingSphere.radius = boundingBox.min.distanceTo(boundingBox.max) / 2;
+
+	// set morph targets
+
+	if (targets) {
+		let hasMorphPosition = false;
+		let hasMorphNormal = false;
+
+		for (let i = 0, il = targets.length; i < il; i++) {
+			const target = targets[i];
+
+			if (target.POSITION !== undefined) hasMorphPosition = true;
+			if (target.NORMAL !== undefined) hasMorphNormal = true;
+
+			if (hasMorphPosition && hasMorphNormal) break;
+		}
+
+		if (hasMorphPosition || hasMorphNormal) {
+			const morphPositions = [];
+			const morphNormals = [];
+
+			for (let i = 0, il = targets.length; i < il; i++) {
+				const target = targets[i];
+
+				if (hasMorphPosition) {
+					morphPositions.push(target.POSITION !== undefined ? accessors[target.POSITION] : geometry.attributes[ATTRIBUTES.POSITION]);
+				}
+				if (hasMorphNormal) {
+					morphNormals.push(target.NORMAL !== undefined ? accessors[target.NORMAL] : geometry.attributes[ATTRIBUTES.NORMAL]);
+				}
+			}
+
+			if (hasMorphPosition) {
+				geometry.morphAttributes.position = morphPositions;
+			}
+			if (hasMorphNormal) {
+				geometry.morphAttributes.normal = morphNormals;
+			}
+		}
+	}
+
+	return geometry;
+}
+
+function assignFinalMaterial$1(primitive, materialCache) {
+	let { geometry, material, skinned, mode } = primitive;
+
+	// If the material will be modified later on, clone it now.
+	const useVertexTangents = geometry.attributes[ATTRIBUTES.TANGENT] !== undefined;
+	const useVertexColors = geometry.attributes[ATTRIBUTES.COLOR_0] !== undefined;
+	const useFlatShading = geometry.attributes[ATTRIBUTES.NORMAL] === undefined;
+	const useSkinning = skinned;
+
+	if (mode === WEBGL_DRAW_MODES.POINTS) {
+		const cacheKey = 'PointsMaterial:' + material.id;
+		let pointsMaterial = materialCache.get(cacheKey);
+		if (!pointsMaterial) {
+			pointsMaterial = new PointsMaterial();
+			Material.prototype.copy.call(pointsMaterial, material);
+			pointsMaterial.diffuse.copy(material.diffuse);
+			pointsMaterial.diffuseMap = material.map;
+			pointsMaterial.drawMode = mode;
+			pointsMaterial.acceptLight = false; // PointsMaterial doesn't support lights yet
+			materialCache.set(cacheKey, pointsMaterial);
+		}
+		material = pointsMaterial;
+	} else if (mode === WEBGL_DRAW_MODES.LINES || mode === WEBGL_DRAW_MODES.LINE_STRIP || mode === WEBGL_DRAW_MODES.LINE_LOOP) {
+		const cacheKey = 'BasicMaterial:' + material.id;
+		let basicMaterial = materialCache.get(cacheKey);
+		if (!basicMaterial) {
+			basicMaterial = new BasicMaterial();
+			basicMaterial.envMap = undefined; // force close env map
+			basicMaterial.diffuse.copy(material.diffuse);
+			basicMaterial.diffuseMap = material.diffuseMap;
+			basicMaterial.drawMode = mode;
+			materialCache.set(cacheKey, basicMaterial);
+		}
+		material = basicMaterial;
+	} else if (mode === WEBGL_DRAW_MODES.TRIANGLE_STRIP) {
+		// TODO
+		console.warn('TRIANGLE_STRIP will be removed later.');
+		material.drawMode = WEBGL_DRAW_MODES.TRIANGLE_STRIP;
+	} else if (mode === WEBGL_DRAW_MODES.TRIANGLE_FAN) {
+		// TODO
+		console.warn('TRIANGLE_FAN will be removed later.');
+		material.drawMode = WEBGL_DRAW_MODES.TRIANGLE_FAN;
+	}
+
+	if (useVertexTangents || useVertexColors || useFlatShading || useSkinning) {
+		let cacheKey = 'ClonedMaterial:' + material.id + ':';
+
+		if (useVertexTangents) cacheKey += 'vertex-tangents:';
+		if (useVertexColors) {
+			if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 3) {
+				cacheKey += 'vertex-colors-rgb:';
+			} else if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 4) {
+				cacheKey += 'vertex-colors-rgba:';
+			}
+		}
+		if (useFlatShading) cacheKey += 'flat-shading:';
+
+		let cachedMaterial = materialCache.get(cacheKey);
+
+		if (!cachedMaterial) {
+			cachedMaterial = material.clone();
+
+			if (useVertexTangents) {
+				cachedMaterial.vertexTangents = true;
+
+				// revert flip y fix for tangents
+				// https://github.com/mrdoob/three.js/issues/11438#issuecomment-507003995
+				if (cachedMaterial.normalMap) {
+					cachedMaterial.normalScale.y *= -1;
+				}
+			}
+
+			if (useVertexColors) {
+				if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 3) {
+					cachedMaterial.vertexColors = VERTEX_COLOR.RGB;
+				} else if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 4) {
+					cachedMaterial.vertexColors = VERTEX_COLOR.RGBA;
+				} else {
+					console.warn('Illegal vertex color size: ' + geometry.attributes[ATTRIBUTES.COLOR_0].size);
+				}
+			}
+
+			if (useFlatShading) {
+				cachedMaterial.shading = SHADING_TYPE.FLAT_SHADING;
+			}
+		}
+
+		material = cachedMaterial;
+	}
+
+	primitive.material = material;
+}
+
+function createGeometryKey$1(primitive) {
+	const dracoExtension = primitive.extensions && primitive.extensions.KHR_draco_mesh_compression;
+	let geometryKey;
+
+	if (dracoExtension) {
+		geometryKey = 'draco:' + dracoExtension.bufferView
+				+ ':' + dracoExtension.indices
+				+ ':' + createAttributesKey$1(dracoExtension.attributes);
+	} else {
+		geometryKey = primitive.indices + ':' + createAttributesKey$1(primitive.attributes) + ':' + primitive.mode;
+	}
+
+	if (primitive.targets) {
+		for (let i = 0, il = primitive.targets.length; i < il; i++) {
+			geometryKey += ':' + createAttributesKey$1(primitive.targets[i]);
+		}
+	}
+
+	return geometryKey;
+}
+
+function createAttributesKey$1(attributes) {
+	let attributesKey = '';
+
+	const keys = Object.keys(attributes).sort();
+
+	for (let i = 0, il = keys.length; i < il; i++) {
+		attributesKey += keys[i] + ':' + attributes[keys[i]] + ';';
+	}
+
+	return attributesKey;
+}
+
+class I3DMRootParser {
+
+	static parse(context, loader) {
+		const { featureTable, root, options } = context;
+
+		const INSTANCES_LENGTH = featureTable.getData('INSTANCES_LENGTH');
+		const POSITION = featureTable.getData('POSITION', INSTANCES_LENGTH, 'FLOAT', 'VEC3');
+		const NORMAL_UP = featureTable.getData('NORMAL_UP', INSTANCES_LENGTH, 'FLOAT', 'VEC3');
+		const NORMAL_RIGHT = featureTable.getData('NORMAL_RIGHT', INSTANCES_LENGTH, 'FLOAT', 'VEC3');
+		const SCALE = featureTable.getData('SCALE', INSTANCES_LENGTH, 'FLOAT', 'SCALAR');
+		const SCALE_NON_UNIFORM = featureTable.getData('SCALE_NON_UNIFORM', INSTANCES_LENGTH, 'FLOAT', 'VEC3');
+
+		// check unsupported features
+
+		[
+			// Global Properties
+			'QUANTIZED_VOLUME_OFFSET',
+			'QUANTIZED_VOLUME_SCALE',
+			'EAST_NORTH_UP',
+
+			// Per-instance Properties
+			'POSITION_QUANTIZED',
+			'NORMAL_UP_OCT32P',
+			'NORMAL_RIGHT_OCT32P'
+		].forEach(feature => {
+			if (feature in featureTable.header) {
+				console.warn(`I3DMLoader: Unsupported FeatureTable feature "${feature}" detected.`);
+			}
+		});
+
+		// set instance matrix for all geometries
+
+		const averageVector = new Vector3();
+		for (let i = 0; i < INSTANCES_LENGTH; i++) {
+			averageVector.x += POSITION[i * 3 + 0] / INSTANCES_LENGTH;
+			averageVector.y += POSITION[i * 3 + 1] / INSTANCES_LENGTH;
+			averageVector.z += POSITION[i * 3 + 2] / INSTANCES_LENGTH;
+		}
+
+		const instances = [];
+
+		root.traverse(child => {
+			if (child.isMesh) {
+				const { geometry } = child;
+				geometry.instanceCount = INSTANCES_LENGTH;
+
+				const instanceMatrix = new Attribute(new Buffer(new Float32Array(INSTANCES_LENGTH * 16), 16), 16);
+				instanceMatrix.divisor = 1;
+				geometry.addAttribute('instanceMatrix', instanceMatrix);
+
+				// Center the instance around an average point to avoid jitter at large scales.
+				// Transform the average vector by matrix world so we can account for any existing
+				// transforms of the instanced mesh.
+				child.updateMatrix(true);
+				child.position.copy(averageVector).applyMatrix4(child.worldMatrix);
+
+				instances.push(child);
+			}
+		});
+
+		for (let i = 0; i < INSTANCES_LENGTH; i++) {
+			// position
+			tempPos.fromArray(POSITION, i * 3).sub(averageVector);
+
+			// rotation
+			if (NORMAL_UP) {
+				tempUp.fromArray(NORMAL_UP, i * 3);
+				tempRight.fromArray(NORMAL_RIGHT, i * 3);
+				tempFwd.crossVectors(tempRight, tempUp).normalize();
+
+				tempMat$1.set(
+					tempRight.x, tempUp.x, tempFwd.x, 0,
+					tempRight.y, tempUp.y, tempFwd.y, 0,
+					tempRight.z, tempUp.z, tempFwd.z, 0,
+					0, 0, 0, 1
+				);
+
+				tempQuat.setFromRotationMatrix(tempMat$1);
+			} else {
+				tempQuat.set(0, 0, 0, 1);
+			}
+
+			// scale
+			if (SCALE) {
+				tempSca.set(SCALE[i], SCALE[i], SCALE[i]);
+			} else if (SCALE_NON_UNIFORM) {
+				tempSca.fromArray(SCALE_NON_UNIFORM, i * 3);
+			} else {
+				tempSca.set(1, 1, 1);
+			}
+
+			// TODO instance matrix should be applied to model root
+			tempMat$1.transform(tempPos, tempSca, tempQuat).multiply(options.adjustmentTransform);
+
+			for (let j = 0, l = instances.length; j < l; j++) {
+				const { geometry } = instances[j];
+				const instanceArray = geometry.getAttribute('instanceMatrix').buffer.array;
+				tempMat$1.toArray(instanceArray, i * 16);
+				geometry.version++;
+			}
+		}
+
+		// fix rtc center
+
+		const rtcCenter = featureTable.getData('RTC_CENTER');
+		if (rtcCenter) {
+			root.position.x += rtcCenter[0];
+			root.position.y += rtcCenter[1];
+			root.position.z += rtcCenter[2];
+		}
+	}
+
+}
+
+const tempFwd = new Vector3();
+const tempUp = new Vector3();
+const tempRight = new Vector3();
+const tempPos = new Vector3();
+const tempQuat = new Quaternion();
+const tempSca = new Vector3();
+const tempMat$1 = new Matrix4();
+
+class KHR_techniques_webgl_i extends KHR_techniques_webgl {
+
+	static getMaterial() {
+		return new InstancedPBRMaterial();
+	}
+
+}
+
+class KHR_materials_unlit_i {
+
+	static getMaterial() {
+		return new InstancedBasicMaterial();
+	}
+
+}
+
+class KHR_materials_pbrSpecularGlossiness_i extends KHR_materials_pbrSpecularGlossiness {
+
+	static getMaterial() {
+		const material = new InstancedPBRMaterial(); // fallback to InstancedPBRMaterial
+		material.specular = new Color3(0x111111);
+		return material;
+	}
+
+}
+
+class KHR_materials_clearcoat_i extends KHR_materials_clearcoat {
+
+	static getMaterial() {
+		return new InstancedPBRMaterial();
+	}
+
+}
+
+/**
+ * I3DMLoader is a loader for the I3DM format.
+ */
+class I3DMLoader extends GLTFLoader {
+
+	constructor(manager) {
+		super(manager, [
+			HeaderParser, // insert HeaderParser
+			TableParser, // insert TableParser
+			I3DMParser, // insert I3DMParser
+			ReferenceParser,
+			Validator,
+			BufferParser,
+			BufferViewParser,
+			ImageParser,
+			TextureParser,
+			MaterialParser, // replace MaterialParser
+			AccessorParser$1,
+			PrimitiveParser$1, // replace PrimitiveParser
+			NodeParser$1,
+			SkinParser,
+			SceneParser,
+			AnimationParser,
+			I3DMRootParser // insert I3DMSetupParser
+		]);
+
+		this.extensions.set('KHR_techniques_webgl', KHR_techniques_webgl_i);
+
+		this.extensions.set('KHR_materials_unlit', KHR_materials_unlit_i);
+		this.extensions.set('KHR_materials_pbrSpecularGlossiness', KHR_materials_pbrSpecularGlossiness_i);
+		this.extensions.set('KHR_materials_clearcoat', KHR_materials_clearcoat_i);
+
+		this.autoParseConfig.materials.push('KHR_techniques_webgl');
+	}
+
+}
+
+class PNTSRootParser {
+
+	static parse(context, loader) {
+		const { featureTable } = context;
+
+		const POINTS_LENGTH = featureTable.getData('POINTS_LENGTH');
+		const POSITION = featureTable.getData('POSITION', POINTS_LENGTH, 'FLOAT', 'VEC3');
+		const RGB = featureTable.getData('RGB', POINTS_LENGTH, 'UNSIGNED_BYTE', 'VEC3');
+		const RGBA = featureTable.getData('RGBA', POINTS_LENGTH, 'UNSIGNED_BYTE', 'VEC4');
+
+		// check unsupported features
+
+		[
+			// Global Properties
+			'QUANTIZED_VOLUME_OFFSET',
+			'QUANTIZED_VOLUME_SCALE',
+			'CONSTANT_RGBA',
+			'BATCH_LENGTH',
+
+			// Per-point Properties
+			'POSITION_QUANTIZED',
+			'RGB565',
+			'NORMAL',
+			'NORMAL_OCT16P',
+			'BATCH_ID'
+		].forEach(feature => {
+			if (feature in featureTable.header) {
+				console.warn(`PNTSLoader: Unsupported FeatureTable feature "${feature}" detected.`);
+			}
+		});
+
+		// generate root
+
+		const geometry = new Geometry();
+		geometry.addAttribute('a_Position', new Attribute(new Buffer(POSITION, 3), 3, 0, true));
+		geometry.computeBoundingBox();
+		geometry.computeBoundingSphere();
+
+		const material = new PointsMaterial();
+		material.size = 2;
+		material.sizeAttenuation = false;
+
+		if (RGB !== null) {
+			geometry.addAttribute('a_Color', new Attribute(new Buffer(RGB, 3), 3, 0, true));
+			material.vertexColors = VERTEX_COLOR.RGB;
+		} else if (RGBA !== null) {
+			geometry.addAttribute('a_Color', new Attribute(new Buffer(RGBA, 4), 4, 0, true));
+			material.vertexColors = VERTEX_COLOR.RGBA;
+		}
+
+		const root = new Mesh(geometry, material);
+
+		// output mesh to root
+
+		context.root = root;
+
+		// fix rtc center
+
+		const rtcCenter = featureTable.getData('RTC_CENTER');
+		if (rtcCenter) {
+			root.position.x += rtcCenter[0];
+			root.position.y += rtcCenter[1];
+			root.position.z += rtcCenter[2];
+		}
+	}
+
+}
+
+/**
+ * PNTSLoader is a loader for the PNTS format.
+ */
+class PNTSLoader extends GLTFLoader {
+
+	constructor(manager) {
+		super(manager, [
+			HeaderParser,
+			TableParser,
+			PNTSRootParser
+		]);
+	}
+
+}
+
+class CMPTParser {
+
+	static parse(context, loader) {
+		const buffer = context.options.buffer;
+		const tilesLength = context.header.tilesLength;
+
+		const tiles = [];
+		let offset = 16;
+
+		for (let i = 0; i < tilesLength; i++) {
+			const tileView = new DataView(buffer, offset, 12);
+
+			const tileMagic =
+				String.fromCharCode(tileView.getUint8(0)) +
+				String.fromCharCode(tileView.getUint8(1)) +
+				String.fromCharCode(tileView.getUint8(2)) +
+				String.fromCharCode(tileView.getUint8(3));
+
+			const tileVersion = tileView.getUint32(4, true);
+
+			const byteLength = tileView.getUint32(8, true);
+
+			const tileBuffer = new Uint8Array(buffer, offset, byteLength);
+
+			tiles.push({
+				type: tileMagic,
+				buffer: tileBuffer,
+				version: tileVersion
+			});
+
+			offset += byteLength;
+		}
+
+		context.tiles = tiles;
+	}
+
+}
+
+class CMPTRootParser {
+
+	static parse(context, loader) {
+		const { tiles, options, path } = context;
+
+		const adjustmentTransform = options.adjustmentTransform;
+
+		const promises = [];
+
+		for (const i in tiles) {
+			const { type, buffer } = tiles[i];
+
+			const config = {
+				fetchOptions: options.fetchOptions,
+				path,
+				buffer: buffer.slice().buffer
+			};
+			if (type === 'b3dm' || type === 'i3dm') {
+				config.adjustmentTransform = adjustmentTransform;
+			}
+
+			const _loader = loader._loaders.get(type);
+			if (_loader) {
+				promises.push(_loader.load(`${path}/temp.${type}`, config));
+			}
+		}
+
+		return Promise.all(promises).then(results => {
+			const group = new Object3D();
+
+			results.forEach(result => {
+				group.add(result.root);
+			});
+
+			return {
+				tiles: results,
+				root: group
+			};
+		});
+	}
+
+}
+
+/**
+ * CMPTLoader is a loader for the CMPT format.
+ */
+class CMPTLoader extends GLTFLoader {
+
+	constructor(manager) {
+		super(manager, [
+			HeaderParser,
+			CMPTParser,
+			CMPTRootParser
+		]);
+
+		const b3dmLoader = new B3DMLoader(manager);
+		const i3dmLoader = new I3DMLoader(manager);
+		const pntsLoader = new PNTSLoader(manager);
+
+		this._loaders = new Map([
+			['b3dm', b3dmLoader],
+			['i3dm', i3dmLoader],
+			['pnts', pntsLoader]
+		]);
+	}
+
+	setDRACOLoader(dracoLoader) {
+		for (const loader of this._loaders.values()) {
+			loader.setDRACOLoader(dracoLoader);
+		}
+		return super.setDRACOLoader(dracoLoader);
+	}
+
+	setKTX2Loader(ktx2Loader) {
+		for (const loader of this._loaders.values()) {
+			loader.setKTX2Loader(ktx2Loader);
+		}
+		return super.setKTX2Loader(ktx2Loader);
+	}
+
+}
+
+class KHR_gaussian_splatting_compression_spz {
+
+	static getGeometry(bufferView, spzLoader) {
+		return new Promise(function(resolve, reject) {
+			const bufferViewTypedArray = new Uint8Array(bufferView);
+			spzLoader(bufferViewTypedArray, {
+				unpackOptions: { coordinateSystem: 'LDB' }
+			}).then(gcloud => {
+				const splatBuffer = KHR_gaussian_splatting_compression_spz.convertInternalDataToSplat(gcloud.numPoints, gcloud.positions, gcloud.rotations, gcloud.scales, gcloud.alphas, gcloud.colors);
+				splatBuffer._isSplatBuffer = true;
+				resolve(splatBuffer);
+			}).catch(error => {
+				reject(new Error('Failed to load SPZ: ' + error.message));
+			});
+		});
+	}
+
+	static convertInternalDataToSplat(vertexCount, positions, rotations, scales, alphas, colors) {
+		const rotationsOut = new Float32Array(vertexCount * 4);
+		const positionOut = new Float32Array(vertexCount * 3);
+		for (let i = 0; i < vertexCount; i++) {
+			const off = i * 4;
+			const x = rotations[off + 0];
+			const y = rotations[off + 1];
+			const z = rotations[off + 2];
+			const w = rotations[off + 3];
+
+			rotationsOut[off + 0] = w;
+			rotationsOut[off + 1] = x;
+			rotationsOut[off + 2] = y;
+			rotationsOut[off + 3] = z;
+			const posOff = i * 3;
+			positionOut[posOff + 0] = -positions[posOff + 0];
+			positionOut[posOff + 1] = -positions[posOff + 1];
+			positionOut[posOff + 2] = positions[posOff + 2];
+		}
+
+		const colorsOut = new Uint8Array(vertexCount * 4);
+		for (let i = 0; i < vertexCount; i++) {
+			colorsOut[i * 4 + 0] = MathUtils.clamp(colors[i * 3 + 0] * 255, 0, 255);
+			colorsOut[i * 4 + 1] = MathUtils.clamp(colors[i * 3 + 1] * 255, 0, 255);
+			colorsOut[i * 4 + 2] = MathUtils.clamp(colors[i * 3 + 2] * 255, 0, 255);
+			colorsOut[i * 4 + 3] = MathUtils.clamp(alphas[i] * 255, 0, 255);
+		}
+
+		return {
+			vertexCount,
+			positions: positionOut,
+			rotations: rotationsOut,
+			scales,
+			colors: colorsOut
+		};
+	}
+
+}
+
+/**
+ * KHR_gaussian_splatting extension
+ * https://github.com/CesiumGS/glTF/blob/draft-splat-spz/extensions/2.0/Khronos/KHR_gaussian_splatting
+ */
+class KHR_gaussian_splatting {
+
+	static getGeometry(isCompressed, extensions, bufferViews, spzLoader) {
+		if (isCompressed) {
+			const bufferViewIndex = extensions.bufferView;
+			const bufferView = bufferViews[bufferViewIndex];
+			return KHR_gaussian_splatting_compression_spz.getGeometry(bufferView, spzLoader);
+		}
+	}
+
+}
+
+class NodeParser {
+
+	static parse(context, loader) {
+		const {
+			gltf: { nodes: gltfNodes, cameras: gltfCameras, extensions: gltfExtensions }
+		} = context;
+
+		if (!gltfNodes) return;
+
+		const lightsExt = loader.extensions.get('KHR_lights_punctual');
+		const instancingExt = loader.extensions.get('EXT_mesh_gpu_instancing');
+		const spzExt = loader.extensions.get('KHR_gaussian_splatting'); // @parser-modification support spz
+
+		const cameras = [];
+		const lights = [];
+		const nodes = gltfNodes.map(gltfNode => {
+			const {
+				matrix, translation, rotation, scale,
+				camera: cameraID, mesh: meshID,
+				extensions = {}
+			} = gltfNode;
+			const { KHR_lights_punctual, EXT_mesh_gpu_instancing } = extensions;
+
+			let node = null;
+
+			if (gltfNode.isBone) {
+				// .isBone isn't in glTF spec. Marked in IndexParser
+				node = new Bone();
+			} else if (meshID !== undefined) {
+				if (EXT_mesh_gpu_instancing && instancingExt) {
+					node = instancingExt.getInstancedMesh(context, gltfNode);
+				} else if (spzExt) { // @parser-modification support spz
+					node = createSplatMesh(context, gltfNode, loader);
+				} else {
+					node = createMesh(context, gltfNode);
+				}
+			} else if (cameraID !== undefined) {
+				node = createCamera(gltfCameras[cameraID]);
+				cameras.push(node);
+			} else if (KHR_lights_punctual && lightsExt) {
+				const lightIndex = KHR_lights_punctual.light;
+				const gltfLights = gltfExtensions.KHR_lights_punctual.lights;
+				node = lightsExt.getLight(gltfLights[lightIndex]);
+				lights.push(node);
+			} else {
+				node = new Object3D();
+			}
+
+			node.name = gltfNode.name || '';
+			if (!!node.name && node.children.length > 0) {
+				for (let i = 0; i < node.children.length; i++) {
+					node.children[i].name = node.name + '_' + i;
+				}
+			}
+
+			if (matrix !== undefined) {
+				node.matrix.fromArray(matrix);
+				node.matrix.decompose(node.position, node.quaternion, node.scale);
+			} else {
+				if (translation !== undefined) {
+					node.position.fromArray(translation);
+				}
+
+				if (rotation !== undefined) {
+					node.quaternion.fromArray(rotation);
+				}
+
+				if (scale !== undefined) {
+					node.scale.fromArray(scale);
+				}
+			}
+
+			return node;
+		});
+
+		context.nodes = nodes;
+		context.cameras = cameras;
+		context.lights = lights;
+	}
+
+}
+
+function createCamera(cameraDef) {
+	const { orthographic, perspective, type } = cameraDef;
+
+	const camera = new Camera();
+
+	if (type == 'perspective') {
+		const { aspectRatio, yfov, zfar, znear } = perspective;
+		camera.setPerspective(yfov, aspectRatio || 1, znear || 1, zfar || 2e6);
+	} else if (type == 'orthographic') {
+		const { xmag, ymag, zfar, znear } = orthographic;
+		// https:// github.com/KhronosGroup/glTF/issues/1663
+		camera.setOrtho(-xmag, xmag, -ymag, ymag, znear || 1, zfar || 2e6);
+	}
+
+	return camera;
+}
+
+function createMesh(context, gltfNode) {
+	const { primitives } = context;
+
+	const { mesh: meshID, skin: skinID } = gltfNode;
+
+	const meshes = primitives[meshID].map(primitive => {
+		const { geometry, material, weights } = primitive;
+
+		let mesh;
+
+		if (skinID !== undefined) {
+			mesh = new SkinnedMesh(geometry, material);
+
+			if (geometry.attributes.skinWeight && !geometry.attributes.skinWeight.normalized) {
+				GLTFUtils.normalizeSkinWeights(geometry.attributes.skinWeight);
+			}
+		} else {
+			mesh = new Mesh(geometry, material);
+
+			if (weights) {
+				mesh.morphTargetInfluences = weights.slice();
+			}
+		}
+
+		return mesh;
+	});
+
+	if (meshes.length > 1) {
+		const parent = new Object3D();
+		meshes.forEach(mesh => parent.add(mesh));
+		return parent;
+	} else {
+		return meshes[0];
+	}
+}
+
+// @parser-modification support spz
+function createSplatMesh(context, gltfNode, loader) {
+	const { primitives } = context;
+
+	const { mesh: meshID } = gltfNode;
+
+	const meshes = primitives[meshID].map(primitive => {
+		const GaussianSplattingMeshClass = loader.getGaussianSplattingMeshClass();
+		const mesh = new GaussianSplattingMeshClass(primitive.splatBuffer, true);
+		return mesh;
+	});
+
+	if (meshes.length > 1) {
+		const parent = new Object3D();
+		meshes.forEach(mesh => parent.add(mesh));
+		return parent;
+	} else {
+		return meshes[0];
+	}
+}
+
+class PrimitiveParser {
+
+	static parse(context, loader) {
+		const { gltf, accessors, materials, bufferViews } = context;
+
+		if (!gltf.meshes) return;
+
+		const dracoExt = loader.extensions.get('KHR_draco_mesh_compression');
+		const spzExt = loader.extensions.get('KHR_gaussian_splatting'); // @parser-modification support spz
+
+		const materialCache = new Map();
+		const geometryPromiseCache = new Map();
+
+		const meshPromises = [];
+		for (let i = 0; i < gltf.meshes.length; i++) {
+			const gltfMesh = gltf.meshes[i];
+
+			const primitivePromises = [];
+			for (let j = 0; j < gltfMesh.primitives.length; j++) {
+				const gltfPrimitive = gltfMesh.primitives[j];
+				const {
+					extensions = {},
+					mode,
+					material
+				} = gltfPrimitive;
+				 // @parser-modification support spz
+				const { KHR_draco_mesh_compression, KHR_spz_gaussian_splats_compression, KHR_gaussian_splatting } = extensions;
+
+				let extensionsSPZ = null;
+				if (KHR_gaussian_splatting !== undefined) {
+					extensionsSPZ = KHR_gaussian_splatting.extensions.KHR_gaussian_splatting_compression_spz_2;
+				} else {
+					extensionsSPZ = KHR_spz_gaussian_splats_compression;
+				}
+				let geometryPromise;
+
+				const geometryKey = createGeometryKey(gltfPrimitive);
+				if (geometryPromiseCache.has(geometryKey)) {
+					geometryPromise = geometryPromiseCache.get(geometryKey);
+				} else {
+					if (KHR_draco_mesh_compression && dracoExt) {
+						geometryPromise = dracoExt.getGeometry(KHR_draco_mesh_compression, bufferViews, gltfPrimitive.attributes, gltf.accessors, loader.getDRACOLoader());
+					} else if (extensionsSPZ && spzExt) { // @parser-modification support spz
+						geometryPromise = spzExt.getGeometry(true, extensionsSPZ, bufferViews, loader.getSPZLoader());
+					} else {
+						geometryPromise = Promise.resolve(new Geometry());
+					}
+					if (extensionsSPZ && spzExt) {
+						 // @parser-modification support spz
+						geometryPromise = geometryPromise.then(splatBuffer => {
+							return splatBuffer;
+						});
+					} else {
+						geometryPromise = geometryPromise.then(geometry => {
+							parseGeometryFromGLTFPrimitive(geometry, gltfPrimitive, gltf, accessors);
+							return geometry;
+						});
+					}
+					geometryPromiseCache.set(geometryKey, geometryPromise);
+				}
+
+				const primitivePromise = geometryPromise.then(geometry => {
+					if (geometry._isSplatBuffer) {
+						const primitive = {
+							splatBuffer: geometry
+						};
+						return primitive;
+					}
+					const primitive = {
+						mode,
+						geometry,
+						material: material === undefined ? new PBRMaterial() : materials[material],
 						weights: (Object.keys(geometry.morphAttributes).length > 0 && gltfMesh.weights) ? gltfMesh.weights.slice(0) : undefined,
 						skinned: gltfMesh.isSkinned
 					};
@@ -4188,402 +5120,6 @@ function createAttributesKey(attributes) {
 	return attributesKey;
 }
 
-class I3DMRootParser {
-
-	static parse(context, loader) {
-		const { featureTable, root, options } = context;
-
-		const INSTANCES_LENGTH = featureTable.getData('INSTANCES_LENGTH');
-		const POSITION = featureTable.getData('POSITION', INSTANCES_LENGTH, 'FLOAT', 'VEC3');
-		const NORMAL_UP = featureTable.getData('NORMAL_UP', INSTANCES_LENGTH, 'FLOAT', 'VEC3');
-		const NORMAL_RIGHT = featureTable.getData('NORMAL_RIGHT', INSTANCES_LENGTH, 'FLOAT', 'VEC3');
-		const SCALE = featureTable.getData('SCALE', INSTANCES_LENGTH, 'FLOAT', 'SCALAR');
-		const SCALE_NON_UNIFORM = featureTable.getData('SCALE_NON_UNIFORM', INSTANCES_LENGTH, 'FLOAT', 'VEC3');
-
-		// check unsupported features
-
-		[
-			// Global Properties
-			'QUANTIZED_VOLUME_OFFSET',
-			'QUANTIZED_VOLUME_SCALE',
-			'EAST_NORTH_UP',
-
-			// Per-instance Properties
-			'POSITION_QUANTIZED',
-			'NORMAL_UP_OCT32P',
-			'NORMAL_RIGHT_OCT32P'
-		].forEach(feature => {
-			if (feature in featureTable.header) {
-				console.warn(`I3DMLoader: Unsupported FeatureTable feature "${feature}" detected.`);
-			}
-		});
-
-		// set instance matrix for all geometries
-
-		const averageVector = new Vector3();
-		for (let i = 0; i < INSTANCES_LENGTH; i++) {
-			averageVector.x += POSITION[i * 3 + 0] / INSTANCES_LENGTH;
-			averageVector.y += POSITION[i * 3 + 1] / INSTANCES_LENGTH;
-			averageVector.z += POSITION[i * 3 + 2] / INSTANCES_LENGTH;
-		}
-
-		const instances = [];
-
-		root.traverse(child => {
-			if (child.isMesh) {
-				const { geometry } = child;
-				geometry.instanceCount = INSTANCES_LENGTH;
-
-				const instanceMatrix = new Attribute(new Buffer(new Float32Array(INSTANCES_LENGTH * 16), 16), 16);
-				instanceMatrix.divisor = 1;
-				geometry.addAttribute('instanceMatrix', instanceMatrix);
-
-				// Center the instance around an average point to avoid jitter at large scales.
-				// Transform the average vector by matrix world so we can account for any existing
-				// transforms of the instanced mesh.
-				child.updateMatrix(true);
-				child.position.copy(averageVector).applyMatrix4(child.worldMatrix);
-
-				instances.push(child);
-			}
-		});
-
-		for (let i = 0; i < INSTANCES_LENGTH; i++) {
-			// position
-			tempPos.fromArray(POSITION, i * 3).sub(averageVector);
-
-			// rotation
-			if (NORMAL_UP) {
-				tempUp.fromArray(NORMAL_UP, i * 3);
-				tempRight.fromArray(NORMAL_RIGHT, i * 3);
-				tempFwd.crossVectors(tempRight, tempUp).normalize();
-
-				tempMat$1.set(
-					tempRight.x, tempUp.x, tempFwd.x, 0,
-					tempRight.y, tempUp.y, tempFwd.y, 0,
-					tempRight.z, tempUp.z, tempFwd.z, 0,
-					0, 0, 0, 1
-				);
-
-				tempQuat.setFromRotationMatrix(tempMat$1);
-			} else {
-				tempQuat.set(0, 0, 0, 1);
-			}
-
-			// scale
-			if (SCALE) {
-				tempSca.set(SCALE[i], SCALE[i], SCALE[i]);
-			} else if (SCALE_NON_UNIFORM) {
-				tempSca.fromArray(SCALE_NON_UNIFORM, i * 3);
-			} else {
-				tempSca.set(1, 1, 1);
-			}
-
-			// TODO instance matrix should be applied to model root
-			tempMat$1.transform(tempPos, tempSca, tempQuat).multiply(options.adjustmentTransform);
-
-			for (let j = 0, l = instances.length; j < l; j++) {
-				const { geometry } = instances[j];
-				const instanceArray = geometry.getAttribute('instanceMatrix').buffer.array;
-				tempMat$1.toArray(instanceArray, i * 16);
-				geometry.version++;
-			}
-		}
-
-		// fix rtc center
-
-		const rtcCenter = featureTable.getData('RTC_CENTER');
-		if (rtcCenter) {
-			root.position.x += rtcCenter[0];
-			root.position.y += rtcCenter[1];
-			root.position.z += rtcCenter[2];
-		}
-	}
-
-}
-
-const tempFwd = new Vector3();
-const tempUp = new Vector3();
-const tempRight = new Vector3();
-const tempPos = new Vector3();
-const tempQuat = new Quaternion();
-const tempSca = new Vector3();
-const tempMat$1 = new Matrix4();
-
-class KHR_techniques_webgl_i extends KHR_techniques_webgl {
-
-	static getMaterial() {
-		return new InstancedPBRMaterial();
-	}
-
-}
-
-class KHR_materials_unlit_i {
-
-	static getMaterial() {
-		return new InstancedBasicMaterial();
-	}
-
-}
-
-class KHR_materials_pbrSpecularGlossiness_i extends KHR_materials_pbrSpecularGlossiness {
-
-	static getMaterial() {
-		const material = new InstancedPBRMaterial(); // fallback to InstancedPBRMaterial
-		material.specular = new Color3(0x111111);
-		return material;
-	}
-
-}
-
-class KHR_materials_clearcoat_i extends KHR_materials_clearcoat {
-
-	static getMaterial() {
-		return new InstancedPBRMaterial();
-	}
-
-}
-
-/**
- * I3DMLoader is a loader for the I3DM format.
- */
-class I3DMLoader extends GLTFLoader {
-
-	constructor(manager) {
-		super(manager, [
-			HeaderParser, // insert HeaderParser
-			TableParser, // insert TableParser
-			I3DMParser, // insert I3DMParser
-			ReferenceParser,
-			Validator,
-			BufferParser,
-			BufferViewParser,
-			ImageParser,
-			TextureParser,
-			MaterialParser, // replace MaterialParser
-			AccessorParser,
-			PrimitiveParser, // replace PrimitiveParser
-			NodeParser,
-			SkinParser,
-			SceneParser,
-			AnimationParser,
-			I3DMRootParser // insert I3DMSetupParser
-		]);
-
-		this.extensions.set('KHR_techniques_webgl', KHR_techniques_webgl_i);
-
-		this.extensions.set('KHR_materials_unlit', KHR_materials_unlit_i);
-		this.extensions.set('KHR_materials_pbrSpecularGlossiness', KHR_materials_pbrSpecularGlossiness_i);
-		this.extensions.set('KHR_materials_clearcoat', KHR_materials_clearcoat_i);
-
-		this.autoParseConfig.materials.push('KHR_techniques_webgl');
-	}
-
-}
-
-class PNTSRootParser {
-
-	static parse(context, loader) {
-		const { featureTable } = context;
-
-		const POINTS_LENGTH = featureTable.getData('POINTS_LENGTH');
-		const POSITION = featureTable.getData('POSITION', POINTS_LENGTH, 'FLOAT', 'VEC3');
-		const RGB = featureTable.getData('RGB', POINTS_LENGTH, 'UNSIGNED_BYTE', 'VEC3');
-		const RGBA = featureTable.getData('RGBA', POINTS_LENGTH, 'UNSIGNED_BYTE', 'VEC4');
-
-		// check unsupported features
-
-		[
-			// Global Properties
-			'QUANTIZED_VOLUME_OFFSET',
-			'QUANTIZED_VOLUME_SCALE',
-			'CONSTANT_RGBA',
-			'BATCH_LENGTH',
-
-			// Per-point Properties
-			'POSITION_QUANTIZED',
-			'RGB565',
-			'NORMAL',
-			'NORMAL_OCT16P',
-			'BATCH_ID'
-		].forEach(feature => {
-			if (feature in featureTable.header) {
-				console.warn(`PNTSLoader: Unsupported FeatureTable feature "${feature}" detected.`);
-			}
-		});
-
-		// generate root
-
-		const geometry = new Geometry();
-		geometry.addAttribute('a_Position', new Attribute(new Buffer(POSITION, 3), 3, 0, true));
-		geometry.computeBoundingBox();
-		geometry.computeBoundingSphere();
-
-		const material = new PointsMaterial();
-		material.size = 2;
-		material.sizeAttenuation = false;
-
-		if (RGB !== null) {
-			geometry.addAttribute('a_Color', new Attribute(new Buffer(RGB, 3), 3, 0, true));
-			material.vertexColors = VERTEX_COLOR.RGB;
-		} else if (RGBA !== null) {
-			geometry.addAttribute('a_Color', new Attribute(new Buffer(RGBA, 4), 4, 0, true));
-			material.vertexColors = VERTEX_COLOR.RGBA;
-		}
-
-		const root = new Mesh(geometry, material);
-
-		// output mesh to root
-
-		context.root = root;
-
-		// fix rtc center
-
-		const rtcCenter = featureTable.getData('RTC_CENTER');
-		if (rtcCenter) {
-			root.position.x += rtcCenter[0];
-			root.position.y += rtcCenter[1];
-			root.position.z += rtcCenter[2];
-		}
-	}
-
-}
-
-/**
- * PNTSLoader is a loader for the PNTS format.
- */
-class PNTSLoader extends GLTFLoader {
-
-	constructor(manager) {
-		super(manager, [
-			HeaderParser,
-			TableParser,
-			PNTSRootParser
-		]);
-	}
-
-}
-
-class CMPTParser {
-
-	static parse(context, loader) {
-		const buffer = context.options.buffer;
-		const tilesLength = context.header.tilesLength;
-
-		const tiles = [];
-		let offset = 16;
-
-		for (let i = 0; i < tilesLength; i++) {
-			const tileView = new DataView(buffer, offset, 12);
-
-			const tileMagic =
-				String.fromCharCode(tileView.getUint8(0)) +
-				String.fromCharCode(tileView.getUint8(1)) +
-				String.fromCharCode(tileView.getUint8(2)) +
-				String.fromCharCode(tileView.getUint8(3));
-
-			const tileVersion = tileView.getUint32(4, true);
-
-			const byteLength = tileView.getUint32(8, true);
-
-			const tileBuffer = new Uint8Array(buffer, offset, byteLength);
-
-			tiles.push({
-				type: tileMagic,
-				buffer: tileBuffer,
-				version: tileVersion
-			});
-
-			offset += byteLength;
-		}
-
-		context.tiles = tiles;
-	}
-
-}
-
-class CMPTRootParser {
-
-	static parse(context, loader) {
-		const { tiles, options, path } = context;
-
-		const adjustmentTransform = options.adjustmentTransform;
-
-		const promises = [];
-
-		for (const i in tiles) {
-			const { type, buffer } = tiles[i];
-
-			const config = {
-				fetchOptions: options.fetchOptions,
-				path,
-				buffer: buffer.slice().buffer
-			};
-			if (type === 'b3dm' || type === 'i3dm') {
-				config.adjustmentTransform = adjustmentTransform;
-			}
-
-			const _loader = loader._loaders.get(type);
-			if (_loader) {
-				promises.push(_loader.load(`${path}/temp.${type}`, config));
-			}
-		}
-
-		return Promise.all(promises).then(results => {
-			const group = new Object3D();
-
-			results.forEach(result => {
-				group.add(result.root);
-			});
-
-			return {
-				tiles: results,
-				root: group
-			};
-		});
-	}
-
-}
-
-/**
- * CMPTLoader is a loader for the CMPT format.
- */
-class CMPTLoader extends GLTFLoader {
-
-	constructor(manager) {
-		super(manager, [
-			HeaderParser,
-			CMPTParser,
-			CMPTRootParser
-		]);
-
-		const b3dmLoader = new B3DMLoader(manager);
-		const i3dmLoader = new I3DMLoader(manager);
-		const pntsLoader = new PNTSLoader(manager);
-
-		this._loaders = new Map([
-			['b3dm', b3dmLoader],
-			['i3dm', i3dmLoader],
-			['pnts', pntsLoader]
-		]);
-	}
-
-	setDRACOLoader(dracoLoader) {
-		for (const loader of this._loaders.values()) {
-			loader.setDRACOLoader(dracoLoader);
-		}
-		return super.setDRACOLoader(dracoLoader);
-	}
-
-	setKTX2Loader(ktx2Loader) {
-		for (const loader of this._loaders.values()) {
-			loader.setKTX2Loader(ktx2Loader);
-		}
-		return super.setKTX2Loader(ktx2Loader);
-	}
-
-}
-
 class IndexParser {
 
 	static parse(context, loader) {
@@ -4607,6 +5143,104 @@ const isGLB = url => {
 	return getUrlExtension(url) === 'glb';
 };
 
+class AccessorParser {
+
+	static parse(context) {
+		const { bufferViews, gltf } = context;
+
+		if (!gltf.accessors) return;
+
+		const interleavedBufferCache = new Map();
+
+		const accessors = gltf.accessors.map(accessor => {
+			const { bufferView: bufferViewIndex, type, componentType, count, byteOffset = 0, normalized = false, sparse } = accessor;
+
+			// @parser-modification support spz
+			if ((bufferViewIndex === undefined || bufferViewIndex === null) && sparse === undefined) {
+				// Ignore empty accessors, which may be used to declare runtime
+				// information about attributes coming from another source (e.g. Draco compression extension).
+				return null;
+			}
+
+			// Get buffer view infos
+			const bufferView = bufferViewIndex !== undefined ? bufferViews[bufferViewIndex] : null;
+			const byteStride = bufferViewIndex !== undefined ? gltf.bufferViews[bufferViewIndex].byteStride : undefined;
+
+			// Get accessor infos
+			const itemSize = ACCESSOR_TYPE_SIZES[type];
+			const TypedArray = ACCESSOR_COMPONENT_TYPES[componentType];
+			const elementBytes = TypedArray.BYTES_PER_ELEMENT;
+			const itemBytes = elementBytes * itemSize; // For VEC3: itemSize is 3, elementBytes is 4, itemBytes is 12.
+
+			let array, attribute;
+
+			if (byteStride && byteStride !== itemBytes) { // The buffer is interleaved
+				// Each "slice" of the buffer, as defined by 'count' elements of 'byteStride' bytes, gets its own InterleavedBuffer
+				// This makes sure that IBA.count reflects accessor.count properly
+				const ibSlice = Math.floor(byteOffset / byteStride);
+				const ibCacheKey = 'Buffer:' + bufferViewIndex + ':' + componentType + ':' + ibSlice + ':' + count;
+				let ib = interleavedBufferCache.get(ibCacheKey);
+
+				if (!ib) {
+					// Use the full buffer if it's interleaved.
+					array = new TypedArray(bufferView, ibSlice * byteStride, count * byteStride / elementBytes);
+
+					// Integer parameters to IB/IBA are in array elements, not bytes.
+					ib = new Buffer(array, byteStride / elementBytes);
+
+					interleavedBufferCache.set(ibCacheKey, ib);
+				}
+
+				attribute = new Attribute(ib, itemSize, (byteOffset % byteStride) / elementBytes, normalized);
+			} else {
+				if (bufferView === null) {
+					array = new TypedArray(count * itemSize);
+				} else {
+					array = new TypedArray(bufferView, byteOffset, count * itemSize);
+				}
+
+				attribute = new Attribute(new Buffer(array, itemSize), itemSize, 0, normalized);
+			}
+
+			// https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#sparse-accessors
+			if (sparse) {
+				const itemSizeIndices = ACCESSOR_TYPE_SIZES.SCALAR;
+				const TypedArrayIndices = ACCESSOR_COMPONENT_TYPES[sparse.indices.componentType];
+
+				const byteOffsetIndices = sparse.indices.byteOffset || 0;
+				const byteOffsetValues = sparse.values.byteOffset || 0;
+
+				const sparseIndices = new TypedArrayIndices(bufferViews[sparse.indices.bufferView], byteOffsetIndices, sparse.count * itemSizeIndices);
+				const sparseValues = new TypedArray(bufferViews[sparse.values.bufferView], byteOffsetValues, sparse.count * itemSize);
+
+				if (bufferView !== null) {
+					// Avoid modifying the original ArrayBuffer, if the bufferView wasn't initialized with zeroes.
+					attribute = new Attribute(attribute.buffer.clone(), attribute.size, attribute.offset, attribute.normalized);
+				}
+
+				const buffer = attribute.buffer;
+
+				for (let i = 0, il = sparseIndices.length; i < il; i++) {
+					const index = sparseIndices[i];
+
+					buffer.array[index * attribute.size] = sparseValues[i * itemSize];
+					if (itemSize >= 2) buffer.array[index * attribute.size + 1] = sparseValues[i * itemSize + 1];
+					if (itemSize >= 3) buffer.array[index * attribute.size + 2] = sparseValues[i * itemSize + 2];
+					if (itemSize >= 4) buffer.array[index * attribute.size + 3] = sparseValues[i * itemSize + 3];
+					if (itemSize >= 5) throw new Error('Unsupported itemSize in sparse Attribute.');
+				}
+			}
+
+			return attribute;
+		});
+
+		interleavedBufferCache.clear();
+
+		context.accessors = accessors;
+	}
+
+}
+
 /**
  * TileGLTFLoader is a gltf loader
  * that extends the default gltf loader with additional parsers
@@ -4617,6 +5251,30 @@ class TileGLTFLoader extends GLTFLoader {
 	constructor(manager) {
 		super(manager);
 		this.replaceParser(IndexParser, 0);
+		this.replaceParser(AccessorParser, 8);
+		this.replaceParser(PrimitiveParser, 9);
+		this.replaceParser(NodeParser, 10);
+	    this.extensions.set('KHR_gaussian_splatting', KHR_gaussian_splatting);
+
+		this.autoParseConfig.materials.push('KHR_gaussian_splatting');
+	}
+
+	setSPZLoader(spzLoader) {
+		this._spzLoader = spzLoader;
+		return this;
+	}
+
+	getSPZLoader() {
+		return this._spzLoader;
+	}
+
+	setGaussianSplattingMeshClass(gaussianSplattingMeshClass) {
+		this._gaussianSplattingMeshClass = gaussianSplattingMeshClass;
+		return this;
+	}
+
+	getGaussianSplattingMeshClass() {
+		return this._gaussianSplattingMeshClass;
 	}
 
 }
@@ -5853,6 +6511,14 @@ class Tiles3D extends Object3D {
 		this._loaders.get('i3dm').setDRACOLoader(dracoLoader);
 		this._loaders.get('cmpt').setDRACOLoader(dracoLoader);
 		this._loaders.get('gltf').setDRACOLoader(dracoLoader);
+	}
+
+	setSPZLoader(spzLoader) {
+		this._loaders.get('gltf').setSPZLoader(spzLoader);
+	}
+
+	setGaussianSplattingMeshClass(gaussianSplattingMeshClass) {
+		this._loaders.get('gltf').setGaussianSplattingMeshClass(gaussianSplattingMeshClass);
 	}
 
 	setKTX2Loader(ktx2Loader) {

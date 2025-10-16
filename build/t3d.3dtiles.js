@@ -1,9 +1,9 @@
 // t3d-3dtiles
 (function (global, factory) {
-	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('t3d')) :
-	typeof define === 'function' && define.amd ? define(['exports', 't3d'], factory) :
-	(global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.t3d = global.t3d || {}, global.t3d));
-})(this, (function (exports, t3d) { 'use strict';
+	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('t3d'), require('t3d/addons/loaders/glTF/GLTFLoader.js'), require('t3d/addons/loaders/glTF/parsers/ReferenceParser.js'), require('t3d/addons/loaders/glTF/parsers/Validator.js'), require('t3d/addons/loaders/glTF/parsers/BufferParser.js'), require('t3d/addons/loaders/glTF/parsers/BufferViewParser.js'), require('t3d/addons/loaders/glTF/parsers/ImageParser.js'), require('t3d/addons/loaders/glTF/parsers/TextureParser.js'), require('t3d/addons/loaders/glTF/parsers/MaterialParser.js'), require('t3d/addons/loaders/glTF/parsers/AccessorParser.js'), require('t3d/addons/loaders/glTF/parsers/PrimitiveParser.js'), require('t3d/addons/loaders/glTF/parsers/NodeParser.js'), require('t3d/addons/loaders/glTF/parsers/SkinParser.js'), require('t3d/addons/loaders/glTF/parsers/SceneParser.js'), require('t3d/addons/loaders/glTF/parsers/AnimationParser.js'), require('t3d/addons/loaders/glTF/GLTFUtils.js'), require('t3d/addons/loaders/glTF/Constants.js'), require('t3d/addons/materials/InstancedMaterial.js'), require('t3d/addons/loaders/glTF/extensions/KHR_materials_pbrSpecularGlossiness.js'), require('t3d/addons/loaders/glTF/extensions/KHR_materials_clearcoat.js'), require('t3d/addons/Raycaster.js'), require('t3d/addons/geometries/GeometryUtils.js'), require('t3d/addons/objects/Box3Helper.js'), require('t3d/addons/objects/SphereHelper.js'), require('t3d/addons/geometries/builders/EdgesBuilder.js')) :
+	typeof define === 'function' && define.amd ? define(['exports', 't3d', 't3d/addons/loaders/glTF/GLTFLoader.js', 't3d/addons/loaders/glTF/parsers/ReferenceParser.js', 't3d/addons/loaders/glTF/parsers/Validator.js', 't3d/addons/loaders/glTF/parsers/BufferParser.js', 't3d/addons/loaders/glTF/parsers/BufferViewParser.js', 't3d/addons/loaders/glTF/parsers/ImageParser.js', 't3d/addons/loaders/glTF/parsers/TextureParser.js', 't3d/addons/loaders/glTF/parsers/MaterialParser.js', 't3d/addons/loaders/glTF/parsers/AccessorParser.js', 't3d/addons/loaders/glTF/parsers/PrimitiveParser.js', 't3d/addons/loaders/glTF/parsers/NodeParser.js', 't3d/addons/loaders/glTF/parsers/SkinParser.js', 't3d/addons/loaders/glTF/parsers/SceneParser.js', 't3d/addons/loaders/glTF/parsers/AnimationParser.js', 't3d/addons/loaders/glTF/GLTFUtils.js', 't3d/addons/loaders/glTF/Constants.js', 't3d/addons/materials/InstancedMaterial.js', 't3d/addons/loaders/glTF/extensions/KHR_materials_pbrSpecularGlossiness.js', 't3d/addons/loaders/glTF/extensions/KHR_materials_clearcoat.js', 't3d/addons/Raycaster.js', 't3d/addons/geometries/GeometryUtils.js', 't3d/addons/objects/Box3Helper.js', 't3d/addons/objects/SphereHelper.js', 't3d/addons/geometries/builders/EdgesBuilder.js'], factory) :
+	(global = typeof globalThis !== 'undefined' ? globalThis : global || self, factory(global.t3d = global.t3d || {}, global.t3d, global.GLTFLoader_js, global.ReferenceParser_js, global.Validator_js, global.BufferParser_js, global.BufferViewParser_js, global.ImageParser_js, global.TextureParser_js, global.MaterialParser_js, global.AccessorParser_js, global.PrimitiveParser_js, global.NodeParser_js, global.SkinParser_js, global.SceneParser_js, global.AnimationParser_js, global.GLTFUtils_js, global.Constants_js, global.InstancedMaterial_js, global.KHR_materials_pbrSpecularGlossiness_js, global.KHR_materials_clearcoat_js, global.Raycaster_js, global.GeometryUtils_js, global.Box3Helper_js, global.SphereHelper_js, global.EdgesBuilder_js));
+})(this, (function (exports, t3d, GLTFLoader_js, ReferenceParser_js, Validator_js, BufferParser_js, BufferViewParser_js, ImageParser_js, TextureParser_js, MaterialParser_js, AccessorParser_js, PrimitiveParser_js, NodeParser_js, SkinParser_js, SceneParser_js, AnimationParser_js, GLTFUtils_js, Constants_js, InstancedMaterial_js, KHR_materials_pbrSpecularGlossiness_js, KHR_materials_clearcoat_js, Raycaster_js, GeometryUtils_js, Box3Helper_js, SphereHelper_js, EdgesBuilder_js) { 'use strict';
 
 	class LoaderBase {
 		constructor() {
@@ -815,28 +815,28 @@
 				* @return {OBB} A reference to this OBB.
 				*/
 		setFromCenterAndAxes(center, axisX, axisY, axisZ) {
-			_vec3_1$4.copy(axisX);
+			_vec3_1$3.copy(axisX);
 			_vec3_2$1.copy(axisY);
 			_vec3_3$1.copy(axisZ);
-			const scaleX = _vec3_1$4.getLength();
+			const scaleX = _vec3_1$3.getLength();
 			const scaleY = _vec3_2$1.getLength();
 			const scaleZ = _vec3_3$1.getLength();
-			_vec3_1$4.normalize();
+			_vec3_1$3.normalize();
 			_vec3_2$1.normalize();
 			_vec3_3$1.normalize();
 
 			// handle the case where the box has a dimension of 0 in one axis
 			if (scaleX === 0) {
-				_vec3_1$4.crossVectors(_vec3_2$1, _vec3_3$1);
+				_vec3_1$3.crossVectors(_vec3_2$1, _vec3_3$1);
 			}
 			if (scaleY === 0) {
-				_vec3_2$1.crossVectors(_vec3_1$4, _vec3_3$1);
+				_vec3_2$1.crossVectors(_vec3_1$3, _vec3_3$1);
 			}
 			if (scaleZ === 0) {
-				_vec3_3$1.crossVectors(_vec3_1$4, _vec3_2$1);
+				_vec3_3$1.crossVectors(_vec3_1$3, _vec3_2$1);
 			}
-			this.rotation.set(_vec3_1$4.x, _vec3_2$1.x, _vec3_3$1.x, _vec3_1$4.y, _vec3_2$1.y, _vec3_3$1.y, _vec3_1$4.z, _vec3_2$1.z, _vec3_3$1.z);
-			const halfSize = _vec3_1$4.set(scaleX, scaleY, scaleZ);
+			this.rotation.set(_vec3_1$3.x, _vec3_2$1.x, _vec3_3$1.x, _vec3_1$3.y, _vec3_2$1.y, _vec3_3$1.y, _vec3_1$3.z, _vec3_2$1.z, _vec3_3$1.z);
+			const halfSize = _vec3_1$3.set(scaleX, scaleY, scaleZ);
 			this.box.min.copy(center).sub(halfSize);
 			this.box.max.copy(center).add(halfSize);
 			return this;
@@ -849,26 +849,26 @@
 				*/
 		applyMatrix4(matrix) {
 			const e = matrix.elements;
-			let sx = _vec3_1$4.set(e[0], e[1], e[2]).getLength();
-			const sy = _vec3_1$4.set(e[4], e[5], e[6]).getLength();
-			const sz = _vec3_1$4.set(e[8], e[9], e[10]).getLength();
+			let sx = _vec3_1$3.set(e[0], e[1], e[2]).getLength();
+			const sy = _vec3_1$3.set(e[4], e[5], e[6]).getLength();
+			const sz = _vec3_1$3.set(e[8], e[9], e[10]).getLength();
 			const det = matrix.determinant();
 			if (det < 0) sx = -sx;
-			_mat3_1$2.setFromMatrix4(matrix);
+			_mat3_1$1.setFromMatrix4(matrix);
 			const invSX = 1 / sx;
 			const invSY = 1 / sy;
 			const invSZ = 1 / sz;
-			_mat3_1$2.elements[0] *= invSX;
-			_mat3_1$2.elements[1] *= invSX;
-			_mat3_1$2.elements[2] *= invSX;
-			_mat3_1$2.elements[3] *= invSY;
-			_mat3_1$2.elements[4] *= invSY;
-			_mat3_1$2.elements[5] *= invSY;
-			_mat3_1$2.elements[6] *= invSZ;
-			_mat3_1$2.elements[7] *= invSZ;
-			_mat3_1$2.elements[8] *= invSZ;
-			this.rotation.multiply(_mat3_1$2);
-			const center = this.box.getCenter(_vec3_1$4);
+			_mat3_1$1.elements[0] *= invSX;
+			_mat3_1$1.elements[1] *= invSX;
+			_mat3_1$1.elements[2] *= invSX;
+			_mat3_1$1.elements[3] *= invSY;
+			_mat3_1$1.elements[4] *= invSY;
+			_mat3_1$1.elements[5] *= invSY;
+			_mat3_1$1.elements[6] *= invSZ;
+			_mat3_1$1.elements[7] *= invSZ;
+			_mat3_1$1.elements[8] *= invSZ;
+			this.rotation.multiply(_mat3_1$1);
+			const center = this.box.getCenter(_vec3_1$3);
 			const halfSize = this.box.getSize(_vec3_2$1).multiplyScalar(0.5);
 			halfSize.x *= sx;
 			halfSize.y *= sy;
@@ -887,7 +887,7 @@
 				* @return {Vector3[]} The array of points.
 				*/
 		getPoints(points) {
-			const center = this.box.getCenter(_vec3_1$4);
+			const center = this.box.getCenter(_vec3_1$3);
 			const min = _vec3_2$1.subVectors(this.box.min, center);
 			const max = _vec3_3$1.subVectors(this.box.max, center);
 			let index = 0;
@@ -908,29 +908,29 @@
 				* @return {Plane[]} The array of planes.
 				*/
 		getPlanes(planes) {
-			const center = this.box.getCenter(_vec3_1$4);
+			const center = this.box.getCenter(_vec3_1$3);
 			const worldMin = _vec3_2$1.subVectors(this.box.min, center).applyMatrix3(this.rotation).add(center);
 			const worldMax = _vec3_3$1.subVectors(this.box.max, center).applyMatrix3(this.rotation).add(center);
-			_vec3_1$4.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
-			planes[0].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
-			planes[1].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
+			_vec3_1$3.set(0, 0, 1).applyMatrix3(this.rotation).normalize();
+			planes[0].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
+			planes[1].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
 			planes[1].normal.negate();
 			planes[1].constant *= -1;
-			_vec3_1$4.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
-			planes[2].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
-			planes[3].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
+			_vec3_1$3.set(0, 1, 0).applyMatrix3(this.rotation).normalize();
+			planes[2].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
+			planes[3].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
 			planes[3].normal.negate();
 			planes[3].constant *= -1;
-			_vec3_1$4.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
-			planes[4].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMin);
-			planes[5].setFromNormalAndCoplanarPoint(_vec3_1$4, worldMax);
+			_vec3_1$3.set(1, 0, 0).applyMatrix3(this.rotation).normalize();
+			planes[4].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMin);
+			planes[5].setFromNormalAndCoplanarPoint(_vec3_1$3, worldMax);
 			planes[5].normal.negate();
 			planes[5].constant *= -1;
 			return planes;
 		}
 		containsPoint(point) {
 			const obbStruct = getOBBStruct(this, a);
-			const v = _vec3_1$4.subVectors(point, obbStruct.c);
+			const v = _vec3_1$3.subVectors(point, obbStruct.c);
 
 			// project _vec3_4 onto each axis and check if these points lie inside the OBB
 
@@ -943,7 +943,7 @@
 		 */
 		clampPoint(point, result) {
 			const obbStruct = getOBBStruct(this, a);
-			const v = _vec3_1$4.subVectors(point, obbStruct.c);
+			const v = _vec3_1$3.subVectors(point, obbStruct.c);
 
 			// start at the center position of the OBB
 
@@ -981,7 +981,7 @@
 
 			// compute translation vector
 
-			const v1 = _vec3_1$4.subVectors(b.c, a.c);
+			const v1 = _vec3_1$3.subVectors(b.c, a.c);
 
 			// bring translation into a's coordinate frame
 
@@ -1083,7 +1083,7 @@
 				* @param {Matrix4} transform - The transformation matrix.
 				*/
 		toBoundingBoxWithTransform(box3, transform) {
-			const center = this.box.getCenter(_vec3_1$4);
+			const center = this.box.getCenter(_vec3_1$3);
 			box3.min.copy(this.box.min).sub(center);
 			box3.max.copy(this.box.max).sub(center);
 			const e = this.rotation.elements;
@@ -1091,10 +1091,10 @@
 		}
 	}
 	const closestPoint = new t3d.Vector3();
-	const _vec3_1$4 = new t3d.Vector3();
+	const _vec3_1$3 = new t3d.Vector3();
 	const _vec3_2$1 = new t3d.Vector3();
 	const _vec3_3$1 = new t3d.Vector3();
-	const _mat3_1$2 = new t3d.Matrix3();
+	const _mat3_1$1 = new t3d.Matrix3();
 	const R = [[], [], []];
 	const AbsR = [[], [], []];
 	const t = [];
@@ -1145,8 +1145,8 @@
 			this._originBoxTransformInverse.copy(this._originBoxTransform).inverse();
 		}
 		containsPoint(point) {
-			_vec3_1$3.copy(point).applyMatrix4(this._originBoxTransformInverse);
-			return this.box.containsPoint(_vec3_1$3);
+			_vec3_1$2.copy(point).applyMatrix4(this._originBoxTransformInverse);
+			return this.box.containsPoint(_vec3_1$2);
 		}
 		intersectsRay(ray) {
 			_ray_1.copy(ray).applyMatrix4(this._originBoxTransformInverse);
@@ -1193,8 +1193,8 @@
 		distanceToPoint(point) {
 			// originBoxTransformInverse has no scale,
 			// so we don't need to scale the distance
-			_vec3_1$3.copy(point).applyMatrix4(this._originBoxTransformInverse);
-			return this._originBox.distanceToPoint(_vec3_1$3);
+			_vec3_1$2.copy(point).applyMatrix4(this._originBoxTransformInverse);
+			return this._originBox.distanceToPoint(_vec3_1$2);
 		}
 		getBoundingSphere(target) {
 			return this.box.getBoundingSphere(target);
@@ -1204,7 +1204,7 @@
 		}
 	}
 	const _ray_1 = new t3d.Ray();
-	const _vec3_1$3 = new t3d.Vector3();
+	const _vec3_1$2 = new t3d.Vector3();
 
 	// Cesium / 3D tiles Spheroid:
 	// - Up is Z at 90 degrees latitude
@@ -1550,7 +1550,7 @@
 		}
 		setOBBData(data, transform) {
 			const obb = new TileOBB();
-			obb.setFromCenterAndAxes(_vec3_4.set(data[0], data[1], data[2]), _vec3_1$2.set(data[3], data[4], data[5]), _vec3_2.set(data[6], data[7], data[8]), _vec3_3.set(data[9], data[10], data[11])).applyMatrix4(transform);
+			obb.setFromCenterAndAxes(_vec3_4.set(data[0], data[1], data[2]), _vec3_1$1.set(data[3], data[4], data[5]), _vec3_2.set(data[6], data[7], data[8]), _vec3_3.set(data[9], data[10], data[11])).applyMatrix4(transform);
 			obb.updateCache();
 			this.obb = obb;
 		}
@@ -1594,13 +1594,13 @@
 			let sphereDistSq = -Infinity;
 			let obbDistSq = -Infinity;
 			if (sphere) {
-				if (ray.intersectSphere(sphere, _vec3_1$2)) {
-					sphereDistSq = sphere.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$2);
+				if (ray.intersectSphere(sphere, _vec3_1$1)) {
+					sphereDistSq = sphere.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$1);
 				}
 			}
 			if (obb) {
-				if (obb.intersectRay(ray, _vec3_1$2)) {
-					obbDistSq = obb.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$2);
+				if (obb.intersectRay(ray, _vec3_1$1)) {
+					obbDistSq = obb.containsPoint(ray.origin) ? 0 : ray.origin.distanceToSquared(_vec3_1$1);
 				}
 			}
 
@@ -1668,7 +1668,7 @@
 			}
 		}
 	}
-	const _vec3_1$2 = new t3d.Vector3();
+	const _vec3_1$1 = new t3d.Vector3();
 	const _vec3_2 = new t3d.Vector3();
 	const _vec3_3 = new t3d.Vector3();
 	const _vec3_4 = new t3d.Vector3();
@@ -1863,12 +1863,12 @@
 			});
 		}
 	}
-	const _mat3_1$1 = new t3d.Matrix3();
+	const _mat3_1 = new t3d.Matrix3();
 
 	// Solve a system of equations to find the point where the three planes intersect
 	function findIntersectionPoint(plane1, plane2, plane3, target) {
 		// Create the matrix A using the normals of the planes as rows
-		const A = _mat3_1$1.set(plane1.normal.x, plane1.normal.y, plane1.normal.z, plane2.normal.x, plane2.normal.y, plane2.normal.z, plane3.normal.x, plane3.normal.y, plane3.normal.z);
+		const A = _mat3_1.set(plane1.normal.x, plane1.normal.y, plane1.normal.z, plane2.normal.x, plane2.normal.y, plane2.normal.z, plane3.normal.x, plane3.normal.y, plane3.normal.z);
 
 		// Create the vector B using the constants of the planes
 		target.set(-plane1.constant, -plane2.constant, -plane3.constant);
@@ -1936,9 +1936,9 @@
 			// get inverse scale of origin matrix
 
 			_mat4_1.copy(originMatrix).inverse();
-			const invScaleX = _vec3_1$1.setFromMatrixColumn(_mat4_1, 0).getLength();
-			const invScaleY = _vec3_1$1.setFromMatrixColumn(_mat4_1, 1).getLength();
-			const invScaleZ = _vec3_1$1.setFromMatrixColumn(_mat4_1, 2).getLength();
+			const invScaleX = _vec3_1.setFromMatrixColumn(_mat4_1, 0).getLength();
+			const invScaleY = _vec3_1.setFromMatrixColumn(_mat4_1, 1).getLength();
+			const invScaleZ = _vec3_1.setFromMatrixColumn(_mat4_1, 2).getLength();
 			if (Math.abs(Math.max(invScaleX - invScaleY, invScaleX - invScaleZ)) > 1e-6) {
 				console.warn('CameraList.updateInfos(): Non uniform scale used for tile which may cause issues when calculating screen space error.');
 			}
@@ -1987,7 +1987,7 @@
 	}
 	const _mat4_1 = new t3d.Matrix4();
 	const _mat4_2 = new t3d.Matrix4();
-	const _vec3_1$1 = new t3d.Vector3();
+	const _vec3_1 = new t3d.Vector3();
 
 	const GIGABYTE_BYTES = 2 ** 30;
 	class LRUCache {
@@ -2752,1935 +2752,6 @@
 		};
 	}
 
-	class ImageBitmapLoader extends t3d.Loader {
-		constructor(manager) {
-			super(manager);
-			if (typeof createImageBitmap === 'undefined') {
-				console.warn('ImageBitmapLoader: createImageBitmap() not supported.');
-			}
-			if (typeof fetch === 'undefined') {
-				console.warn('ImageBitmapLoader: fetch() not supported.');
-			}
-			this.options = {
-				premultiplyAlpha: 'none'
-			};
-		}
-		setOptions(options) {
-			this.options = options;
-			return this;
-		}
-		load(url, onLoad, _onProgress, onError) {
-			if (url === undefined) url = '';
-			if (this.path !== undefined) url = this.path + url;
-			url = this.manager.resolveURL(url);
-			const scope = this;
-			const fetchOptions = {};
-			fetchOptions.credentials = this.crossOrigin === 'anonymous' ? 'same-origin' : 'include';
-			fetchOptions.headers = this.requestHeader;
-			fetch(url, fetchOptions).then(function (res) {
-				return res.blob();
-			}).then(function (blob) {
-				return createImageBitmap(blob, Object.assign(scope.options, {
-					colorSpaceConversion: 'none'
-				}));
-			}).then(function (imageBitmap) {
-				if (onLoad) onLoad(imageBitmap);
-				scope.manager.itemEnd(url);
-			}).catch(function (e) {
-				if (onError) onError(e);
-				scope.manager.itemError(url);
-				scope.manager.itemEnd(url);
-			});
-			scope.manager.itemStart(url);
-		}
-	}
-
-	const _vec4_1 = new t3d.Vector4();
-	class GLTFUtils {
-		constructor() {}
-		static extractUrlBase(url) {
-			const parts = url.split('/');
-			parts.pop();
-			return (parts.length < 1 ? '.' : parts.join('/')) + '/';
-		}
-
-		// url: aa.bin ;	path:example/resource/model/		 (for example)example/resource/model/aa.bin
-		static resolveURL(url, path) {
-			// Invalid URL
-			if (typeof url !== 'string' || url === '') return '';
-
-			// Absolute URL http://,https://,//
-			if (/^(https?:)?\/\//i.test(url)) return url;
-
-			// Data URI
-			if (/^data:/i.test(url)) return url;
-
-			// Blob URL
-			if (/^blob:/i.test(url)) return url;
-
-			// Relative URL
-			return path + url;
-		}
-		static decodeText(array) {
-			if (typeof TextDecoder !== 'undefined') {
-				return new TextDecoder().decode(array);
-			}
-
-			// Avoid the String.fromCharCode.apply(null, array) shortcut, which
-			// throws a "maximum call stack size exceeded" error for large arrays.
-
-			let s = '';
-			for (let i = 0, il = array.length; i < il; i++) {
-				// Implicitly assumes little-endian.
-				s += String.fromCharCode(array[i]);
-			}
-			try {
-				// merges multi-byte utf-8 characters.
-
-				return decodeURIComponent(escape(s));
-			} catch (e) {
-				// see #16358
-				return s;
-			}
-		}
-		static parseGLB(glb) {
-			const UINT32_LENGTH = 4;
-			const GLB_HEADER_MAGIC = 0x46546C67; // 'glTF'
-			const GLB_HEADER_LENGTH = 12;
-			const GLB_CHUNK_TYPES = {
-				JSON: 0x4E4F534A,
-				BIN: 0x004E4942
-			};
-			const dataView = new DataView(glb);
-			const header = {
-				magic: dataView.getUint32(0, true),
-				version: dataView.getUint32(UINT32_LENGTH, true),
-				length: dataView.getUint32(2 * UINT32_LENGTH, true)
-			};
-			if (header.magic !== GLB_HEADER_MAGIC) {
-				console.error('Invalid glb magic number. Expected 0x46546C67, found 0x' + header.magic.toString(16));
-				return null;
-			} else if (header.version < 2.0) {
-				console.error('GLTFLoader: Legacy binary file detected.');
-			}
-			let chunkLength = dataView.getUint32(GLB_HEADER_LENGTH, true);
-			let chunkType = dataView.getUint32(GLB_HEADER_LENGTH + UINT32_LENGTH, true);
-			if (chunkType !== GLB_CHUNK_TYPES.JSON) {
-				console.error('Invalid glb chunk type. Expected 0x4E4F534A, found 0x' + chunkType.toString(16));
-				return null;
-			}
-			const glTFData = new Uint8Array(glb, GLB_HEADER_LENGTH + 2 * UINT32_LENGTH, chunkLength);
-			const gltf = JSON.parse(GLTFUtils.decodeText(glTFData));
-			const buffers = [];
-			let byteOffset = GLB_HEADER_LENGTH + 2 * UINT32_LENGTH + chunkLength;
-			while (byteOffset < header.length) {
-				chunkLength = dataView.getUint32(byteOffset, true);
-				chunkType = dataView.getUint32(byteOffset + UINT32_LENGTH, true);
-				if (chunkType !== GLB_CHUNK_TYPES.BIN) {
-					console.error('Invalid glb chunk type. Expected 0x004E4942, found 0x' + chunkType.toString(16));
-					return null;
-				}
-				const currentOffset = byteOffset + 2 * UINT32_LENGTH;
-				const buffer = glb.slice(currentOffset, currentOffset + chunkLength);
-				buffers.push(buffer);
-				byteOffset += chunkLength + 2 * UINT32_LENGTH;
-			}
-			return {
-				gltf,
-				buffers
-			};
-		}
-
-		// Reference: github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_mesh_quantization#encoding-quantized-data
-		static getNormalizedComponentScale(constructor) {
-			if (constructor === Int8Array) {
-				return 1 / 127;
-			} else if (constructor === Uint8Array) {
-				return 1 / 255;
-			} else if (constructor === Int16Array) {
-				return 1 / 32767;
-			} else if (constructor === Uint16Array) {
-				return 1 / 65535;
-			} else {
-				throw new Error('Unsupported normalized accessor component type.');
-			}
-		}
-		static normalizeSkinWeights(skinWeight) {
-			const offset = skinWeight.offset;
-			const buffer = skinWeight.buffer;
-			const stride = buffer.stride;
-			for (let i = 0, l = buffer.count; i < l; i++) {
-				_vec4_1.fromArray(buffer.array, i * stride + offset);
-				const scale = 1.0 / _vec4_1.getManhattanLength();
-				if (scale !== Infinity) {
-					_vec4_1.multiplyScalar(scale);
-				} else {
-					_vec4_1.set(1, 0, 0, 0); // do something reasonable
-				}
-				_vec4_1.toArray(buffer.array, i * stride + offset);
-			}
-		}
-	}
-
-	let IndexParser$1 = class IndexParser {
-		static parse(context, loader) {
-			const {
-				url
-			} = context;
-			return loader.loadFile(url, 'arraybuffer').then(data => {
-				const magic = GLTFUtils.decodeText(new Uint8Array(data, 0, 4));
-				if (magic === 'glTF') {
-					const glbData = GLTFUtils.parseGLB(data);
-					context.gltf = glbData.gltf;
-					context.buffers = glbData.buffers;
-				} else {
-					const gltfString = GLTFUtils.decodeText(new Uint8Array(data));
-					context.gltf = JSON.parse(gltfString);
-				}
-			});
-		}
-	};
-
-	// Marks the special nodes/meshes in json for efficient parse.
-	class ReferenceParser {
-		static parse(context, loader) {
-			const {
-				gltf,
-				path
-			} = context;
-			const {
-				nodes = [],
-				skins = [],
-				meshes = [],
-				buffers,
-				images
-			} = gltf;
-
-			// Nothing in the node definition indicates whether it is a Bone or an
-			// Object3D. Use the skins' joint references to mark bones.
-			skins.forEach(skin => {
-				const {
-					joints = []
-				} = skin;
-				joints.forEach(joint => {
-					nodes[joint].isBone = true;
-				});
-			});
-
-			// Nothing in the mesh definition indicates whether it is
-			// a SkinnedMesh or Mesh. Use the node's mesh reference
-			// to mark SkinnedMesh if node has skin.
-			nodes.forEach(node => {
-				if (node.mesh !== undefined) {
-					if (node.skin !== undefined) {
-						meshes[node.mesh].isSkinned = true;
-					}
-				}
-			});
-
-			// setup loading list for detail load progress
-			if (loader.detailLoadProgress) {
-				const loadItems = new Set();
-				if (buffers) {
-					buffers.forEach(buffer => {
-						if (!buffer.uri) {
-							// glb or other
-							return;
-						}
-						const bufferUrl = GLTFUtils.resolveURL(buffer.uri, path);
-						loadItems.add(bufferUrl);
-					});
-				}
-				if (images) {
-					images.forEach((image, index) => {
-						const {
-							uri,
-							bufferView: bufferViewIndex
-						} = image;
-						let imageUrl = uri;
-						if (bufferViewIndex !== undefined) {
-							imageUrl = 'blob<' + index + '>'; // fake url for blob image
-						}
-						imageUrl = GLTFUtils.resolveURL(imageUrl, path);
-						loadItems.add(imageUrl);
-					});
-				}
-				loadItems.forEach(item => loader.manager.itemStart(item));
-				context.loadItems = loadItems;
-			}
-		}
-	}
-
-	class Validator {
-		static parse(context) {
-			const {
-				gltf: {
-					asset: {
-						version
-					}
-				}
-			} = context;
-			const gltfVersion = Number(version);
-			if (!(gltfVersion >= 2 && gltfVersion < 3)) {
-				throw 'Only support gltf 2.x.';
-			}
-		}
-	}
-
-	class BufferParser {
-		static parse(context, loader) {
-			const {
-				gltf,
-				loadItems
-			} = context;
-			if (context.buffers !== null) {
-				// buffers have been parsed
-				return null;
-			} else {
-				return Promise.all(gltf.buffers.map(buffer => {
-					const bufferUrl = GLTFUtils.resolveURL(buffer.uri, context.path);
-					if (loader.detailLoadProgress) {
-						loadItems.delete(bufferUrl);
-					}
-					const promise = loader.loadFile(bufferUrl, 'arraybuffer').then(buffer => {
-						if (loader.detailLoadProgress) {
-							loader.manager.itemEnd(bufferUrl);
-						}
-						return buffer;
-					});
-					if (loader.detailLoadProgress) {
-						promise.catch(() => loader.manager.itemEnd(bufferUrl));
-					}
-					return promise;
-				})).then(buffers => {
-					context.buffers = buffers;
-				});
-			}
-		}
-	}
-
-	class BufferViewParser {
-		static parse(context, loader) {
-			const {
-				buffers,
-				gltf
-			} = context;
-			if (!gltf.bufferViews) return;
-			const meshoptExt = loader.extensions.get('EXT_meshopt_compression');
-			return Promise.all(gltf.bufferViews.map(bufferView => {
-				const {
-					buffer,
-					byteOffset = 0,
-					byteLength = 0
-				} = bufferView;
-				if (bufferView.extensions) {
-					const {
-						EXT_meshopt_compression
-					} = bufferView.extensions;
-					if (EXT_meshopt_compression && meshoptExt) {
-						return meshoptExt.loadBufferView(EXT_meshopt_compression, buffers, loader.getMeshoptDecoder());
-					}
-				}
-				const arrayBuffer = buffers[buffer];
-				return arrayBuffer.slice(byteOffset, byteOffset + byteLength);
-			})).then(bufferViews => {
-				context.bufferViews = bufferViews;
-			});
-		}
-	}
-
-	class ImageParser {
-		static parse(context, loader) {
-			const {
-				gltf,
-				bufferViews,
-				path,
-				loadItems
-			} = context;
-			if (!gltf.images) return;
-			const basisuExt = loader.extensions.get('KHR_texture_basisu');
-			return Promise.all(gltf.images.map((params, index) => {
-				const {
-					uri,
-					bufferView: bufferViewIndex,
-					mimeType,
-					name: imageName
-				} = params;
-				let isObjectURL = false;
-				let sourceUrl = uri || '';
-				if (bufferViewIndex !== undefined) {
-					const bufferViewData = bufferViews[bufferViewIndex];
-					const blob = new Blob([bufferViewData], {
-						type: mimeType
-					});
-					sourceUrl = URL.createObjectURL(blob);
-					isObjectURL = true;
-				}
-				const imageUrl = GLTFUtils.resolveURL(sourceUrl, path);
-				if (loader.detailLoadProgress) {
-					loadItems.delete(imageUrl);
-				}
-				let promise;
-				if (mimeType && mimeType.includes('ktx2') && basisuExt) {
-					promise = basisuExt.loadTextureData(imageUrl, loader.getKTX2Loader()).then(transcodeResult => {
-						if (loader.detailLoadProgress) {
-							if (isObjectURL) {
-								loader.manager.itemEnd(GLTFUtils.resolveURL('blob<' + index + '>', path));
-							} else {
-								loader.manager.itemEnd(imageUrl);
-							}
-						}
-						return transcodeResult;
-					});
-				} else {
-					const param = {
-						loader,
-						imageUrl,
-						imageName,
-						isObjectURL,
-						sourceUrl,
-						index,
-						path
-					};
-					if (mimeType && (mimeType.includes('avif') || mimeType.includes('webp'))) {
-						promise = detectSupport(mimeType).then(isSupported => {
-							if (isSupported) return loadImage(param);
-							throw new Error('GLTFLoader: WebP or AVIF required by asset but unsupported.');
-						});
-					} else {
-						return loadImage(param);
-					}
-				}
-				if (loader.detailLoadProgress) {
-					promise.catch(() => loader.manager.itemEnd(imageUrl));
-				}
-				return promise;
-			})).then(images => {
-				context.images = images;
-			});
-		}
-	}
-	function detectSupport(mimeType) {
-		const isSupported = new Promise(resolve => {
-			// Lossy test image.
-			const image = new Image();
-			if (mimeType.includes('avif')) {
-				image.src = 'data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADybWV0YQAAAAAAAAAoaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAGxpYmF2aWYAAAAADnBpdG0AAAAAAAEAAAAeaWxvYwAAAABEAAABAAEAAAABAAABGgAAABcAAAAoaWluZgAAAAAAAQAAABppbmZlAgAAAAABAABhdjAxQ29sb3IAAAAAamlwcnAAAABLaXBjbwAAABRpc3BlAAAAAAAAAAEAAAABAAAAEHBpeGkAAAAAAwgICAAAAAxhdjFDgQAMAAAAABNjb2xybmNseAACAAIABoAAAAAXaXBtYQAAAAAAAAABAAEEAQKDBAAAAB9tZGF0EgAKCBgABogQEDQgMgkQAAAAB8dSLfI=';
-			} else {
-				image.src = 'data:image/webp;base64,UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA';
-			}
-			image.onload = () => {
-				resolve(image.height === 1);
-			};
-		});
-		return isSupported;
-	}
-	function loadImage(param) {
-		const {
-			loader,
-			imageUrl,
-			imageName,
-			isObjectURL,
-			sourceUrl,
-			index,
-			path
-		} = param;
-		const promise = loader.loadImage(imageUrl).then(image => {
-			image.__name = imageName;
-			if (isObjectURL === true) {
-				URL.revokeObjectURL(sourceUrl);
-			}
-			if (loader.detailLoadProgress) {
-				if (isObjectURL) {
-					loader.manager.itemEnd(GLTFUtils.resolveURL('blob<' + index + '>', path));
-				} else {
-					loader.manager.itemEnd(imageUrl);
-				}
-			}
-			return image;
-		});
-		return promise;
-	}
-
-	const ATTRIBUTES = {
-		POSITION: 'a_Position',
-		NORMAL: 'a_Normal',
-		TANGENT: 'a_Tangent',
-		TEXCOORD_0: 'a_Uv',
-		TEXCOORD_1: 'a_Uv2',
-		TEXCOORD_2: 'a_Uv3',
-		TEXCOORD_3: 'a_Uv4',
-		TEXCOORD_4: 'a_Uv5',
-		TEXCOORD_5: 'a_Uv6',
-		TEXCOORD_6: 'a_Uv7',
-		TEXCOORD_7: 'a_Uv8',
-		COLOR_0: 'a_Color',
-		WEIGHTS_0: 'skinWeight',
-		JOINTS_0: 'skinIndex',
-		TEXCOORD0: 'a_Uv',
-		// deprecated
-		TEXCOORD: 'a_Uv',
-		// deprecated
-		COLOR0: 'a_Color',
-		// deprecated
-		COLOR: 'a_Color',
-		// deprecated
-		WEIGHT: 'skinWeight',
-		// deprecated
-		JOINT: 'skinIndex' // deprecated
-	};
-	const ALPHA_MODES = {
-		MASK: 'MASK',
-		BLEND: 'BLEND'
-	};
-	const ACCESSOR_TYPE_SIZES = {
-		'SCALAR': 1,
-		'VEC2': 2,
-		'VEC3': 3,
-		'VEC4': 4,
-		'MAT2': 4,
-		'MAT3': 9,
-		'MAT4': 16
-	};
-	const ACCESSOR_COMPONENT_TYPES = {
-		5120: Int8Array,
-		5121: Uint8Array,
-		5122: Int16Array,
-		5123: Uint16Array,
-		5125: Uint32Array,
-		5126: Float32Array
-	};
-	const WEBGL_FILTERS = {
-		9728: t3d.TEXTURE_FILTER.NEAREST,
-		9729: t3d.TEXTURE_FILTER.LINEAR,
-		9984: t3d.TEXTURE_FILTER.NEAREST_MIPMAP_NEAREST,
-		9985: t3d.TEXTURE_FILTER.LINEAR_MIPMAP_NEAREST,
-		9986: t3d.TEXTURE_FILTER.NEAREST_MIPMAP_LINEAR,
-		9987: t3d.TEXTURE_FILTER.LINEAR_MIPMAP_LINEAR
-	};
-	const WEBGL_WRAPPINGS = {
-		33071: t3d.TEXTURE_WRAP.CLAMP_TO_EDGE,
-		33648: t3d.TEXTURE_WRAP.MIRRORED_REPEAT,
-		10497: t3d.TEXTURE_WRAP.REPEAT
-	};
-	const WEBGL_DRAW_MODES = {
-		POINTS: 0,
-		LINES: 1,
-		LINE_LOOP: 2,
-		LINE_STRIP: 3,
-		TRIANGLE_STRIP: 5,
-		TRIANGLE_FAN: 6
-	};
-
-	class TextureParser {
-		static parse(context) {
-			const {
-				gltf,
-				images
-			} = context;
-			if (!gltf.textures) return;
-			const textureCache = new Map();
-			return Promise.all(gltf.textures.map((params, index) => {
-				const {
-					sampler,
-					source = 0,
-					name: textureName
-				} = params;
-				let sourceIndex = source,
-					isTextureData = false;
-				if (params.extensions) {
-					const {
-						KHR_texture_basisu
-					} = params.extensions;
-					if (KHR_texture_basisu) {
-						sourceIndex = KHR_texture_basisu.source;
-						isTextureData = true;
-					} else if (Object.values(params.extensions).length && Object.values(params.extensions)[0].hasOwnProperty('source')) {
-						sourceIndex = Object.values(params.extensions)[0].source;
-					} else {
-						console.warn('GLTFLoader: unknown texture extension');
-					}
-				}
-				const cacheKey = sourceIndex + ':' + sampler;
-				if (textureCache.has(cacheKey)) {
-					return textureCache.get(cacheKey);
-				}
-				const texture = new t3d.Texture2D();
-				if (isTextureData) {
-					const {
-						image,
-						mipmaps,
-						type,
-						format,
-						minFilter,
-						magFilter,
-						generateMipmaps,
-						encoding,
-						premultiplyAlpha
-					} = images[sourceIndex];
-					texture.image = image;
-					texture.mipmaps = mipmaps;
-					texture.type = type;
-					texture.format = format;
-					texture.minFilter = minFilter;
-					texture.magFilter = magFilter;
-					texture.generateMipmaps = generateMipmaps;
-					texture.encoding = encoding;
-					texture.premultiplyAlpha = premultiplyAlpha;
-				} else {
-					texture.image = images[sourceIndex];
-				}
-				texture.version++;
-				texture.name = textureName || texture.image.__name || `texture_${index}`;
-				texture.flipY = false;
-				const {
-					mimeType,
-					uri
-				} = gltf.images[sourceIndex];
-				texture.userData.mimeType = mimeType || getImageURIMimeType(uri);
-				const samplers = gltf.samplers || {};
-				parseSampler(texture, samplers[sampler]);
-				textureCache.set(cacheKey, texture);
-				return texture;
-			})).then(textures => {
-				context.textures = textures;
-				textureCache.clear();
-			});
-		}
-	}
-	function parseSampler(texture, sampler = {}) {
-		const {
-			magFilter,
-			minFilter,
-			wrapS,
-			wrapT
-		} = sampler;
-		texture.magFilter = WEBGL_FILTERS[magFilter] || t3d.TEXTURE_FILTER.LINEAR;
-		texture.minFilter = WEBGL_FILTERS[minFilter] || t3d.TEXTURE_FILTER.LINEAR_MIPMAP_LINEAR;
-		texture.wrapS = WEBGL_WRAPPINGS[wrapS] || t3d.TEXTURE_WRAP.REPEAT;
-		texture.wrapT = WEBGL_WRAPPINGS[wrapT] || t3d.TEXTURE_WRAP.REPEAT;
-	}
-
-	// only for jpeg, png, webp
-	// because other should get mimeType from glTF image object
-	function getImageURIMimeType(uri) {
-		if (uri.startsWith('data:image/')) {
-			// early return for data URIs
-			if (uri.startsWith('data:image/jpeg')) return 'image/jpeg';
-			if (uri.startsWith('data:image/webp')) return 'image/webp';
-			return 'image/png';
-		} else {
-			if (uri.search(/\.jpe?g($|\?)/i) > 0) return 'image/jpeg';
-			if (uri.search(/\.webp($|\?)/i) > 0) return 'image/webp';
-			return 'image/png';
-		}
-	}
-
-	let MaterialParser$1 = class MaterialParser {
-		static parse(context, loader) {
-			const {
-				gltf,
-				textures
-			} = context;
-			if (!gltf.materials) return;
-			const transformExt = loader.extensions.get('KHR_texture_transform');
-			const materials = [];
-			for (let i = 0; i < gltf.materials.length; i++) {
-				const {
-					extensions = {},
-					pbrMetallicRoughness,
-					normalTexture,
-					occlusionTexture,
-					emissiveTexture,
-					emissiveFactor,
-					alphaMode,
-					alphaCutoff,
-					doubleSided,
-					name = ''
-				} = gltf.materials[i];
-				let material = null;
-				const materialExtNames = loader.autoParseConfig.materials;
-
-				// TODO: refactor invoke method
-				for (let j = 0; j < materialExtNames.length; j++) {
-					const extName = materialExtNames[j];
-					const extParams = extensions[extName];
-					const ext = loader.extensions.get(extName);
-					if (extParams && ext && ext.getMaterial) {
-						material = ext.getMaterial();
-						break;
-					}
-				}
-				material = material || new t3d.PBRMaterial();
-				material.name = name;
-				for (let j = 0; j < materialExtNames.length; j++) {
-					const extName = materialExtNames[j];
-					const extParams = extensions[extName];
-					const ext = loader.extensions.get(extName);
-					if (extParams && ext && ext.parseParams) {
-						ext.parseParams(material, extParams, textures, transformExt);
-					}
-				}
-				const {
-					KHR_materials_unlit,
-					KHR_materials_pbrSpecularGlossiness
-				} = extensions;
-				if (pbrMetallicRoughness) {
-					const {
-						baseColorFactor,
-						baseColorTexture,
-						metallicFactor,
-						roughnessFactor,
-						metallicRoughnessTexture
-					} = pbrMetallicRoughness;
-					if (Array.isArray(baseColorFactor)) {
-						material.diffuse.fromArray(baseColorFactor);
-						material.opacity = baseColorFactor[3] !== undefined ? baseColorFactor[3] : 1;
-					}
-					if (baseColorTexture) {
-						material.diffuseMap = textures[baseColorTexture.index];
-						material.diffuseMapCoord = baseColorTexture.texCoord || 0;
-						if (material.diffuseMap) {
-							material.diffuseMap.encoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
-							transformExt && transformExt.handleMaterialMap(material, 'diffuseMap', baseColorTexture);
-						}
-					}
-					if (!KHR_materials_unlit && !KHR_materials_pbrSpecularGlossiness) {
-						material.metalness = metallicFactor !== undefined ? metallicFactor : 1;
-						material.roughness = roughnessFactor !== undefined ? roughnessFactor : 1;
-						if (metallicRoughnessTexture) {
-							material.metalnessMap = textures[metallicRoughnessTexture.index];
-							material.roughnessMap = textures[metallicRoughnessTexture.index];
-							// metallicRoughnessTexture transform not supported yet
-						}
-					}
-				}
-				if (emissiveFactor) {
-					material.emissive.fromArray(emissiveFactor);
-				}
-				if (emissiveTexture) {
-					material.emissiveMap = textures[emissiveTexture.index];
-					material.emissiveMapCoord = emissiveTexture.texCoord || 0;
-					if (material.emissiveMap) {
-						material.emissiveMap.encoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
-						transformExt && transformExt.handleMaterialMap(material, 'emissiveMap', emissiveTexture);
-					}
-				}
-				if (occlusionTexture) {
-					material.aoMap = textures[occlusionTexture.index];
-					material.aoMapCoord = occlusionTexture.texCoord || 0;
-					if (occlusionTexture.strength !== undefined) {
-						material.aoMapIntensity = occlusionTexture.strength;
-					}
-					if (material.aoMap) {
-						transformExt && transformExt.handleMaterialMap(material, 'aoMap', occlusionTexture);
-					}
-				}
-				if (!KHR_materials_unlit) {
-					if (normalTexture) {
-						material.normalMap = textures[normalTexture.index];
-						material.normalScale.set(1, -1);
-						if (normalTexture.scale !== undefined) {
-							// fix flip y for normal map
-							// https://github.com/mrdoob/three.js/issues/11438#issuecomment-507003995
-							material.normalScale.set(normalTexture.scale, -normalTexture.scale);
-						}
-
-						// normal map transform not supported yet
-					}
-				}
-				material.side = doubleSided === true ? t3d.DRAW_SIDE.DOUBLE : t3d.DRAW_SIDE.FRONT;
-				if (alphaMode === ALPHA_MODES.BLEND) {
-					material.transparent = true;
-				} else {
-					material.transparent = false;
-					if (alphaMode === ALPHA_MODES.MASK) {
-						material.alphaTest = alphaCutoff !== undefined ? alphaCutoff : 0.5;
-					}
-				}
-				materials[i] = material;
-			}
-			context.materials = materials;
-		}
-	};
-
-	class AccessorParser {
-		static parse(context) {
-			const {
-				bufferViews,
-				gltf
-			} = context;
-			if (!gltf.accessors) return;
-			const interleavedBufferCache = new Map();
-			const accessors = gltf.accessors.map(accessor => {
-				const {
-					bufferView: bufferViewIndex,
-					type,
-					componentType,
-					count,
-					byteOffset = 0,
-					normalized = false,
-					sparse
-				} = accessor;
-				if (bufferViewIndex === undefined && sparse === undefined) {
-					// Ignore empty accessors, which may be used to declare runtime
-					// information about attributes coming from another source (e.g. Draco compression extension).
-					return null;
-				}
-
-				// Get buffer view infos
-				const bufferView = bufferViewIndex !== undefined ? bufferViews[bufferViewIndex] : null;
-				const byteStride = bufferViewIndex !== undefined ? gltf.bufferViews[bufferViewIndex].byteStride : undefined;
-
-				// Get accessor infos
-				const itemSize = ACCESSOR_TYPE_SIZES[type];
-				const TypedArray = ACCESSOR_COMPONENT_TYPES[componentType];
-				const elementBytes = TypedArray.BYTES_PER_ELEMENT;
-				const itemBytes = elementBytes * itemSize; // For VEC3: itemSize is 3, elementBytes is 4, itemBytes is 12.
-
-				let array, attribute;
-				if (byteStride && byteStride !== itemBytes) {
-					// The buffer is interleaved
-					// Each "slice" of the buffer, as defined by 'count' elements of 'byteStride' bytes, gets its own InterleavedBuffer
-					// This makes sure that IBA.count reflects accessor.count properly
-					const ibSlice = Math.floor(byteOffset / byteStride);
-					const ibCacheKey = 'Buffer:' + bufferViewIndex + ':' + componentType + ':' + ibSlice + ':' + count;
-					let ib = interleavedBufferCache.get(ibCacheKey);
-					if (!ib) {
-						// Use the full buffer if it's interleaved.
-						array = new TypedArray(bufferView, ibSlice * byteStride, count * byteStride / elementBytes);
-
-						// Integer parameters to IB/IBA are in array elements, not bytes.
-						ib = new t3d.Buffer(array, byteStride / elementBytes);
-						interleavedBufferCache.set(ibCacheKey, ib);
-					}
-					attribute = new t3d.Attribute(ib, itemSize, byteOffset % byteStride / elementBytes, normalized);
-				} else {
-					if (bufferView === null) {
-						array = new TypedArray(count * itemSize);
-					} else {
-						array = new TypedArray(bufferView, byteOffset, count * itemSize);
-					}
-					attribute = new t3d.Attribute(new t3d.Buffer(array, itemSize), itemSize, 0, normalized);
-				}
-
-				// https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#sparse-accessors
-				if (sparse) {
-					const itemSizeIndices = ACCESSOR_TYPE_SIZES.SCALAR;
-					const TypedArrayIndices = ACCESSOR_COMPONENT_TYPES[sparse.indices.componentType];
-					const byteOffsetIndices = sparse.indices.byteOffset || 0;
-					const byteOffsetValues = sparse.values.byteOffset || 0;
-					const sparseIndices = new TypedArrayIndices(bufferViews[sparse.indices.bufferView], byteOffsetIndices, sparse.count * itemSizeIndices);
-					const sparseValues = new TypedArray(bufferViews[sparse.values.bufferView], byteOffsetValues, sparse.count * itemSize);
-					if (bufferView !== null) {
-						// Avoid modifying the original ArrayBuffer, if the bufferView wasn't initialized with zeroes.
-						attribute = new t3d.Attribute(attribute.buffer.clone(), attribute.size, attribute.offset, attribute.normalized);
-					}
-					const buffer = attribute.buffer;
-					for (let i = 0, il = sparseIndices.length; i < il; i++) {
-						const index = sparseIndices[i];
-						buffer.array[index * attribute.size] = sparseValues[i * itemSize];
-						if (itemSize >= 2) buffer.array[index * attribute.size + 1] = sparseValues[i * itemSize + 1];
-						if (itemSize >= 3) buffer.array[index * attribute.size + 2] = sparseValues[i * itemSize + 2];
-						if (itemSize >= 4) buffer.array[index * attribute.size + 3] = sparseValues[i * itemSize + 3];
-						if (itemSize >= 5) throw new Error('Unsupported itemSize in sparse Attribute.');
-					}
-				}
-				return attribute;
-			});
-			interleavedBufferCache.clear();
-			context.accessors = accessors;
-		}
-	}
-
-	let PrimitiveParser$1 = class PrimitiveParser {
-		static parse(context, loader) {
-			const {
-				gltf,
-				accessors,
-				materials,
-				bufferViews
-			} = context;
-			if (!gltf.meshes) return;
-			const dracoExt = loader.extensions.get('KHR_draco_mesh_compression');
-			const materialCache = new Map();
-			const geometryPromiseCache = new Map();
-			const meshPromises = [];
-			for (let i = 0; i < gltf.meshes.length; i++) {
-				const gltfMesh = gltf.meshes[i];
-				const primitivePromises = [];
-				for (let j = 0; j < gltfMesh.primitives.length; j++) {
-					const gltfPrimitive = gltfMesh.primitives[j];
-					const {
-						extensions = {},
-						mode,
-						material
-					} = gltfPrimitive;
-					const {
-						KHR_draco_mesh_compression
-					} = extensions;
-					let geometryPromise;
-					const geometryKey = createGeometryKey$1(gltfPrimitive);
-					if (geometryPromiseCache.has(geometryKey)) {
-						geometryPromise = geometryPromiseCache.get(geometryKey);
-					} else {
-						if (KHR_draco_mesh_compression && dracoExt) {
-							geometryPromise = dracoExt.getGeometry(KHR_draco_mesh_compression, bufferViews, gltfPrimitive.attributes, gltf.accessors, loader.getDRACOLoader());
-						} else {
-							geometryPromise = Promise.resolve(new t3d.Geometry());
-						}
-						geometryPromise = geometryPromise.then(geometry => {
-							parseGeometryFromGLTFPrimitive$1(geometry, gltfPrimitive, gltf, accessors);
-							return geometry;
-						});
-						geometryPromiseCache.set(geometryKey, geometryPromise);
-					}
-					const primitivePromise = geometryPromise.then(geometry => {
-						const primitive = {
-							mode,
-							geometry,
-							material: material === undefined ? new t3d.PBRMaterial() : materials[material],
-							weights: Object.keys(geometry.morphAttributes).length > 0 && gltfMesh.weights ? gltfMesh.weights.slice(0) : undefined,
-							skinned: gltfMesh.isSkinned
-						};
-						assignFinalMaterial$1(primitive, materialCache);
-						return primitive;
-					});
-					primitivePromises.push(primitivePromise);
-				}
-				meshPromises.push(Promise.all(primitivePromises));
-			}
-			materialCache.clear();
-			geometryPromiseCache.clear();
-			return Promise.all(meshPromises).then(primitives => {
-				context.primitives = primitives;
-			});
-		}
-	};
-	function parseGeometryFromGLTFPrimitive$1(geometry, gltfPrimitive, gltf, accessors) {
-		const {
-			attributes,
-			indices,
-			targets
-		} = gltfPrimitive;
-
-		// set attributes
-
-		for (const attributeSemantic in attributes) {
-			const accessorIdx = attributes[attributeSemantic];
-			const attributeName = ATTRIBUTES[attributeSemantic] === undefined ? attributeSemantic : ATTRIBUTES[attributeSemantic];
-			// Skip attributes already provided by e.g. Draco extension.
-			if (attributeName in geometry.attributes) continue;
-			geometry.addAttribute(attributeName, accessors[accessorIdx]);
-		}
-
-		// set index
-
-		if (indices !== undefined && !geometry.index) {
-			geometry.setIndex(accessors[indices]);
-		}
-
-		// compute bounds
-
-		const {
-			boundingBox,
-			boundingSphere
-		} = geometry;
-		if (attributes.POSITION !== undefined) {
-			const accessorIdx = attributes.POSITION;
-			const accessor = gltf.accessors[accessorIdx];
-			if (accessor.min && accessor.max) {
-				boundingBox.min.fromArray(accessor.min);
-				boundingBox.max.fromArray(accessor.max);
-				if (accessor.normalized) {
-					const boxScale = GLTFUtils.getNormalizedComponentScale(ACCESSOR_COMPONENT_TYPES[accessor.componentType]);
-					boundingBox.min.multiplyScalar(boxScale);
-					boundingBox.max.multiplyScalar(boxScale);
-				}
-			} else {
-				geometry.computeBoundingBox();
-			}
-		} else {
-			geometry.computeBoundingBox();
-		}
-		boundingBox.getCenter(boundingSphere.center);
-		boundingSphere.radius = boundingBox.min.distanceTo(boundingBox.max) / 2;
-
-		// set morph targets
-
-		if (targets) {
-			let hasMorphPosition = false;
-			let hasMorphNormal = false;
-			for (let i = 0, il = targets.length; i < il; i++) {
-				const target = targets[i];
-				if (target.POSITION !== undefined) hasMorphPosition = true;
-				if (target.NORMAL !== undefined) hasMorphNormal = true;
-				if (hasMorphPosition && hasMorphNormal) break;
-			}
-			if (hasMorphPosition || hasMorphNormal) {
-				const morphPositions = [];
-				const morphNormals = [];
-				for (let i = 0, il = targets.length; i < il; i++) {
-					const target = targets[i];
-					if (hasMorphPosition) {
-						morphPositions.push(target.POSITION !== undefined ? accessors[target.POSITION] : geometry.attributes[ATTRIBUTES.POSITION]);
-					}
-					if (hasMorphNormal) {
-						morphNormals.push(target.NORMAL !== undefined ? accessors[target.NORMAL] : geometry.attributes[ATTRIBUTES.NORMAL]);
-					}
-				}
-				if (hasMorphPosition) {
-					geometry.morphAttributes.position = morphPositions;
-				}
-				if (hasMorphNormal) {
-					geometry.morphAttributes.normal = morphNormals;
-				}
-			}
-		}
-		return geometry;
-	}
-	function assignFinalMaterial$1(primitive, materialCache) {
-		let {
-			geometry,
-			material,
-			skinned,
-			mode
-		} = primitive;
-
-		// If the material will be modified later on, clone it now.
-		const useVertexTangents = geometry.attributes[ATTRIBUTES.TANGENT] !== undefined;
-		const useVertexColors = geometry.attributes[ATTRIBUTES.COLOR_0] !== undefined;
-		const useFlatShading = geometry.attributes[ATTRIBUTES.NORMAL] === undefined;
-		const useSkinning = skinned;
-		if (mode === WEBGL_DRAW_MODES.POINTS) {
-			const cacheKey = 'PointsMaterial:' + material.id;
-			let pointsMaterial = materialCache.get(cacheKey);
-			if (!pointsMaterial) {
-				pointsMaterial = new t3d.PointsMaterial();
-				t3d.Material.prototype.copy.call(pointsMaterial, material);
-				pointsMaterial.diffuse.copy(material.diffuse);
-				pointsMaterial.diffuseMap = material.map;
-				pointsMaterial.drawMode = mode;
-				pointsMaterial.acceptLight = false; // PointsMaterial doesn't support lights yet
-				materialCache.set(cacheKey, pointsMaterial);
-			}
-			material = pointsMaterial;
-		} else if (mode === WEBGL_DRAW_MODES.LINES || mode === WEBGL_DRAW_MODES.LINE_STRIP || mode === WEBGL_DRAW_MODES.LINE_LOOP) {
-			const cacheKey = 'BasicMaterial:' + material.id;
-			let basicMaterial = materialCache.get(cacheKey);
-			if (!basicMaterial) {
-				basicMaterial = new t3d.BasicMaterial();
-				basicMaterial.envMap = undefined; // force close env map
-				basicMaterial.diffuse.copy(material.diffuse);
-				basicMaterial.diffuseMap = material.diffuseMap;
-				basicMaterial.drawMode = mode;
-				materialCache.set(cacheKey, basicMaterial);
-			}
-			material = basicMaterial;
-		} else if (mode === WEBGL_DRAW_MODES.TRIANGLE_STRIP) {
-			// TODO
-			console.warn('TRIANGLE_STRIP will be removed later.');
-			material.drawMode = WEBGL_DRAW_MODES.TRIANGLE_STRIP;
-		} else if (mode === WEBGL_DRAW_MODES.TRIANGLE_FAN) {
-			// TODO
-			console.warn('TRIANGLE_FAN will be removed later.');
-			material.drawMode = WEBGL_DRAW_MODES.TRIANGLE_FAN;
-		}
-		if (useVertexTangents || useVertexColors || useFlatShading || useSkinning) {
-			let cacheKey = 'ClonedMaterial:' + material.id + ':';
-			if (useVertexTangents) cacheKey += 'vertex-tangents:';
-			if (useVertexColors) {
-				if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 3) {
-					cacheKey += 'vertex-colors-rgb:';
-				} else if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 4) {
-					cacheKey += 'vertex-colors-rgba:';
-				}
-			}
-			if (useFlatShading) cacheKey += 'flat-shading:';
-			let cachedMaterial = materialCache.get(cacheKey);
-			if (!cachedMaterial) {
-				cachedMaterial = material.clone();
-				if (useVertexTangents) {
-					cachedMaterial.vertexTangents = true;
-
-					// revert flip y fix for tangents
-					// https://github.com/mrdoob/three.js/issues/11438#issuecomment-507003995
-					if (cachedMaterial.normalMap) {
-						cachedMaterial.normalScale.y *= -1;
-					}
-				}
-				if (useVertexColors) {
-					if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 3) {
-						cachedMaterial.vertexColors = t3d.VERTEX_COLOR.RGB;
-					} else if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 4) {
-						cachedMaterial.vertexColors = t3d.VERTEX_COLOR.RGBA;
-					} else {
-						console.warn('Illegal vertex color size: ' + geometry.attributes[ATTRIBUTES.COLOR_0].size);
-					}
-				}
-				if (useFlatShading) {
-					cachedMaterial.shading = t3d.SHADING_TYPE.FLAT_SHADING;
-				}
-			}
-			material = cachedMaterial;
-		}
-		primitive.material = material;
-	}
-	function createGeometryKey$1(primitive) {
-		const dracoExtension = primitive.extensions && primitive.extensions.KHR_draco_mesh_compression;
-		let geometryKey;
-		if (dracoExtension) {
-			geometryKey = 'draco:' + dracoExtension.bufferView + ':' + dracoExtension.indices + ':' + createAttributesKey$1(dracoExtension.attributes);
-		} else {
-			geometryKey = primitive.indices + ':' + createAttributesKey$1(primitive.attributes) + ':' + primitive.mode;
-		}
-		if (primitive.targets) {
-			for (let i = 0, il = primitive.targets.length; i < il; i++) {
-				geometryKey += ':' + createAttributesKey$1(primitive.targets[i]);
-			}
-		}
-		return geometryKey;
-	}
-	function createAttributesKey$1(attributes) {
-		let attributesKey = '';
-		const keys = Object.keys(attributes).sort();
-		for (let i = 0, il = keys.length; i < il; i++) {
-			attributesKey += keys[i] + ':' + attributes[keys[i]] + ';';
-		}
-		return attributesKey;
-	}
-
-	class NodeParser {
-		static parse(context, loader) {
-			const {
-				gltf: {
-					nodes: gltfNodes,
-					cameras: gltfCameras,
-					extensions: gltfExtensions
-				}
-			} = context;
-			if (!gltfNodes) return;
-			const lightsExt = loader.extensions.get('KHR_lights_punctual');
-			const instancingExt = loader.extensions.get('EXT_mesh_gpu_instancing');
-			const cameras = [];
-			const lights = [];
-			const nodes = gltfNodes.map(gltfNode => {
-				const {
-					matrix,
-					translation,
-					rotation,
-					scale,
-					camera: cameraID,
-					mesh: meshID,
-					extensions = {}
-				} = gltfNode;
-				const {
-					KHR_lights_punctual,
-					EXT_mesh_gpu_instancing
-				} = extensions;
-				let node = null;
-				if (gltfNode.isBone) {
-					// .isBone isn't in glTF spec. Marked in IndexParser
-					node = new t3d.Bone();
-				} else if (meshID !== undefined) {
-					if (EXT_mesh_gpu_instancing && instancingExt) {
-						node = instancingExt.getInstancedMesh(context, gltfNode);
-					} else {
-						node = createMesh(context, gltfNode);
-					}
-				} else if (cameraID !== undefined) {
-					node = createCamera(gltfCameras[cameraID]);
-					cameras.push(node);
-				} else if (KHR_lights_punctual && lightsExt) {
-					const lightIndex = KHR_lights_punctual.light;
-					const gltfLights = gltfExtensions.KHR_lights_punctual.lights;
-					node = lightsExt.getLight(gltfLights[lightIndex]);
-					lights.push(node);
-				} else {
-					node = new t3d.Object3D();
-				}
-				node.name = gltfNode.name || '';
-				if (!!node.name && node.children.length > 0) {
-					for (let i = 0; i < node.children.length; i++) {
-						node.children[i].name = node.name + '_' + i;
-					}
-				}
-				if (matrix !== undefined) {
-					node.matrix.fromArray(matrix);
-					node.matrix.decompose(node.position, node.quaternion, node.scale);
-				} else {
-					if (translation !== undefined) {
-						node.position.fromArray(translation);
-					}
-					if (rotation !== undefined) {
-						node.quaternion.fromArray(rotation);
-					}
-					if (scale !== undefined) {
-						node.scale.fromArray(scale);
-					}
-				}
-				return node;
-			});
-			context.nodes = nodes;
-			context.cameras = cameras;
-			context.lights = lights;
-		}
-	}
-	function createCamera(cameraDef) {
-		const {
-			orthographic,
-			perspective,
-			type
-		} = cameraDef;
-		const camera = new t3d.Camera();
-		if (type == 'perspective') {
-			const {
-				aspectRatio,
-				yfov,
-				zfar,
-				znear
-			} = perspective;
-			camera.setPerspective(yfov, aspectRatio || 1, znear || 1, zfar || 2e6);
-		} else if (type == 'orthographic') {
-			const {
-				xmag,
-				ymag,
-				zfar,
-				znear
-			} = orthographic;
-			// https:// github.com/KhronosGroup/glTF/issues/1663
-			camera.setOrtho(-xmag, xmag, -ymag, ymag, znear || 1, zfar || 2e6);
-		}
-		return camera;
-	}
-	function createMesh(context, gltfNode) {
-		const {
-			primitives
-		} = context;
-		const {
-			mesh: meshID,
-			skin: skinID
-		} = gltfNode;
-		const meshes = primitives[meshID].map(primitive => {
-			const {
-				geometry,
-				material,
-				weights
-			} = primitive;
-			let mesh;
-			if (skinID !== undefined) {
-				mesh = new t3d.SkinnedMesh(geometry, material);
-				if (geometry.attributes.skinWeight && !geometry.attributes.skinWeight.normalized) {
-					GLTFUtils.normalizeSkinWeights(geometry.attributes.skinWeight);
-				}
-			} else {
-				mesh = new t3d.Mesh(geometry, material);
-				if (weights) {
-					mesh.morphTargetInfluences = weights.slice();
-				}
-			}
-			return mesh;
-		});
-		if (meshes.length > 1) {
-			const parent = new t3d.Object3D();
-			meshes.forEach(mesh => parent.add(mesh));
-			return parent;
-		} else {
-			return meshes[0];
-		}
-	}
-
-	class SkinParser {
-		static parse(context) {
-			const {
-				gltf,
-				accessors,
-				nodes
-			} = context;
-			const gltfSkins = gltf.skins;
-			if (!gltfSkins) return;
-			const skins = gltfSkins.map(skin => {
-				const {
-					inverseBindMatrices,
-					joints
-				} = skin;
-				const attribute = accessors[inverseBindMatrices];
-				const bones = [];
-				const boneInverses = [];
-				joints.forEach((jointId, index) => {
-					const jointNode = nodes[jointId];
-					if (jointNode) {
-						bones.push(jointNode);
-						const boneInverse = new t3d.Matrix4();
-						if (attribute) {
-							boneInverse.fromArray(attribute.buffer.array, index * 16);
-						}
-						boneInverses.push(boneInverse);
-					} else {
-						console.warn('Joint ' + jointId + ' could not be found.');
-					}
-				});
-				return new t3d.Skeleton(bones, boneInverses);
-			});
-			context.skins = skins;
-
-			// Bind all skined meshes
-			nodes.forEach((node, index) => {
-				const {
-					skin: skinID
-				} = gltf.nodes[index];
-				if (skinID !== undefined) {
-					node.traverse(function (mesh) {
-						if (!mesh.isSkinnedMesh) return;
-						mesh.bind(skins[skinID], mesh.worldMatrix); // TODO need updateMatrix ?
-					});
-				}
-			});
-		}
-	}
-
-	class SceneParser {
-		static parse(context) {
-			const {
-				gltf,
-				nodes
-			} = context;
-			const roots = gltf.scenes.map(sceneDef => {
-				const {
-					name: sceneName = '',
-					nodes: nodeIds = []
-				} = sceneDef;
-				const group = new t3d.Object3D();
-				group.name = sceneName;
-				for (let i = 0; i < nodeIds.length; i++) {
-					buildNodeHierachy(nodeIds[i], group, gltf.nodes, nodes);
-				}
-				return group;
-			});
-			context.roots = roots;
-			context.root = roots[gltf.scene || 0];
-		}
-	}
-	function buildNodeHierachy(nodeId, parentNode, gltfNodes, nodes) {
-		const node = nodes[nodeId];
-		const nodeDef = gltfNodes[nodeId];
-		parentNode.add(node);
-		if (nodeDef.children) {
-			const children = nodeDef.children;
-			for (let i = 0, il = children.length; i < il; i++) {
-				const child = children[i];
-				buildNodeHierachy(child, node, gltfNodes, nodes);
-			}
-		}
-	}
-
-	class AnimationParser {
-		static parse(context, loader) {
-			const {
-				gltf,
-				nodes,
-				accessors
-			} = context;
-			const {
-				animations
-			} = gltf;
-			if (!animations) return;
-			const pointerExt = loader.extensions.get('KHR_animation_pointer');
-			const animationClips = animations.map((gltfAnimation, index) => {
-				const {
-					channels,
-					samplers,
-					name = `animation_${index}`
-				} = gltfAnimation;
-				const trackInfos = [];
-				let duration = 0;
-				for (let i = 0; i < channels.length; i++) {
-					const gltfChannel = channels[i];
-					const gltfSampler = samplers[gltfChannel.sampler];
-					if (!gltfSampler) continue;
-					const targetDef = gltfChannel.target;
-					const inputAccessor = accessors[gltfSampler.input];
-					const input = new inputAccessor.buffer.array.constructor(inputAccessor.buffer.array);
-					const outputAccessor = accessors[gltfSampler.output];
-					const output = new Float32Array(outputAccessor.buffer.array);
-					if (outputAccessor.normalized) {
-						const scale = GLTFUtils.getNormalizedComponentScale(outputAccessor.buffer.array.constructor);
-						for (let j = 0, jl = output.length; j < jl; j++) {
-							output[j] *= scale;
-						}
-					}
-					duration = Math.max(duration, input[input.length - 1]);
-					if (pointerExt && targetDef.extensions && targetDef.extensions['KHR_animation_pointer']) {
-						pointerExt.getTrackInfos(context, targetDef.extensions['KHR_animation_pointer'], input, output, gltfSampler.interpolation, trackInfos);
-					} else {
-						const target = nodes[targetDef.node !== undefined ? targetDef.node : targetDef.id]; // Note: targetDef.id is deprecated.
-
-						if (!target) continue;
-						let TypedKeyframeTrack, propertyPath;
-						if (targetDef.path === 'rotation') {
-							TypedKeyframeTrack = t3d.QuaternionKeyframeTrack;
-							propertyPath = 'quaternion';
-						} else if (targetDef.path === 'weights') {
-							TypedKeyframeTrack = t3d.NumberKeyframeTrack;
-							propertyPath = 'morphTargetInfluences';
-						} else if (targetDef.path === 'translation') {
-							TypedKeyframeTrack = t3d.VectorKeyframeTrack;
-							propertyPath = 'position';
-						} else if (targetDef.path === 'scale') {
-							TypedKeyframeTrack = t3d.VectorKeyframeTrack;
-							propertyPath = 'scale';
-						} else {
-							continue;
-						}
-						trackInfos.push({
-							TypedKeyframeTrack,
-							target,
-							propertyPath,
-							times: input,
-							values: output,
-							interpolation: gltfSampler.interpolation
-						});
-					}
-				}
-				const tracks = [];
-				trackInfos.forEach(trackInfo => {
-					const {
-						TypedKeyframeTrack,
-						target,
-						propertyPath,
-						times,
-						values,
-						interpolation
-					} = trackInfo;
-					const interpolant = getInterpolant(interpolation, TypedKeyframeTrack === t3d.QuaternionKeyframeTrack);
-					if (propertyPath === 'morphTargetInfluences') {
-						// node may be a Object3D (glTF mesh with several primitives) or a Mesh.
-						target.traverse(object => {
-							if (object.isMesh && object.morphTargetInfluences) {
-								const track = new TypedKeyframeTrack(object, propertyPath, times, values, interpolant);
-								tracks.push(track);
-							}
-						});
-					} else {
-						const track = new TypedKeyframeTrack(target, propertyPath, times, values, interpolant);
-						tracks.push(track);
-					}
-				});
-				return new t3d.KeyframeClip(name, tracks, duration);
-			});
-			context.animations = animationClips;
-		}
-	}
-	function getInterpolant(type, quaternion) {
-		switch (type) {
-			case 'STEP':
-				return t3d.StepInterpolant;
-			case 'CUBICSPLINE':
-				return quaternion ? t3d.QuaternionCubicSplineInterpolant : t3d.CubicSplineInterpolant;
-			case 'LINEAR':
-			default:
-				return quaternion ? t3d.QuaternionLinearInterpolant : t3d.LinearInterpolant;
-		}
-	}
-
-	let resourceId = 0;
-	class GLTFResource {
-		constructor() {
-			this.id = ++resourceId;
-			this.url = ''; // url string
-			this.path = ''; // path string
-			this.options = null; // load options
-			this.gltf = null; // gltf json after IndexParser
-			this.loadItems = null; // String[] after IndexParser. Store all urls that need to load.
-			this.buffers = null; // ArrayBuffer[] after BufferParser
-			this.bufferViews = null; // ArrayBuffer[] after BufferViewParser
-			this.images = null; // Image[] after ImageParser
-			this.textures = null; // Texture2D[] after TextureParser
-			this.materials = null; // Material[] after MaterialParser
-			this.accessors = null; // Attribute[] after AccessorParser
-			this.primitives = null; // { mode, geometry, material, weights, skinned }[] after PrimitiveParser
-			this.nodes = null; // Object3D[] after NodeParser
-			this.cameras = null; // Camera[] after NodeParser
-			this.lights = null; // Light[] after NodeParser
-			this.skins = null; // Skeleton[] after SkinParser
-			this.root = null; // root after SceneParser
-			this.roots = null; // root[] after SceneParser
-			this.animations = null; // KeyframeClip[] after AnimationParser
-		}
-	}
-
-	/**
-	 * meshopt BufferView Compression Extension
-	 *
-	 * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Vendor/EXT_meshopt_compression
-	 */
-	class EXT_meshopt_compression {
-		static loadBufferView(extensionDef, buffers, meshoptDecoder) {
-			const buffer = buffers[extensionDef.buffer];
-			if (!meshoptDecoder || !meshoptDecoder.supported) {
-				throw new Error('GLTFLoader: setMeshoptDecoder must be called before loading compressed files.');
-			}
-			const byteOffset = extensionDef.byteOffset || 0;
-			const byteLength = extensionDef.byteLength || 0;
-			const count = extensionDef.count;
-			const stride = extensionDef.byteStride;
-			const source = new Uint8Array(buffer, byteOffset, byteLength);
-			if (meshoptDecoder.decodeGltfBufferAsync) {
-				return meshoptDecoder.decodeGltfBufferAsync(count, stride, source, extensionDef.mode, extensionDef.filter).then(res => res.buffer);
-			} else {
-				// Support for MeshoptDecoder 0.18 or earlier, without decodeGltfBufferAsync
-				return meshoptDecoder.ready.then(() => {
-					const result = new ArrayBuffer(count * stride);
-					meshoptDecoder.decodeGltfBuffer(new Uint8Array(result), count, stride, source, extensionDef.mode, extensionDef.filter);
-					return result;
-				});
-			}
-		}
-	}
-
-	/**
-	 * KHR_draco_mesh_compression extension
-	 * https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_draco_mesh_compression
-	 */
-	class KHR_draco_mesh_compression {
-		static getGeometry(params, bufferViews, attributes, accessors, dracoLoader) {
-			const {
-				bufferView: bufferViewIndex,
-				attributes: gltfAttributeMap
-			} = params;
-			if (!dracoLoader) {
-				throw new Error('GLTFLoader: No DRACOLoader instance provided.');
-			}
-			const attributeMap = {};
-			for (const attributeSemantic in gltfAttributeMap) {
-				const attributeName = ATTRIBUTES[attributeSemantic] === undefined ? attributeSemantic : ATTRIBUTES[attributeSemantic];
-				attributeMap[attributeName] = gltfAttributeMap[attributeSemantic];
-			}
-			const attributeNormalizedMap = {};
-			const attributeTypeMap = {};
-			for (const attributeNameItem in attributes) {
-				const attributeName = ATTRIBUTES[attributeNameItem] || attributeNameItem.toLowerCase();
-				if (gltfAttributeMap[attributeNameItem] !== undefined) {
-					const accessorDef = accessors[attributes[attributeNameItem]];
-					const componentType = ACCESSOR_COMPONENT_TYPES[accessorDef.componentType];
-					attributeTypeMap[attributeName] = componentType.name;
-					attributeNormalizedMap[attributeName] = accessorDef.normalized === true;
-				}
-			}
-			const bufferView = bufferViews[bufferViewIndex];
-			return new Promise(function (resolve) {
-				dracoLoader.decodeDracoFile(bufferView, function (geometry) {
-					for (const attributeName in geometry.attributes) {
-						const attribute = geometry.attributes[attributeName];
-						const normalized = attributeNormalizedMap[attributeName];
-						if (normalized !== undefined) attribute.normalized = normalized;
-					}
-					resolve(geometry);
-				}, attributeMap, attributeTypeMap);
-			});
-		}
-	}
-
-	/**
-	 * KHR_lights_punctual extension
-	 * https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md
-	 */
-	class KHR_lights_punctual {
-		static getLight(params) {
-			const {
-				color,
-				intensity = 1,
-				type,
-				range,
-				spot
-			} = params;
-			let lightNode;
-			if (type === 'directional') {
-				lightNode = new t3d.DirectionalLight();
-			} else if (type === 'point') {
-				lightNode = new t3d.PointLight();
-				if (range !== undefined) {
-					lightNode.distance = range;
-				}
-
-				// https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
-				// lightNode.decay = 2;
-			} else if (type === 'spot') {
-				lightNode = new t3d.SpotLight();
-				if (range !== undefined) {
-					lightNode.distance = range;
-				}
-
-				// https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
-				// lightNode.decay = 2;
-
-				if (spot) {
-					const {
-						innerConeAngle = 0,
-						outerConeAngle = Math.PI / 4
-					} = spot;
-					lightNode.angle = outerConeAngle;
-					lightNode.penumbra = 1.0 - innerConeAngle / outerConeAngle;
-				}
-			} else {
-				throw new Error('Unexpected light type: ' + type);
-			}
-			if (color) {
-				lightNode.color.fromArray(color);
-			}
-			lightNode.intensity = intensity;
-			return lightNode;
-		}
-	}
-
-	/**
-	 * KHR_materials_clearcoat extension
-	 * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_clearcoat
-	 */
-	class KHR_materials_clearcoat {
-		static getMaterial() {
-			return new t3d.PBRMaterial();
-		}
-		static parseParams(material, extension, textures) {
-			if (material.constructor !== t3d.PBRMaterial) return;
-			const {
-				clearcoatFactor,
-				clearcoatTexture,
-				clearcoatRoughnessFactor,
-				clearcoatRoughnessTexture,
-				clearcoatNormalTexture
-			} = extension;
-			if (clearcoatFactor) {
-				material.clearcoat = clearcoatFactor;
-			}
-			if (clearcoatTexture) {
-				material.clearcoatMap = textures[clearcoatTexture.index];
-				// material does not yet support the transform of clearcoatMap.
-				// parseTextureTransform(material, 'clearcoatMap', clearcoatTexture.extensions);
-			}
-			if (clearcoatRoughnessFactor) {
-				material.clearcoatRoughness = clearcoatRoughnessFactor;
-			}
-			if (clearcoatRoughnessTexture) {
-				material.clearcoatRoughnessMap = textures[clearcoatRoughnessTexture.index];
-				// material does not yet support the transform of clearcoatRoughnessMap.
-				// parseTextureTransform(material, 'clearcoatRoughnessMap', clearcoatRoughnessTexture.extensions);
-			}
-			if (clearcoatNormalTexture) {
-				material.clearcoatNormalMap = textures[clearcoatNormalTexture.index];
-				// material does not yet support the transform of clearcoatNormalMap.
-				// parseTextureTransform(material, 'clearcoatNormalMap', clearcoatNormalTexture.extensions);
-				if (clearcoatNormalTexture.scale) {
-					const scale = clearcoatNormalTexture.scale;
-					material.clearcoatNormalScale = new t3d.Vector2(scale, scale);
-				}
-			}
-		}
-	}
-
-	/**
-	 * KHR_materials_pbrSpecularGlossiness extension
-	 * https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Archived/KHR_materials_pbrSpecularGlossiness/README.md
-	 */
-	class KHR_materials_pbrSpecularGlossiness {
-		static getMaterial() {
-			return new t3d.PBR2Material();
-		}
-		static parseParams(material, params, textures, transformExt) {
-			if (material.constructor !== t3d.PBR2Material) return;
-			const {
-				diffuseFactor,
-				diffuseTexture,
-				specularFactor,
-				glossinessFactor,
-				specularGlossinessTexture
-			} = params;
-			if (Array.isArray(diffuseFactor)) {
-				material.diffuse.fromArray(diffuseFactor);
-				material.opacity = diffuseFactor[3] || 1;
-			}
-			if (diffuseTexture) {
-				material.diffuseMap = textures[diffuseTexture.index];
-				material.diffuseMapCoord = diffuseTexture.texCoord || 0;
-				if (material.diffuseMap) {
-					material.diffuseMap.encoding = t3d.TEXEL_ENCODING_TYPE.SRGB;
-					transformExt && transformExt.handleMaterialMap(material, 'diffuseMap', diffuseTexture);
-				}
-			}
-			material.glossiness = glossinessFactor !== undefined ? glossinessFactor : 1.0;
-			if (Array.isArray(specularFactor)) {
-				material.specular.fromArray(specularFactor);
-			}
-			if (specularGlossinessTexture) {
-				material.glossinessMap = textures[specularGlossinessTexture.index];
-				material.specularMap = textures[specularGlossinessTexture.index];
-				// specularGlossinessTexture transform not supported yet
-			}
-		}
-	}
-
-	/**
-	 * KHR_materials_unlit extension
-	 * https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_materials_unlit
-	 */
-	class KHR_materials_unlit {
-		static getMaterial() {
-			return new t3d.BasicMaterial();
-		}
-	}
-
-	/**
-	 * BasisU Texture Extension
-	 *
-	 * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_basisu
-	 */
-	class KHR_texture_basisu {
-		static loadTextureData(url, ktx2Loader) {
-			return new Promise((resolve, reject) => {
-				ktx2Loader.load(url, resolve, undefined, reject);
-			});
-		}
-	}
-
-	/**
-	 * KHR_texture_transform extension
-	 * https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_transform
-	 */
-	class KHR_texture_transform {
-		static handleMaterialMap(material, mapType, textureDef) {
-			if (!textureDef.extensions) return;
-			const extDef = textureDef.extensions.KHR_texture_transform;
-			if (!extDef) return;
-
-			// If texCoord is present, it overrides the texture's texCoord
-			if (extDef.texCoord !== undefined) {
-				material[mapType + 'Coord'] = extDef.texCoord;
-			}
-			const transform = material[mapType + 'Transform'];
-			if (!transform) return;
-			if (extDef.offset !== undefined) {
-				transform.offset.fromArray(extDef.offset);
-			}
-			if (extDef.rotation !== undefined) {
-				transform.rotation = extDef.rotation;
-			}
-			if (extDef.scale !== undefined) {
-				transform.scale.fromArray(extDef.scale);
-			}
-			transform.updateMatrix();
-		}
-	}
-
-	class KHR_animation_pointer {
-		static getTrackInfos(context, extensionDef, input, output, interpolation, trackInfos) {
-			const {
-				pointer
-			} = extensionDef;
-			const segments = pointer.replace(/^\//, '').split('/');
-			const type = segments[0];
-			const index = parseInt(segments[1]);
-			const property = segments[segments.length - 1];
-			const searchArray = context[type];
-			if (!searchArray) return;
-			const target = searchArray[index];
-			if (!target) return;
-			let TypedKeyframeTrack, propertyPath, TypedKeyframeTrack2, propertyPath2;
-			if (property === 'rotation') {
-				TypedKeyframeTrack = t3d.QuaternionKeyframeTrack;
-				propertyPath = 'quaternion';
-			} else if (property === 'weights') {
-				TypedKeyframeTrack = t3d.NumberKeyframeTrack;
-				propertyPath = 'morphTargetInfluences';
-			} else if (property === 'translation') {
-				TypedKeyframeTrack = t3d.VectorKeyframeTrack;
-				propertyPath = 'position';
-			} else if (property === 'scale') {
-				TypedKeyframeTrack = t3d.VectorKeyframeTrack;
-				propertyPath = 'scale';
-			} else if (property === 'baseColorFactor') {
-				TypedKeyframeTrack = t3d.ColorKeyframeTrack;
-				propertyPath = 'diffuse';
-				TypedKeyframeTrack2 = t3d.NumberKeyframeTrack;
-				propertyPath2 = 'opacity';
-			} else if (property === 'metallicFactor') {
-				TypedKeyframeTrack = t3d.NumberKeyframeTrack;
-				propertyPath = 'metalness';
-			} else if (property === 'roughnessFactor') {
-				TypedKeyframeTrack = t3d.NumberKeyframeTrack;
-				propertyPath = 'roughness';
-			} else if (property === 'emissiveFactor') {
-				TypedKeyframeTrack = t3d.VectorKeyframeTrack;
-				propertyPath = 'emissive';
-			} else if (segments[segments.length - 2] === 'KHR_texture_transform') {
-				TypedKeyframeTrack = t3d.VectorKeyframeTrack;
-				const textureProperty = segments[segments.length - 4];
-				if (textureProperty === 'baseColorTexture') {
-					propertyPath = 'diffuseMapTransform.' + property;
-				} else if (textureProperty === 'emissiveTexture') {
-					propertyPath = 'emissiveMapTransform.' + property;
-				} else {
-					return;
-				}
-			} else {
-				return;
-			}
-			if (property === 'baseColorFactor') {
-				// Separate the alpha channel from the color
-				const color3Output = new Float32Array(output.length / 4 * 3);
-				const alphaOutput = new Float32Array(output.length / 4);
-				for (let i = 0; i < output.length / 4; i++) {
-					color3Output[i * 3] = output[i * 4];
-					color3Output[i * 3 + 1] = output[i * 4 + 1];
-					color3Output[i * 3 + 2] = output[i * 4 + 2];
-					alphaOutput[i] = output[i * 4 + 3];
-				}
-				trackInfos.push({
-					TypedKeyframeTrack,
-					target,
-					propertyPath,
-					times: input,
-					values: color3Output,
-					interpolation
-				});
-				trackInfos.push({
-					TypedKeyframeTrack: TypedKeyframeTrack2,
-					target,
-					propertyPath: propertyPath2,
-					times: input,
-					values: alphaOutput,
-					interpolation
-				});
-			} else {
-				trackInfos.push({
-					TypedKeyframeTrack,
-					target,
-					propertyPath,
-					times: input,
-					values: output,
-					interpolation
-				});
-			}
-		}
-	}
-
-	const DefaultParsePipeline = [IndexParser$1, ReferenceParser, Validator, BufferParser, BufferViewParser, ImageParser, TextureParser, MaterialParser$1, AccessorParser, PrimitiveParser$1, NodeParser, SkinParser, SceneParser, AnimationParser];
-	const DefaultExtensions = new Map([['EXT_meshopt_compression', EXT_meshopt_compression], ['KHR_draco_mesh_compression', KHR_draco_mesh_compression], ['KHR_lights_punctual', KHR_lights_punctual], ['KHR_materials_clearcoat', KHR_materials_clearcoat], ['KHR_materials_pbrSpecularGlossiness', KHR_materials_pbrSpecularGlossiness], ['KHR_materials_unlit', KHR_materials_unlit], ['KHR_mesh_quantization', {}],
-	// This is supported by default
-	['KHR_texture_basisu', KHR_texture_basisu], ['KHR_texture_transform', KHR_texture_transform], ['KHR_animation_pointer', KHR_animation_pointer]]);
-	class GLTFLoader {
-		constructor(manager = t3d.DefaultLoadingManager, parsers = DefaultParsePipeline, extensions = DefaultExtensions) {
-			this.manager = manager;
-
-			// If ture, loading manager will dispatch progress for every buffer and image.
-			// otherwise, loading manager will only dispatch progress for the whole gltf resource.
-			this.detailLoadProgress = true;
-
-			// If set false, need add Promise.catch to catch errors.
-			this.autoLogError = true;
-			this.extensions = new Map(extensions);
-
-			// Indicate which extensions can be parsed in a uniform way.
-			this.autoParseConfig = {
-				materials: ['KHR_materials_clearcoat', 'KHR_materials_pbrSpecularGlossiness', 'KHR_materials_unlit', 'KHR_materials_transmission', 'KHR_materials_ior', 'KHR_materials_volume', 'KHR_materials_dispersion']
-			};
-			this._parsers = parsers.slice(0);
-			this._dracoLoader = null;
-			this._meshoptDecoder = null;
-			this._ktx2Loader = null;
-			this._fileLoader = new t3d.FileLoader();
-			const userAgent = navigator.userAgent;
-			const isSafari = /^((?!chrome|android).)*safari/i.test(userAgent) === true;
-			const safariMatch = userAgent.match(/Version\/(\d+)/);
-			const safariVersion = isSafari && safariMatch ? parseInt(safariMatch[1], 10) : -1;
-			const isFirefox = userAgent.indexOf('Firefox') > -1;
-			const firefoxVersion = isFirefox ? userAgent.match(/Firefox\/([0-9]+)\./)[1] : -1;
-			if (typeof createImageBitmap === 'undefined' || isSafari && safariVersion < 17 || isFirefox && firefoxVersion < 98) {
-				this._imageLoader = new t3d.ImageLoader();
-			} else {
-				this._imageLoader = new ImageBitmapLoader();
-			}
-		}
-		load(url, options = {}) {
-			this.manager.itemStart(url);
-			return new Promise((resolve, reject) => {
-				const resource = new GLTFResource();
-				resource.url = url;
-				resource.path = GLTFUtils.extractUrlBase(url);
-				resource.options = options;
-				this._parse(resource).then(resolve).then(() => this.manager.itemEnd(url)).catch(e => {
-					if (this.autoLogError) {
-						console.error(e);
-					}
-					if (this.detailLoadProgress && resource.loadItems) {
-						resource.loadItems.forEach(item => {
-							this.manager.itemEnd(item);
-						});
-					}
-					this.manager.itemError(url);
-					this.manager.itemEnd(url);
-					reject(`Error loading glTF model from ${url} .`);
-				});
-			});
-		}
-		_parse(context) {
-			let lastParser;
-			return new Promise((resolve, reject) => {
-				this._parsers.forEach(parser => {
-					if (lastParser) {
-						lastParser = lastParser.then(() => parser.parse(context, this));
-					} else {
-						lastParser = parser.parse(context, this);
-					}
-				});
-				if (lastParser) {
-					lastParser.then(() => resolve(context)).catch(reject);
-				} else {
-					resolve(context);
-				}
-			});
-		}
-		setDRACOLoader(dracoLoader) {
-			this._dracoLoader = dracoLoader;
-			return this;
-		}
-		getDRACOLoader() {
-			return this._dracoLoader;
-		}
-		setMeshoptDecoder(meshoptDecoder) {
-			this._meshoptDecoder = meshoptDecoder;
-			return this;
-		}
-		getMeshoptDecoder() {
-			return this._meshoptDecoder;
-		}
-		setKTX2Loader(ktx2Loader) {
-			this._ktx2Loader = ktx2Loader;
-			return this;
-		}
-		getKTX2Loader() {
-			return this._ktx2Loader;
-		}
-		loadFile(url, type = 'json') {
-			this._fileLoader.setResponseType(type);
-			return new Promise((resolve, reject) => {
-				url = this.manager.resolveURL(url);
-				this._fileLoader.load(url, resolve, undefined, reject);
-			});
-		}
-		loadImage(url) {
-			return new Promise((resolve, reject) => {
-				url = this.manager.resolveURL(url);
-				this._imageLoader.load(url, resolve, undefined, reject);
-			});
-		}
-		insertParser(parser, index) {
-			this._parsers.splice(index, 0, parser);
-		}
-		replaceParser(parser, index) {
-			this._parsers.splice(index, 1, parser);
-		}
-	}
-
 	/**
 	 * This parser is used to parse the header of a 3D Tiles resource.
 	 * For 'b3dm', 'i3dm', 'pnts' and 'cmpt' formats.
@@ -5045,7 +3116,7 @@
 	class B3DMParser {
 		static parse(context, loader) {
 			const glbBytes = new Uint8Array(context.options.buffer, context.batchTableEnd, context.header.byteLength - context.batchTableEnd);
-			const glbData = GLTFUtils.parseGLB(glbBytes.slice().buffer);
+			const glbData = GLTFUtils_js.GLTFUtils.parseGLB(glbBytes.slice().buffer);
 			context.gltf = glbData.gltf;
 			context.buffers = glbData.buffers;
 		}
@@ -5101,7 +3172,7 @@
 	/**
 	 * B3DMLoader is a loader for the B3DM format.
 	 */
-	class B3DMLoader extends GLTFLoader {
+	class B3DMLoader extends GLTFLoader_js.GLTFLoader {
 		constructor(manager) {
 			super(manager, [HeaderParser,
 			// insert HeaderParser
@@ -5109,7 +3180,7 @@
 			// insert TableParser
 			B3DMParser,
 			// insert B3DMParser
-			ReferenceParser, Validator, BufferParser, BufferViewParser, ImageParser, TextureParser, MaterialParser$1, AccessorParser, PrimitiveParser$1, NodeParser, SkinParser, SceneParser, AnimationParser, B3DMRootParser // insert B3DMRootParser
+			ReferenceParser_js.ReferenceParser, Validator_js.Validator, BufferParser_js.BufferParser, BufferViewParser_js.BufferViewParser, ImageParser_js.ImageParser, TextureParser_js.TextureParser, MaterialParser_js.MaterialParser, AccessorParser_js.AccessorParser, PrimitiveParser_js.PrimitiveParser, NodeParser_js.NodeParser, SkinParser_js.SkinParser, SceneParser_js.SceneParser, AnimationParser_js.AnimationParser, B3DMRootParser // insert B3DMRootParser
 			]);
 			this.extensions.set('KHR_techniques_webgl', KHR_techniques_webgl);
 			this.autoParseConfig.materials.push('KHR_techniques_webgl');
@@ -5123,108 +3194,16 @@
 			if (context.header.gltfFormat === 1) {
 				promise = Promise.resolve(bodyBytes);
 			} else {
-				const externalUri = GLTFUtils.resolveURL(GLTFUtils.decodeText(bodyBytes), context.path);
+				const externalUri = GLTFUtils_js.GLTFUtils.resolveURL(GLTFUtils_js.GLTFUtils.decodeText(bodyBytes), context.path);
 				promise = loader.loadFile(externalUri, 'arraybuffer').then(buffer => new Uint8Array(buffer));
 			}
 			return promise.then(glbBytes => {
-				const glbData = GLTFUtils.parseGLB(glbBytes.slice().buffer);
+				const glbData = GLTFUtils_js.GLTFUtils.parseGLB(glbBytes.slice().buffer);
 				context.gltf = glbData.gltf;
 				context.buffers = glbData.buffers;
 			});
 		}
 	}
-
-	const instancing_pars_vert = `
-#ifdef USE_INSTANCING
-	attribute mat4 instanceMatrix;
-	uniform mat4 instanceOffset;
-#endif
-`;
-	const instancing_position_vert = `
-#ifdef USE_INSTANCING
-	mat4 instancingMatrix = inverseMat4(instanceOffset) * instanceMatrix * instanceOffset;
-	transformed = (instancingMatrix * vec4(transformed, 1.0)).xyz;
-#endif
-`;
-	const instancing_normal_vert = `
-#ifdef USE_INSTANCING
-	mat4 instancingNormalMatrix = transposeMat4(inverseMat4(instancingMatrix));
-
-	objectNormal = (instancingNormalMatrix * vec4(objectNormal, 0.0)).xyz;
-
-	#ifdef USE_TANGENT
-		objectTangent = (instancingNormalMatrix * vec4(objectTangent, 0.0)).xyz;
-	#endif
-#endif
-`;
-
-	// InstancedPBRMaterial
-
-	let pbr_vert = t3d.ShaderLib.pbr_vert;
-	pbr_vert = pbr_vert.replace('#include <logdepthbuf_pars_vert>', `
-#include <logdepthbuf_pars_vert>
-${instancing_pars_vert}
-`);
-	pbr_vert = pbr_vert.replace('#include <pvm_vert>', `
-${instancing_position_vert}
-#include <pvm_vert>
-`);
-	pbr_vert = pbr_vert.replace('#include <normal_vert>', `
-${instancing_normal_vert}
-#include <normal_vert>
-`);
-	class InstancedPBRMaterial extends t3d.PBRMaterial {
-		constructor(sourceMaterial) {
-			super();
-			this.type = t3d.MATERIAL_TYPE.SHADER;
-			if (sourceMaterial) {
-				this.copy(sourceMaterial);
-			}
-			this.shaderName = 'InstancedPBR';
-			this.vertexShader = pbr_vert;
-			this.fragmentShader = t3d.ShaderLib.pbr_frag;
-			this.defines.USE_INSTANCING = true;
-			this.uniforms.instanceOffset = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-		}
-	}
-
-	// InstancedBasicMaterial
-
-	let basic_vert = t3d.ShaderLib.basic_vert;
-	basic_vert = basic_vert.replace('#include <logdepthbuf_pars_vert>', `
-	#include <logdepthbuf_pars_vert>
-	${instancing_pars_vert}
-`);
-	basic_vert = basic_vert.replace('#include <pvm_vert>', `
-	${instancing_position_vert}
-	#include <pvm_vert>
-`);
-	class InstancedBasicMaterial extends t3d.BasicMaterial {
-		constructor(sourceMaterial) {
-			super();
-			this.type = t3d.MATERIAL_TYPE.SHADER;
-			if (sourceMaterial) {
-				this.copy(sourceMaterial);
-			}
-			this.shaderName = 'InstancedBasic';
-			this.vertexShader = basic_vert;
-			this.fragmentShader = t3d.ShaderLib.basic_frag;
-			this.defines.USE_INSTANCING = true;
-			this.uniforms.instanceOffset = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
-		}
-	}
-
-	// InstancedDepthMaterial
-
-	let depth_vert = t3d.ShaderLib.depth_vert;
-	depth_vert = depth_vert.replace('#include <logdepthbuf_pars_vert>', `
-	#include <logdepthbuf_pars_vert>
-	${instancing_pars_vert}
-`);
-	depth_vert = depth_vert.replace('#include <pvm_vert>', `
-	${instancing_position_vert}
-	#include <pvm_vert>
-`);
 
 	class MaterialParser {
 		static parse(context, loader) {
@@ -5261,7 +3240,7 @@ ${instancing_normal_vert}
 						break;
 					}
 				}
-				material = material || new InstancedPBRMaterial(); // @parser-modification - instanced materials
+				material = material || new InstancedMaterial_js.InstancedPBRMaterial(); // @parser-modification - instanced materials
 				material.name = name;
 				for (let j = 0; j < materialExtNames.length; j++) {
 					const extName = materialExtNames[j];
@@ -5340,11 +3319,11 @@ ${instancing_normal_vert}
 					}
 				}
 				material.side = doubleSided === true ? t3d.DRAW_SIDE.DOUBLE : t3d.DRAW_SIDE.FRONT;
-				if (alphaMode === ALPHA_MODES.BLEND) {
+				if (alphaMode === Constants_js.ALPHA_MODES.BLEND) {
 					material.transparent = true;
 				} else {
 					material.transparent = false;
-					if (alphaMode === ALPHA_MODES.MASK) {
+					if (alphaMode === Constants_js.ALPHA_MODES.MASK) {
 						material.alphaTest = alphaCutoff !== undefined ? alphaCutoff : 0.5;
 					}
 				}
@@ -5354,7 +3333,7 @@ ${instancing_normal_vert}
 		}
 	}
 
-	class PrimitiveParser {
+	let PrimitiveParser$1 = class PrimitiveParser {
 		static parse(context, loader) {
 			const {
 				gltf,
@@ -5381,7 +3360,7 @@ ${instancing_normal_vert}
 						KHR_draco_mesh_compression
 					} = extensions;
 					let geometryPromise;
-					const geometryKey = createGeometryKey(gltfPrimitive);
+					const geometryKey = createGeometryKey$1(gltfPrimitive);
 					if (geometryPromiseCache.has(geometryKey)) {
 						geometryPromise = geometryPromiseCache.get(geometryKey);
 					} else {
@@ -5391,7 +3370,7 @@ ${instancing_normal_vert}
 							geometryPromise = Promise.resolve(new t3d.Geometry());
 						}
 						geometryPromise = geometryPromise.then(geometry => {
-							parseGeometryFromGLTFPrimitive(geometry, gltfPrimitive, gltf, accessors);
+							parseGeometryFromGLTFPrimitive$1(geometry, gltfPrimitive, gltf, accessors);
 							return geometry;
 						});
 						geometryPromiseCache.set(geometryKey, geometryPromise);
@@ -5400,12 +3379,12 @@ ${instancing_normal_vert}
 						const primitive = {
 							mode,
 							geometry,
-							material: material === undefined ? new InstancedPBRMaterial() : materials[material],
+							material: material === undefined ? new InstancedMaterial_js.InstancedPBRMaterial() : materials[material],
 							// @parser-modification - instanced materials
 							weights: Object.keys(geometry.morphAttributes).length > 0 && gltfMesh.weights ? gltfMesh.weights.slice(0) : undefined,
 							skinned: gltfMesh.isSkinned
 						};
-						assignFinalMaterial(primitive, materialCache);
+						assignFinalMaterial$1(primitive, materialCache);
 						return primitive;
 					});
 					primitivePromises.push(primitivePromise);
@@ -5418,8 +3397,8 @@ ${instancing_normal_vert}
 				context.primitives = primitives;
 			});
 		}
-	}
-	function parseGeometryFromGLTFPrimitive(geometry, gltfPrimitive, gltf, accessors) {
+	};
+	function parseGeometryFromGLTFPrimitive$1(geometry, gltfPrimitive, gltf, accessors) {
 		const {
 			attributes,
 			indices,
@@ -5430,7 +3409,7 @@ ${instancing_normal_vert}
 
 		for (const attributeSemantic in attributes) {
 			const accessorIdx = attributes[attributeSemantic];
-			const attributeName = ATTRIBUTES[attributeSemantic] === undefined ? attributeSemantic : ATTRIBUTES[attributeSemantic];
+			const attributeName = Constants_js.ATTRIBUTES[attributeSemantic] === undefined ? attributeSemantic : Constants_js.ATTRIBUTES[attributeSemantic];
 			// Skip attributes already provided by e.g. Draco extension.
 			if (attributeName in geometry.attributes) continue;
 			geometry.addAttribute(attributeName, accessors[accessorIdx]);
@@ -5455,7 +3434,7 @@ ${instancing_normal_vert}
 				boundingBox.min.fromArray(accessor.min);
 				boundingBox.max.fromArray(accessor.max);
 				if (accessor.normalized) {
-					const boxScale = GLTFUtils.getNormalizedComponentScale(ACCESSOR_COMPONENT_TYPES[accessor.componentType]);
+					const boxScale = GLTFUtils_js.GLTFUtils.getNormalizedComponentScale(Constants_js.ACCESSOR_COMPONENT_TYPES[accessor.componentType]);
 					boundingBox.min.multiplyScalar(boxScale);
 					boundingBox.max.multiplyScalar(boxScale);
 				}
@@ -5485,10 +3464,10 @@ ${instancing_normal_vert}
 				for (let i = 0, il = targets.length; i < il; i++) {
 					const target = targets[i];
 					if (hasMorphPosition) {
-						morphPositions.push(target.POSITION !== undefined ? accessors[target.POSITION] : geometry.attributes[ATTRIBUTES.POSITION]);
+						morphPositions.push(target.POSITION !== undefined ? accessors[target.POSITION] : geometry.attributes[Constants_js.ATTRIBUTES.POSITION]);
 					}
 					if (hasMorphNormal) {
-						morphNormals.push(target.NORMAL !== undefined ? accessors[target.NORMAL] : geometry.attributes[ATTRIBUTES.NORMAL]);
+						morphNormals.push(target.NORMAL !== undefined ? accessors[target.NORMAL] : geometry.attributes[Constants_js.ATTRIBUTES.NORMAL]);
 					}
 				}
 				if (hasMorphPosition) {
@@ -5501,7 +3480,7 @@ ${instancing_normal_vert}
 		}
 		return geometry;
 	}
-	function assignFinalMaterial(primitive, materialCache) {
+	function assignFinalMaterial$1(primitive, materialCache) {
 		let {
 			geometry,
 			material,
@@ -5510,11 +3489,11 @@ ${instancing_normal_vert}
 		} = primitive;
 
 		// If the material will be modified later on, clone it now.
-		const useVertexTangents = geometry.attributes[ATTRIBUTES.TANGENT] !== undefined;
-		const useVertexColors = geometry.attributes[ATTRIBUTES.COLOR_0] !== undefined;
-		const useFlatShading = geometry.attributes[ATTRIBUTES.NORMAL] === undefined;
+		const useVertexTangents = geometry.attributes[Constants_js.ATTRIBUTES.TANGENT] !== undefined;
+		const useVertexColors = geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0] !== undefined;
+		const useFlatShading = geometry.attributes[Constants_js.ATTRIBUTES.NORMAL] === undefined;
 		const useSkinning = skinned;
-		if (mode === WEBGL_DRAW_MODES.POINTS) {
+		if (mode === Constants_js.WEBGL_DRAW_MODES.POINTS) {
 			const cacheKey = 'PointsMaterial:' + material.id;
 			let pointsMaterial = materialCache.get(cacheKey);
 			if (!pointsMaterial) {
@@ -5527,7 +3506,7 @@ ${instancing_normal_vert}
 				materialCache.set(cacheKey, pointsMaterial);
 			}
 			material = pointsMaterial;
-		} else if (mode === WEBGL_DRAW_MODES.LINES || mode === WEBGL_DRAW_MODES.LINE_STRIP || mode === WEBGL_DRAW_MODES.LINE_LOOP) {
+		} else if (mode === Constants_js.WEBGL_DRAW_MODES.LINES || mode === Constants_js.WEBGL_DRAW_MODES.LINE_STRIP || mode === Constants_js.WEBGL_DRAW_MODES.LINE_LOOP) {
 			const cacheKey = 'BasicMaterial:' + material.id;
 			let basicMaterial = materialCache.get(cacheKey);
 			if (!basicMaterial) {
@@ -5539,22 +3518,22 @@ ${instancing_normal_vert}
 				materialCache.set(cacheKey, basicMaterial);
 			}
 			material = basicMaterial;
-		} else if (mode === WEBGL_DRAW_MODES.TRIANGLE_STRIP) {
+		} else if (mode === Constants_js.WEBGL_DRAW_MODES.TRIANGLE_STRIP) {
 			// TODO
 			console.warn('TRIANGLE_STRIP will be removed later.');
-			material.drawMode = WEBGL_DRAW_MODES.TRIANGLE_STRIP;
-		} else if (mode === WEBGL_DRAW_MODES.TRIANGLE_FAN) {
+			material.drawMode = Constants_js.WEBGL_DRAW_MODES.TRIANGLE_STRIP;
+		} else if (mode === Constants_js.WEBGL_DRAW_MODES.TRIANGLE_FAN) {
 			// TODO
 			console.warn('TRIANGLE_FAN will be removed later.');
-			material.drawMode = WEBGL_DRAW_MODES.TRIANGLE_FAN;
+			material.drawMode = Constants_js.WEBGL_DRAW_MODES.TRIANGLE_FAN;
 		}
 		if (useVertexTangents || useVertexColors || useFlatShading || useSkinning) {
 			let cacheKey = 'ClonedMaterial:' + material.id + ':';
 			if (useVertexTangents) cacheKey += 'vertex-tangents:';
 			if (useVertexColors) {
-				if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 3) {
+				if (geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0].size === 3) {
 					cacheKey += 'vertex-colors-rgb:';
-				} else if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 4) {
+				} else if (geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0].size === 4) {
 					cacheKey += 'vertex-colors-rgba:';
 				}
 			}
@@ -5572,12 +3551,12 @@ ${instancing_normal_vert}
 					}
 				}
 				if (useVertexColors) {
-					if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 3) {
+					if (geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0].size === 3) {
 						cachedMaterial.vertexColors = t3d.VERTEX_COLOR.RGB;
-					} else if (geometry.attributes[ATTRIBUTES.COLOR_0].size === 4) {
+					} else if (geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0].size === 4) {
 						cachedMaterial.vertexColors = t3d.VERTEX_COLOR.RGBA;
 					} else {
-						console.warn('Illegal vertex color size: ' + geometry.attributes[ATTRIBUTES.COLOR_0].size);
+						console.warn('Illegal vertex color size: ' + geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0].size);
 					}
 				}
 				if (useFlatShading) {
@@ -5588,22 +3567,22 @@ ${instancing_normal_vert}
 		}
 		primitive.material = material;
 	}
-	function createGeometryKey(primitive) {
+	function createGeometryKey$1(primitive) {
 		const dracoExtension = primitive.extensions && primitive.extensions.KHR_draco_mesh_compression;
 		let geometryKey;
 		if (dracoExtension) {
-			geometryKey = 'draco:' + dracoExtension.bufferView + ':' + dracoExtension.indices + ':' + createAttributesKey(dracoExtension.attributes);
+			geometryKey = 'draco:' + dracoExtension.bufferView + ':' + dracoExtension.indices + ':' + createAttributesKey$1(dracoExtension.attributes);
 		} else {
-			geometryKey = primitive.indices + ':' + createAttributesKey(primitive.attributes) + ':' + primitive.mode;
+			geometryKey = primitive.indices + ':' + createAttributesKey$1(primitive.attributes) + ':' + primitive.mode;
 		}
 		if (primitive.targets) {
 			for (let i = 0, il = primitive.targets.length; i < il; i++) {
-				geometryKey += ':' + createAttributesKey(primitive.targets[i]);
+				geometryKey += ':' + createAttributesKey$1(primitive.targets[i]);
 			}
 		}
 		return geometryKey;
 	}
-	function createAttributesKey(attributes) {
+	function createAttributesKey$1(attributes) {
 		let attributesKey = '';
 		const keys = Object.keys(attributes).sort();
 		for (let i = 0, il = keys.length; i < il; i++) {
@@ -5721,34 +3700,34 @@ ${instancing_normal_vert}
 
 	class KHR_techniques_webgl_i extends KHR_techniques_webgl {
 		static getMaterial() {
-			return new InstancedPBRMaterial();
+			return new InstancedMaterial_js.InstancedPBRMaterial();
 		}
 	}
 
 	class KHR_materials_unlit_i {
 		static getMaterial() {
-			return new InstancedBasicMaterial();
+			return new InstancedMaterial_js.InstancedBasicMaterial();
 		}
 	}
 
-	class KHR_materials_pbrSpecularGlossiness_i extends KHR_materials_pbrSpecularGlossiness {
+	class KHR_materials_pbrSpecularGlossiness_i extends KHR_materials_pbrSpecularGlossiness_js.KHR_materials_pbrSpecularGlossiness {
 		static getMaterial() {
-			const material = new InstancedPBRMaterial(); // fallback to InstancedPBRMaterial
+			const material = new InstancedMaterial_js.InstancedPBRMaterial(); // fallback to InstancedPBRMaterial
 			material.specular = new t3d.Color3(0x111111);
 			return material;
 		}
 	}
 
-	class KHR_materials_clearcoat_i extends KHR_materials_clearcoat {
+	class KHR_materials_clearcoat_i extends KHR_materials_clearcoat_js.KHR_materials_clearcoat {
 		static getMaterial() {
-			return new InstancedPBRMaterial();
+			return new InstancedMaterial_js.InstancedPBRMaterial();
 		}
 	}
 
 	/**
 	 * I3DMLoader is a loader for the I3DM format.
 	 */
-	class I3DMLoader extends GLTFLoader {
+	class I3DMLoader extends GLTFLoader_js.GLTFLoader {
 		constructor(manager) {
 			super(manager, [HeaderParser,
 			// insert HeaderParser
@@ -5756,11 +3735,11 @@ ${instancing_normal_vert}
 			// insert TableParser
 			I3DMParser,
 			// insert I3DMParser
-			ReferenceParser, Validator, BufferParser, BufferViewParser, ImageParser, TextureParser, MaterialParser,
+			ReferenceParser_js.ReferenceParser, Validator_js.Validator, BufferParser_js.BufferParser, BufferViewParser_js.BufferViewParser, ImageParser_js.ImageParser, TextureParser_js.TextureParser, MaterialParser,
 			// replace MaterialParser
-			AccessorParser, PrimitiveParser,
+			AccessorParser_js.AccessorParser, PrimitiveParser$1,
 			// replace PrimitiveParser
-			NodeParser, SkinParser, SceneParser, AnimationParser, I3DMRootParser // insert I3DMSetupParser
+			NodeParser_js.NodeParser, SkinParser_js.SkinParser, SceneParser_js.SceneParser, AnimationParser_js.AnimationParser, I3DMRootParser // insert I3DMSetupParser
 			]);
 			this.extensions.set('KHR_techniques_webgl', KHR_techniques_webgl_i);
 			this.extensions.set('KHR_materials_unlit', KHR_materials_unlit_i);
@@ -5828,7 +3807,7 @@ ${instancing_normal_vert}
 	/**
 	 * PNTSLoader is a loader for the PNTS format.
 	 */
-	class PNTSLoader extends GLTFLoader {
+	class PNTSLoader extends GLTFLoader_js.GLTFLoader {
 		constructor(manager) {
 			super(manager, [HeaderParser, TableParser, PNTSRootParser]);
 		}
@@ -5900,7 +3879,7 @@ ${instancing_normal_vert}
 	/**
 	 * CMPTLoader is a loader for the CMPT format.
 	 */
-	class CMPTLoader extends GLTFLoader {
+	class CMPTLoader extends GLTFLoader_js.GLTFLoader {
 		constructor(manager) {
 			super(manager, [HeaderParser, CMPTParser, CMPTRootParser]);
 			const b3dmLoader = new B3DMLoader(manager);
@@ -5922,6 +3901,523 @@ ${instancing_normal_vert}
 		}
 	}
 
+	class KHR_gaussian_splatting_compression_spz {
+		static getGeometry(bufferView, spzLoader) {
+			return new Promise(function (resolve, reject) {
+				const bufferViewTypedArray = new Uint8Array(bufferView);
+				spzLoader(bufferViewTypedArray, {
+					unpackOptions: {
+						coordinateSystem: 'LDB'
+					}
+				}).then(gcloud => {
+					const splatBuffer = KHR_gaussian_splatting_compression_spz.convertInternalDataToSplat(gcloud.numPoints, gcloud.positions, gcloud.rotations, gcloud.scales, gcloud.alphas, gcloud.colors);
+					splatBuffer._isSplatBuffer = true;
+					resolve(splatBuffer);
+				}).catch(error => {
+					reject(new Error('Failed to load SPZ: ' + error.message));
+				});
+			});
+		}
+		static convertInternalDataToSplat(vertexCount, positions, rotations, scales, alphas, colors) {
+			const rotationsOut = new Float32Array(vertexCount * 4);
+			const positionOut = new Float32Array(vertexCount * 3);
+			for (let i = 0; i < vertexCount; i++) {
+				const off = i * 4;
+				const x = rotations[off + 0];
+				const y = rotations[off + 1];
+				const z = rotations[off + 2];
+				const w = rotations[off + 3];
+				rotationsOut[off + 0] = w;
+				rotationsOut[off + 1] = x;
+				rotationsOut[off + 2] = y;
+				rotationsOut[off + 3] = z;
+				const posOff = i * 3;
+				positionOut[posOff + 0] = -positions[posOff + 0];
+				positionOut[posOff + 1] = -positions[posOff + 1];
+				positionOut[posOff + 2] = positions[posOff + 2];
+			}
+			const colorsOut = new Uint8Array(vertexCount * 4);
+			for (let i = 0; i < vertexCount; i++) {
+				colorsOut[i * 4 + 0] = t3d.MathUtils.clamp(colors[i * 3 + 0] * 255, 0, 255);
+				colorsOut[i * 4 + 1] = t3d.MathUtils.clamp(colors[i * 3 + 1] * 255, 0, 255);
+				colorsOut[i * 4 + 2] = t3d.MathUtils.clamp(colors[i * 3 + 2] * 255, 0, 255);
+				colorsOut[i * 4 + 3] = t3d.MathUtils.clamp(alphas[i] * 255, 0, 255);
+			}
+			return {
+				vertexCount,
+				positions: positionOut,
+				rotations: rotationsOut,
+				scales,
+				colors: colorsOut
+			};
+		}
+	}
+
+	/**
+	 * KHR_gaussian_splatting extension
+	 * https://github.com/CesiumGS/glTF/blob/draft-splat-spz/extensions/2.0/Khronos/KHR_gaussian_splatting
+	 */
+	class KHR_gaussian_splatting {
+		static getGeometry(isCompressed, extensions, bufferViews, spzLoader) {
+			if (isCompressed) {
+				const bufferViewIndex = extensions.bufferView;
+				const bufferView = bufferViews[bufferViewIndex];
+				return KHR_gaussian_splatting_compression_spz.getGeometry(bufferView, spzLoader);
+			}
+		}
+	}
+
+	class NodeParser {
+		static parse(context, loader) {
+			const {
+				gltf: {
+					nodes: gltfNodes,
+					cameras: gltfCameras,
+					extensions: gltfExtensions
+				}
+			} = context;
+			if (!gltfNodes) return;
+			const lightsExt = loader.extensions.get('KHR_lights_punctual');
+			const instancingExt = loader.extensions.get('EXT_mesh_gpu_instancing');
+			const spzExt = loader.extensions.get('KHR_gaussian_splatting'); // @parser-modification support spz
+
+			const cameras = [];
+			const lights = [];
+			const nodes = gltfNodes.map(gltfNode => {
+				const {
+					matrix,
+					translation,
+					rotation,
+					scale,
+					camera: cameraID,
+					mesh: meshID,
+					extensions = {}
+				} = gltfNode;
+				const {
+					KHR_lights_punctual,
+					EXT_mesh_gpu_instancing
+				} = extensions;
+				let node = null;
+				if (gltfNode.isBone) {
+					// .isBone isn't in glTF spec. Marked in IndexParser
+					node = new t3d.Bone();
+				} else if (meshID !== undefined) {
+					if (EXT_mesh_gpu_instancing && instancingExt) {
+						node = instancingExt.getInstancedMesh(context, gltfNode);
+					} else if (spzExt) {
+						// @parser-modification support spz
+						node = createSplatMesh(context, gltfNode, loader);
+					} else {
+						node = createMesh(context, gltfNode);
+					}
+				} else if (cameraID !== undefined) {
+					node = createCamera(gltfCameras[cameraID]);
+					cameras.push(node);
+				} else if (KHR_lights_punctual && lightsExt) {
+					const lightIndex = KHR_lights_punctual.light;
+					const gltfLights = gltfExtensions.KHR_lights_punctual.lights;
+					node = lightsExt.getLight(gltfLights[lightIndex]);
+					lights.push(node);
+				} else {
+					node = new t3d.Object3D();
+				}
+				node.name = gltfNode.name || '';
+				if (!!node.name && node.children.length > 0) {
+					for (let i = 0; i < node.children.length; i++) {
+						node.children[i].name = node.name + '_' + i;
+					}
+				}
+				if (matrix !== undefined) {
+					node.matrix.fromArray(matrix);
+					node.matrix.decompose(node.position, node.quaternion, node.scale);
+				} else {
+					if (translation !== undefined) {
+						node.position.fromArray(translation);
+					}
+					if (rotation !== undefined) {
+						node.quaternion.fromArray(rotation);
+					}
+					if (scale !== undefined) {
+						node.scale.fromArray(scale);
+					}
+				}
+				return node;
+			});
+			context.nodes = nodes;
+			context.cameras = cameras;
+			context.lights = lights;
+		}
+	}
+	function createCamera(cameraDef) {
+		const {
+			orthographic,
+			perspective,
+			type
+		} = cameraDef;
+		const camera = new t3d.Camera();
+		if (type == 'perspective') {
+			const {
+				aspectRatio,
+				yfov,
+				zfar,
+				znear
+			} = perspective;
+			camera.setPerspective(yfov, aspectRatio || 1, znear || 1, zfar || 2e6);
+		} else if (type == 'orthographic') {
+			const {
+				xmag,
+				ymag,
+				zfar,
+				znear
+			} = orthographic;
+			// https:// github.com/KhronosGroup/glTF/issues/1663
+			camera.setOrtho(-xmag, xmag, -ymag, ymag, znear || 1, zfar || 2e6);
+		}
+		return camera;
+	}
+	function createMesh(context, gltfNode) {
+		const {
+			primitives
+		} = context;
+		const {
+			mesh: meshID,
+			skin: skinID
+		} = gltfNode;
+		const meshes = primitives[meshID].map(primitive => {
+			const {
+				geometry,
+				material,
+				weights
+			} = primitive;
+			let mesh;
+			if (skinID !== undefined) {
+				mesh = new t3d.SkinnedMesh(geometry, material);
+				if (geometry.attributes.skinWeight && !geometry.attributes.skinWeight.normalized) {
+					GLTFUtils_js.GLTFUtils.normalizeSkinWeights(geometry.attributes.skinWeight);
+				}
+			} else {
+				mesh = new t3d.Mesh(geometry, material);
+				if (weights) {
+					mesh.morphTargetInfluences = weights.slice();
+				}
+			}
+			return mesh;
+		});
+		if (meshes.length > 1) {
+			const parent = new t3d.Object3D();
+			meshes.forEach(mesh => parent.add(mesh));
+			return parent;
+		} else {
+			return meshes[0];
+		}
+	}
+
+	// @parser-modification support spz
+	function createSplatMesh(context, gltfNode, loader) {
+		const {
+			primitives
+		} = context;
+		const {
+			mesh: meshID
+		} = gltfNode;
+		const meshes = primitives[meshID].map(primitive => {
+			const GaussianSplattingMeshClass = loader.getGaussianSplattingMeshClass();
+			const mesh = new GaussianSplattingMeshClass(primitive.splatBuffer, true);
+			return mesh;
+		});
+		if (meshes.length > 1) {
+			const parent = new t3d.Object3D();
+			meshes.forEach(mesh => parent.add(mesh));
+			return parent;
+		} else {
+			return meshes[0];
+		}
+	}
+
+	class PrimitiveParser {
+		static parse(context, loader) {
+			const {
+				gltf,
+				accessors,
+				materials,
+				bufferViews
+			} = context;
+			if (!gltf.meshes) return;
+			const dracoExt = loader.extensions.get('KHR_draco_mesh_compression');
+			const spzExt = loader.extensions.get('KHR_gaussian_splatting'); // @parser-modification support spz
+
+			const materialCache = new Map();
+			const geometryPromiseCache = new Map();
+			const meshPromises = [];
+			for (let i = 0; i < gltf.meshes.length; i++) {
+				const gltfMesh = gltf.meshes[i];
+				const primitivePromises = [];
+				for (let j = 0; j < gltfMesh.primitives.length; j++) {
+					const gltfPrimitive = gltfMesh.primitives[j];
+					const {
+						extensions = {},
+						mode,
+						material
+					} = gltfPrimitive;
+					// @parser-modification support spz
+					const {
+						KHR_draco_mesh_compression,
+						KHR_spz_gaussian_splats_compression,
+						KHR_gaussian_splatting
+					} = extensions;
+					let extensionsSPZ = null;
+					if (KHR_gaussian_splatting !== undefined) {
+						extensionsSPZ = KHR_gaussian_splatting.extensions.KHR_gaussian_splatting_compression_spz_2;
+					} else {
+						extensionsSPZ = KHR_spz_gaussian_splats_compression;
+					}
+					let geometryPromise;
+					const geometryKey = createGeometryKey(gltfPrimitive);
+					if (geometryPromiseCache.has(geometryKey)) {
+						geometryPromise = geometryPromiseCache.get(geometryKey);
+					} else {
+						if (KHR_draco_mesh_compression && dracoExt) {
+							geometryPromise = dracoExt.getGeometry(KHR_draco_mesh_compression, bufferViews, gltfPrimitive.attributes, gltf.accessors, loader.getDRACOLoader());
+						} else if (extensionsSPZ && spzExt) {
+							// @parser-modification support spz
+							geometryPromise = spzExt.getGeometry(true, extensionsSPZ, bufferViews, loader.getSPZLoader());
+						} else {
+							geometryPromise = Promise.resolve(new t3d.Geometry());
+						}
+						if (extensionsSPZ && spzExt) {
+							// @parser-modification support spz
+							geometryPromise = geometryPromise.then(splatBuffer => {
+								return splatBuffer;
+							});
+						} else {
+							geometryPromise = geometryPromise.then(geometry => {
+								parseGeometryFromGLTFPrimitive(geometry, gltfPrimitive, gltf, accessors);
+								return geometry;
+							});
+						}
+						geometryPromiseCache.set(geometryKey, geometryPromise);
+					}
+					const primitivePromise = geometryPromise.then(geometry => {
+						if (geometry._isSplatBuffer) {
+							const primitive = {
+								splatBuffer: geometry
+							};
+							return primitive;
+						}
+						const primitive = {
+							mode,
+							geometry,
+							material: material === undefined ? new t3d.PBRMaterial() : materials[material],
+							weights: Object.keys(geometry.morphAttributes).length > 0 && gltfMesh.weights ? gltfMesh.weights.slice(0) : undefined,
+							skinned: gltfMesh.isSkinned
+						};
+						assignFinalMaterial(primitive, materialCache);
+						return primitive;
+					});
+					primitivePromises.push(primitivePromise);
+				}
+				meshPromises.push(Promise.all(primitivePromises));
+			}
+			materialCache.clear();
+			geometryPromiseCache.clear();
+			return Promise.all(meshPromises).then(primitives => {
+				context.primitives = primitives;
+			});
+		}
+	}
+	function parseGeometryFromGLTFPrimitive(geometry, gltfPrimitive, gltf, accessors) {
+		const {
+			attributes,
+			indices,
+			targets
+		} = gltfPrimitive;
+
+		// set attributes
+
+		for (const attributeSemantic in attributes) {
+			const accessorIdx = attributes[attributeSemantic];
+			const attributeName = Constants_js.ATTRIBUTES[attributeSemantic] === undefined ? attributeSemantic : Constants_js.ATTRIBUTES[attributeSemantic];
+			// Skip attributes already provided by e.g. Draco extension.
+			if (attributeName in geometry.attributes) continue;
+			geometry.addAttribute(attributeName, accessors[accessorIdx]);
+		}
+
+		// set index
+
+		if (indices !== undefined && !geometry.index) {
+			geometry.setIndex(accessors[indices]);
+		}
+
+		// compute bounds
+
+		const {
+			boundingBox,
+			boundingSphere
+		} = geometry;
+		if (attributes.POSITION !== undefined) {
+			const accessorIdx = attributes.POSITION;
+			const accessor = gltf.accessors[accessorIdx];
+			if (accessor.min && accessor.max) {
+				boundingBox.min.fromArray(accessor.min);
+				boundingBox.max.fromArray(accessor.max);
+				if (accessor.normalized) {
+					const boxScale = GLTFUtils_js.GLTFUtils.getNormalizedComponentScale(Constants_js.ACCESSOR_COMPONENT_TYPES[accessor.componentType]);
+					boundingBox.min.multiplyScalar(boxScale);
+					boundingBox.max.multiplyScalar(boxScale);
+				}
+			} else {
+				geometry.computeBoundingBox();
+			}
+		} else {
+			geometry.computeBoundingBox();
+		}
+		boundingBox.getCenter(boundingSphere.center);
+		boundingSphere.radius = boundingBox.min.distanceTo(boundingBox.max) / 2;
+
+		// set morph targets
+
+		if (targets) {
+			let hasMorphPosition = false;
+			let hasMorphNormal = false;
+			for (let i = 0, il = targets.length; i < il; i++) {
+				const target = targets[i];
+				if (target.POSITION !== undefined) hasMorphPosition = true;
+				if (target.NORMAL !== undefined) hasMorphNormal = true;
+				if (hasMorphPosition && hasMorphNormal) break;
+			}
+			if (hasMorphPosition || hasMorphNormal) {
+				const morphPositions = [];
+				const morphNormals = [];
+				for (let i = 0, il = targets.length; i < il; i++) {
+					const target = targets[i];
+					if (hasMorphPosition) {
+						morphPositions.push(target.POSITION !== undefined ? accessors[target.POSITION] : geometry.attributes[Constants_js.ATTRIBUTES.POSITION]);
+					}
+					if (hasMorphNormal) {
+						morphNormals.push(target.NORMAL !== undefined ? accessors[target.NORMAL] : geometry.attributes[Constants_js.ATTRIBUTES.NORMAL]);
+					}
+				}
+				if (hasMorphPosition) {
+					geometry.morphAttributes.position = morphPositions;
+				}
+				if (hasMorphNormal) {
+					geometry.morphAttributes.normal = morphNormals;
+				}
+			}
+		}
+		return geometry;
+	}
+	function assignFinalMaterial(primitive, materialCache) {
+		let {
+			geometry,
+			material,
+			skinned,
+			mode
+		} = primitive;
+
+		// If the material will be modified later on, clone it now.
+		const useVertexTangents = geometry.attributes[Constants_js.ATTRIBUTES.TANGENT] !== undefined;
+		const useVertexColors = geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0] !== undefined;
+		const useFlatShading = geometry.attributes[Constants_js.ATTRIBUTES.NORMAL] === undefined;
+		const useSkinning = skinned;
+		if (mode === Constants_js.WEBGL_DRAW_MODES.POINTS) {
+			const cacheKey = 'PointsMaterial:' + material.id;
+			let pointsMaterial = materialCache.get(cacheKey);
+			if (!pointsMaterial) {
+				pointsMaterial = new t3d.PointsMaterial();
+				t3d.Material.prototype.copy.call(pointsMaterial, material);
+				pointsMaterial.diffuse.copy(material.diffuse);
+				pointsMaterial.diffuseMap = material.map;
+				pointsMaterial.drawMode = mode;
+				pointsMaterial.acceptLight = false; // PointsMaterial doesn't support lights yet
+				materialCache.set(cacheKey, pointsMaterial);
+			}
+			material = pointsMaterial;
+		} else if (mode === Constants_js.WEBGL_DRAW_MODES.LINES || mode === Constants_js.WEBGL_DRAW_MODES.LINE_STRIP || mode === Constants_js.WEBGL_DRAW_MODES.LINE_LOOP) {
+			const cacheKey = 'BasicMaterial:' + material.id;
+			let basicMaterial = materialCache.get(cacheKey);
+			if (!basicMaterial) {
+				basicMaterial = new t3d.BasicMaterial();
+				basicMaterial.envMap = undefined; // force close env map
+				basicMaterial.diffuse.copy(material.diffuse);
+				basicMaterial.diffuseMap = material.diffuseMap;
+				basicMaterial.drawMode = mode;
+				materialCache.set(cacheKey, basicMaterial);
+			}
+			material = basicMaterial;
+		} else if (mode === Constants_js.WEBGL_DRAW_MODES.TRIANGLE_STRIP) {
+			// TODO
+			console.warn('TRIANGLE_STRIP will be removed later.');
+			material.drawMode = Constants_js.WEBGL_DRAW_MODES.TRIANGLE_STRIP;
+		} else if (mode === Constants_js.WEBGL_DRAW_MODES.TRIANGLE_FAN) {
+			// TODO
+			console.warn('TRIANGLE_FAN will be removed later.');
+			material.drawMode = Constants_js.WEBGL_DRAW_MODES.TRIANGLE_FAN;
+		}
+		if (useVertexTangents || useVertexColors || useFlatShading || useSkinning) {
+			let cacheKey = 'ClonedMaterial:' + material.id + ':';
+			if (useVertexTangents) cacheKey += 'vertex-tangents:';
+			if (useVertexColors) {
+				if (geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0].size === 3) {
+					cacheKey += 'vertex-colors-rgb:';
+				} else if (geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0].size === 4) {
+					cacheKey += 'vertex-colors-rgba:';
+				}
+			}
+			if (useFlatShading) cacheKey += 'flat-shading:';
+			let cachedMaterial = materialCache.get(cacheKey);
+			if (!cachedMaterial) {
+				cachedMaterial = material.clone();
+				if (useVertexTangents) {
+					cachedMaterial.vertexTangents = true;
+
+					// revert flip y fix for tangents
+					// https://github.com/mrdoob/three.js/issues/11438#issuecomment-507003995
+					if (cachedMaterial.normalMap) {
+						cachedMaterial.normalScale.y *= -1;
+					}
+				}
+				if (useVertexColors) {
+					if (geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0].size === 3) {
+						cachedMaterial.vertexColors = t3d.VERTEX_COLOR.RGB;
+					} else if (geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0].size === 4) {
+						cachedMaterial.vertexColors = t3d.VERTEX_COLOR.RGBA;
+					} else {
+						console.warn('Illegal vertex color size: ' + geometry.attributes[Constants_js.ATTRIBUTES.COLOR_0].size);
+					}
+				}
+				if (useFlatShading) {
+					cachedMaterial.shading = t3d.SHADING_TYPE.FLAT_SHADING;
+				}
+			}
+			material = cachedMaterial;
+		}
+		primitive.material = material;
+	}
+	function createGeometryKey(primitive) {
+		const dracoExtension = primitive.extensions && primitive.extensions.KHR_draco_mesh_compression;
+		let geometryKey;
+		if (dracoExtension) {
+			geometryKey = 'draco:' + dracoExtension.bufferView + ':' + dracoExtension.indices + ':' + createAttributesKey(dracoExtension.attributes);
+		} else {
+			geometryKey = primitive.indices + ':' + createAttributesKey(primitive.attributes) + ':' + primitive.mode;
+		}
+		if (primitive.targets) {
+			for (let i = 0, il = primitive.targets.length; i < il; i++) {
+				geometryKey += ':' + createAttributesKey(primitive.targets[i]);
+			}
+		}
+		return geometryKey;
+	}
+	function createAttributesKey(attributes) {
+		let attributesKey = '';
+		const keys = Object.keys(attributes).sort();
+		for (let i = 0, il = keys.length; i < il; i++) {
+			attributesKey += keys[i] + ':' + attributes[keys[i]] + ';';
+		}
+		return attributesKey;
+	}
+
 	class IndexParser {
 		static parse(context, loader) {
 			const {
@@ -5931,7 +4427,7 @@ ${instancing_normal_vert}
 			const buffer = options.buffer;
 			const _isGLB = isGLB(url);
 			if (_isGLB) {
-				const glbData = GLTFUtils.parseGLB(buffer);
+				const glbData = GLTFUtils_js.GLTFUtils.parseGLB(buffer);
 				context.gltf = glbData.gltf;
 				context.buffers = glbData.buffers;
 			} else {
@@ -5943,15 +4439,125 @@ ${instancing_normal_vert}
 		return getUrlExtension(url) === 'glb';
 	};
 
+	class AccessorParser {
+		static parse(context) {
+			const {
+				bufferViews,
+				gltf
+			} = context;
+			if (!gltf.accessors) return;
+			const interleavedBufferCache = new Map();
+			const accessors = gltf.accessors.map(accessor => {
+				const {
+					bufferView: bufferViewIndex,
+					type,
+					componentType,
+					count,
+					byteOffset = 0,
+					normalized = false,
+					sparse
+				} = accessor;
+
+				// @parser-modification support spz
+				if ((bufferViewIndex === undefined || bufferViewIndex === null) && sparse === undefined) {
+					// Ignore empty accessors, which may be used to declare runtime
+					// information about attributes coming from another source (e.g. Draco compression extension).
+					return null;
+				}
+
+				// Get buffer view infos
+				const bufferView = bufferViewIndex !== undefined ? bufferViews[bufferViewIndex] : null;
+				const byteStride = bufferViewIndex !== undefined ? gltf.bufferViews[bufferViewIndex].byteStride : undefined;
+
+				// Get accessor infos
+				const itemSize = Constants_js.ACCESSOR_TYPE_SIZES[type];
+				const TypedArray = Constants_js.ACCESSOR_COMPONENT_TYPES[componentType];
+				const elementBytes = TypedArray.BYTES_PER_ELEMENT;
+				const itemBytes = elementBytes * itemSize; // For VEC3: itemSize is 3, elementBytes is 4, itemBytes is 12.
+
+				let array, attribute;
+				if (byteStride && byteStride !== itemBytes) {
+					// The buffer is interleaved
+					// Each "slice" of the buffer, as defined by 'count' elements of 'byteStride' bytes, gets its own InterleavedBuffer
+					// This makes sure that IBA.count reflects accessor.count properly
+					const ibSlice = Math.floor(byteOffset / byteStride);
+					const ibCacheKey = 'Buffer:' + bufferViewIndex + ':' + componentType + ':' + ibSlice + ':' + count;
+					let ib = interleavedBufferCache.get(ibCacheKey);
+					if (!ib) {
+						// Use the full buffer if it's interleaved.
+						array = new TypedArray(bufferView, ibSlice * byteStride, count * byteStride / elementBytes);
+
+						// Integer parameters to IB/IBA are in array elements, not bytes.
+						ib = new t3d.Buffer(array, byteStride / elementBytes);
+						interleavedBufferCache.set(ibCacheKey, ib);
+					}
+					attribute = new t3d.Attribute(ib, itemSize, byteOffset % byteStride / elementBytes, normalized);
+				} else {
+					if (bufferView === null) {
+						array = new TypedArray(count * itemSize);
+					} else {
+						array = new TypedArray(bufferView, byteOffset, count * itemSize);
+					}
+					attribute = new t3d.Attribute(new t3d.Buffer(array, itemSize), itemSize, 0, normalized);
+				}
+
+				// https://github.com/KhronosGroup/glTF/blob/master/specification/2.0/README.md#sparse-accessors
+				if (sparse) {
+					const itemSizeIndices = Constants_js.ACCESSOR_TYPE_SIZES.SCALAR;
+					const TypedArrayIndices = Constants_js.ACCESSOR_COMPONENT_TYPES[sparse.indices.componentType];
+					const byteOffsetIndices = sparse.indices.byteOffset || 0;
+					const byteOffsetValues = sparse.values.byteOffset || 0;
+					const sparseIndices = new TypedArrayIndices(bufferViews[sparse.indices.bufferView], byteOffsetIndices, sparse.count * itemSizeIndices);
+					const sparseValues = new TypedArray(bufferViews[sparse.values.bufferView], byteOffsetValues, sparse.count * itemSize);
+					if (bufferView !== null) {
+						// Avoid modifying the original ArrayBuffer, if the bufferView wasn't initialized with zeroes.
+						attribute = new t3d.Attribute(attribute.buffer.clone(), attribute.size, attribute.offset, attribute.normalized);
+					}
+					const buffer = attribute.buffer;
+					for (let i = 0, il = sparseIndices.length; i < il; i++) {
+						const index = sparseIndices[i];
+						buffer.array[index * attribute.size] = sparseValues[i * itemSize];
+						if (itemSize >= 2) buffer.array[index * attribute.size + 1] = sparseValues[i * itemSize + 1];
+						if (itemSize >= 3) buffer.array[index * attribute.size + 2] = sparseValues[i * itemSize + 2];
+						if (itemSize >= 4) buffer.array[index * attribute.size + 3] = sparseValues[i * itemSize + 3];
+						if (itemSize >= 5) throw new Error('Unsupported itemSize in sparse Attribute.');
+					}
+				}
+				return attribute;
+			});
+			interleavedBufferCache.clear();
+			context.accessors = accessors;
+		}
+	}
+
 	/**
 	 * TileGLTFLoader is a gltf loader
 	 * that extends the default gltf loader with additional parsers
 	 * to support the tile gltf format.
 	 */
-	class TileGLTFLoader extends GLTFLoader {
+	class TileGLTFLoader extends GLTFLoader_js.GLTFLoader {
 		constructor(manager) {
 			super(manager);
 			this.replaceParser(IndexParser, 0);
+			this.replaceParser(AccessorParser, 8);
+			this.replaceParser(PrimitiveParser, 9);
+			this.replaceParser(NodeParser, 10);
+			this.extensions.set('KHR_gaussian_splatting', KHR_gaussian_splatting);
+			this.autoParseConfig.materials.push('KHR_gaussian_splatting');
+		}
+		setSPZLoader(spzLoader) {
+			this._spzLoader = spzLoader;
+			return this;
+		}
+		getSPZLoader() {
+			return this._spzLoader;
+		}
+		setGaussianSplattingMeshClass(gaussianSplattingMeshClass) {
+			this._gaussianSplattingMeshClass = gaussianSplattingMeshClass;
+			return this;
+		}
+		getGaussianSplattingMeshClass() {
+			return this._gaussianSplattingMeshClass;
 		}
 	}
 
@@ -7055,6 +5661,12 @@ ${instancing_normal_vert}
 			this._loaders.get('cmpt').setDRACOLoader(dracoLoader);
 			this._loaders.get('gltf').setDRACOLoader(dracoLoader);
 		}
+		setSPZLoader(spzLoader) {
+			this._loaders.get('gltf').setSPZLoader(spzLoader);
+		}
+		setGaussianSplattingMeshClass(gaussianSplattingMeshClass) {
+			this._loaders.get('gltf').setGaussianSplattingMeshClass(gaussianSplattingMeshClass);
+		}
 		setKTX2Loader(ktx2Loader) {
 			this._loaders.get('b3dm').setKTX2Loader(ktx2Loader);
 			this._loaders.get('i3dm').setKTX2Loader(ktx2Loader);
@@ -7592,7 +6204,7 @@ ${instancing_normal_vert}
 			this.pivotMesh.scale.setScalar(0.25);
 
 			// raycaster
-			this.raycaster = new t3d.Raycaster();
+			this.raycaster = new Raycaster_js.Raycaster();
 			this.up = new t3d.Vector3(0, 1, 0);
 			this._detachCallback = null;
 			this._upInitialized = false;
@@ -10002,443 +8614,6 @@ ${instancing_normal_vert}
 		}
 	}
 
-	class GeometryUtils {
-		/**
-		 * @param {Geometry} geometry
-		 */
-		static computeNormals(geometry) {
-			const index = geometry.index;
-			const attributes = geometry.attributes;
-			const positionAttribute = attributes.a_Position;
-			if (positionAttribute === undefined) {
-				return;
-			}
-			let normalAttribute = attributes.a_Normal;
-			if (normalAttribute === undefined) {
-				normalAttribute = new t3d.Attribute(new t3d.Buffer(new Float32Array(positionAttribute.buffer.count * 3), 3));
-				geometry.addAttribute('a_Normal', normalAttribute);
-			} else {
-				for (let i = 0; i < normalAttribute.buffer.array.length; i++) {
-					normalAttribute.buffer.array[i] = 0; // reset existing normals to zero
-				}
-				normalAttribute.buffer.version++;
-			}
-			const pA = new t3d.Vector3(),
-				pB = new t3d.Vector3(),
-				pC = new t3d.Vector3();
-			const nA = new t3d.Vector3(),
-				nB = new t3d.Vector3(),
-				nC = new t3d.Vector3();
-			const cb = new t3d.Vector3(),
-				ab = new t3d.Vector3();
-			if (index) {
-				// indexed elements
-				for (let i = 0, il = index.buffer.count; i < il; i += 3) {
-					const vA = index.buffer.array[i + 0];
-					const vB = index.buffer.array[i + 1];
-					const vC = index.buffer.array[i + 2];
-					pA.fromArray(positionAttribute.buffer.array, vA * 3);
-					pB.fromArray(positionAttribute.buffer.array, vB * 3);
-					pC.fromArray(positionAttribute.buffer.array, vC * 3);
-					cb.subVectors(pC, pB);
-					ab.subVectors(pA, pB);
-					cb.cross(ab);
-					nA.fromArray(normalAttribute.buffer.array, vA * 3);
-					nB.fromArray(normalAttribute.buffer.array, vB * 3);
-					nC.fromArray(normalAttribute.buffer.array, vC * 3);
-					nA.add(cb);
-					nB.add(cb);
-					nC.add(cb);
-					nA.toArray(normalAttribute.buffer.array, vA * 3);
-					nB.toArray(normalAttribute.buffer.array, vB * 3);
-					nC.toArray(normalAttribute.buffer.array, vC * 3);
-				}
-			} else {
-				// non-indexed elements (unconnected triangle soup)
-				for (let i = 0, il = positionAttribute.buffer.count * 3; i < il; i += 9) {
-					pA.fromArray(positionAttribute.buffer.array, i + 0);
-					pB.fromArray(positionAttribute.buffer.array, i + 3);
-					pC.fromArray(positionAttribute.buffer.array, i + 6);
-					cb.subVectors(pC, pB);
-					ab.subVectors(pA, pB);
-					cb.cross(ab);
-					cb.toArray(normalAttribute.buffer.array, i + 0);
-					cb.toArray(normalAttribute.buffer.array, i + 3);
-					cb.toArray(normalAttribute.buffer.array, i + 6);
-				}
-			}
-			this.normalizeNormals(geometry);
-		}
-
-		/**
-		 * @param {Geometry} geometry
-		 */
-		static normalizeNormals(geometry) {
-			const normals = geometry.attributes.a_Normal.buffer;
-			for (let i = 0; i < normals.array.length; i += 3) {
-				_vec3_1.fromArray(normals.array, i);
-				_vec3_1.normalize();
-				_vec3_1.toArray(normals.array, i);
-			}
-		}
-
-		/**
-		 * @param {Geometry} geometry
-		 */
-		static computeTangents(geometry) {
-			const index = geometry.index;
-			const attributes = geometry.attributes;
-
-			// based on http://www.terathon.com/code/tangent.html
-			// (per vertex tangents)
-
-			if (index === null || attributes.a_Position === undefined || attributes.a_Normal === undefined || attributes.a_Uv === undefined) {
-				console.warn('GeometryUtils: .computeTangents() failed. Missing required attributes (index, a_Position, a_Normal or a_Uv)');
-				return;
-			}
-			const indices = index.buffer.array;
-			const positions = attributes.a_Position.buffer.array;
-			const normals = attributes.a_Normal.buffer.array;
-			const uvs = attributes.a_Uv.buffer.array;
-			const nVertices = positions.length / 3;
-			if (!attributes.a_Tangent) {
-				geometry.addAttribute('a_Tangent', new t3d.Attribute(new t3d.Buffer(new Float32Array(4 * nVertices), 4)));
-			}
-			const tangents = attributes.a_Tangent.buffer.array;
-			const tan1 = [],
-				tan2 = [];
-			for (let i = 0; i < nVertices; i++) {
-				tan1[i] = new t3d.Vector3();
-				tan2[i] = new t3d.Vector3();
-			}
-			const vA = new t3d.Vector3(),
-				vB = new t3d.Vector3(),
-				vC = new t3d.Vector3(),
-				uvA = new t3d.Vector2(),
-				uvB = new t3d.Vector2(),
-				uvC = new t3d.Vector2(),
-				sdir = new t3d.Vector3(),
-				tdir = new t3d.Vector3();
-			function handleTriangle(a, b, c) {
-				vA.fromArray(positions, a * 3);
-				vB.fromArray(positions, b * 3);
-				vC.fromArray(positions, c * 3);
-				uvA.fromArray(uvs, a * 2);
-				uvB.fromArray(uvs, b * 2);
-				uvC.fromArray(uvs, c * 2);
-				vB.sub(vA);
-				vC.sub(vA);
-				uvB.sub(uvA);
-				uvC.sub(uvA);
-				const r = 1.0 / (uvB.x * uvC.y - uvC.x * uvB.y);
-
-				// silently ignore degenerate uv triangles having coincident or colinear vertices
-
-				if (!isFinite(r)) return;
-				sdir.copy(vB).multiplyScalar(uvC.y).addScaledVector(vC, -uvB.y).multiplyScalar(r);
-				tdir.copy(vC).multiplyScalar(uvB.x).addScaledVector(vB, -uvC.x).multiplyScalar(r);
-				tan1[a].add(sdir);
-				tan1[b].add(sdir);
-				tan1[c].add(sdir);
-				tan2[a].add(tdir);
-				tan2[b].add(tdir);
-				tan2[c].add(tdir);
-			}
-			let groups = geometry.groups;
-			if (groups.length === 0) {
-				groups = [{
-					start: 0,
-					count: indices.length
-				}];
-			}
-			for (let i = 0, il = groups.length; i < il; i++) {
-				const group = groups[i];
-				const start = group.start;
-				const count = group.count;
-				for (let j = start, jl = start + count; j < jl; j += 3) {
-					handleTriangle(indices[j + 0], indices[j + 1], indices[j + 2]);
-				}
-			}
-			const tmp = new t3d.Vector3(),
-				tmp2 = new t3d.Vector3();
-			const n = new t3d.Vector3(),
-				n2 = new t3d.Vector3();
-			function handleVertex(v) {
-				n.fromArray(normals, v * 3);
-				n2.copy(n);
-				const t = tan1[v];
-
-				// Gram-Schmidt orthogonalize
-
-				tmp.copy(t);
-				tmp.sub(n.multiplyScalar(n.dot(t))).normalize();
-
-				// Calculate handedness
-
-				tmp2.crossVectors(n2, t);
-				const test = tmp2.dot(tan2[v]);
-				const w = test < 0.0 ? -1 : 1.0;
-				tangents[v * 4] = tmp.x;
-				tangents[v * 4 + 1] = tmp.y;
-				tangents[v * 4 + 2] = tmp.z;
-				tangents[v * 4 + 3] = -w; // why negative?
-			}
-			for (let i = 0, il = groups.length; i < il; i++) {
-				const group = groups[i];
-				const start = group.start;
-				const count = group.count;
-				for (let j = start, jl = start + count; j < jl; j += 3) {
-					handleVertex(indices[j + 0]);
-					handleVertex(indices[j + 1]);
-					handleVertex(indices[j + 2]);
-				}
-			}
-		}
-
-		/**
-		 * @param {Array<Geometry>} geometries
-		 * @param {boolean} useGroups
-		 * @returns {Geometry}
-		 */
-		static mergeGeometries(geometries, useGroups = false) {
-			const isIndexed = geometries[0].index !== null;
-			const attributesUsed = new Set(Object.keys(geometries[0].attributes));
-			const morphAttributesUsed = new Set(Object.keys(geometries[0].morphAttributes));
-			const attributes = {};
-			const morphAttributes = {};
-			const mergedGeometry = new t3d.Geometry();
-			let offset = 0;
-			for (let i = 0; i < geometries.length; i++) {
-				const geometry = geometries[i];
-
-				// ensure that all geometries are indexed, or none
-
-				if (isIndexed !== (geometry.index !== null)) {
-					console.error('GeometryUtils: .mergeGeometries() failed with geometry at index ' + i + '. All geometries must have compatible attributes; make sure index attribute exists among all geometries, or in none of them.');
-					return null;
-				}
-
-				// gather attributes, exit early if they're different
-
-				for (const name in geometry.attributes) {
-					if (!attributesUsed.has(name)) {
-						console.error('GeometryUtils: .mergeGeometries() failed with geometry at index ' + i + '. All geometries must have compatible attributes; make sure "' + name + '" attribute exists among all geometries, or in none of them.');
-						return null;
-					}
-					if (attributes[name] === undefined) attributes[name] = [];
-					attributes[name].push(geometry.attributes[name]);
-				}
-
-				// gather morph attributes, exit early they're different
-
-				for (const name in geometry.morphAttributes) {
-					if (!morphAttributesUsed.has(name)) {
-						console.error('GeometryUtils: .mergeGeometries() failed with geometry at index ' + i + '. .morphAttributes must be consistent throughout all geometries.');
-						return null;
-					}
-					if (morphAttributes[name] === undefined) morphAttributes[name] = [];
-					morphAttributes[name].push(geometry.morphAttributes[name]);
-				}
-				if (useGroups) {
-					let count;
-					if (isIndexed) {
-						count = geometry.index.buffer.count;
-					} else if (geometry.attributes.a_Position !== undefined) {
-						count = geometry.attributes.a_Position.buffer.count;
-					} else {
-						console.error('GeometryUtils: .mergeGeometries() failed with geometry at index ' + i + '. The geometry must have either an index or an a_Position attribute');
-						return null;
-					}
-					mergedGeometry.addGroup(offset, count, i);
-					offset += count;
-				}
-			}
-
-			// merge indices
-
-			if (isIndexed) {
-				let indexOffset = 0;
-				const mergedIndex = [];
-				for (let i = 0; i < geometries.length; i++) {
-					const index = geometries[i].index;
-					for (let j = 0; j < index.buffer.count; j++) {
-						mergedIndex.push(index.buffer.array[j] + indexOffset);
-					}
-					indexOffset += geometries[i].attributes.a_Position.buffer.count;
-				}
-				mergedGeometry.setIndex(mergedIndex);
-			}
-
-			// merge attributes
-
-			for (const name in attributes) {
-				const mergedAttribute = this.mergeAttributes(attributes[name]);
-				if (!mergedAttribute) {
-					console.error('GeometryUtils: .mergeGeometries() failed while trying to merge the ' + name + ' attribute.');
-					return null;
-				}
-				mergedGeometry.addAttribute(name, mergedAttribute);
-			}
-
-			// merge morph attributes
-
-			for (const name in morphAttributes) {
-				const numMorphTargets = morphAttributes[name][0].length;
-				if (numMorphTargets === 0) break;
-				mergedGeometry.morphAttributes = mergedGeometry.morphAttributes || {};
-				mergedGeometry.morphAttributes[name] = [];
-				for (let i = 0; i < numMorphTargets; i++) {
-					const morphAttributesToMerge = [];
-					for (let j = 0; j < morphAttributes[name].length; j++) {
-						morphAttributesToMerge.push(morphAttributes[name][j][i]);
-					}
-					const mergedMorphAttribute = this.mergeAttributes(morphAttributesToMerge);
-					if (!mergedMorphAttribute) {
-						console.error('GeometryUtils: .mergeGeometries() failed while trying to merge the ' + name + ' morphAttribute.');
-						return null;
-					}
-					mergedGeometry.morphAttributes[name].push(mergedMorphAttribute);
-				}
-			}
-			return mergedGeometry;
-		}
-
-		/**
-		 * @param {Array<Attribute>} attributes
-		 * @returns {Attribute}
-		 */
-		static mergeAttributes(attributes) {
-			let TypedArray;
-			let size;
-			let normalized;
-			let arrayLength = 0;
-			for (let i = 0; i < attributes.length; i++) {
-				const attribute = attributes[i];
-				if (attribute.buffer.stride !== attribute.size) {
-					console.error('GeometryUtils: .mergeAttributes() failed. Interleaved buffer attributes are not supported.');
-					return null;
-				}
-				if (TypedArray === undefined) TypedArray = attribute.buffer.array.constructor;
-				if (TypedArray !== attribute.buffer.array.constructor) {
-					console.error('GeometryUtils: .mergeAttributes() failed. Buffer.array must be of consistent array types across matching attributes.');
-					return null;
-				}
-				if (size === undefined) size = attribute.size;
-				if (size !== attribute.size) {
-					console.error('GeometryUtils: .mergeAttributes() failed. Attribute.size must be consistent across matching attributes.');
-					return null;
-				}
-				if (normalized === undefined) normalized = attribute.normalized;
-				if (normalized !== attribute.normalized) {
-					console.error('GeometryUtils: .mergeAttributes() failed. Attribute.normalized must be consistent across matching attributes.');
-					return null;
-				}
-				arrayLength += attribute.buffer.array.length;
-			}
-			const array = new TypedArray(arrayLength);
-			let offset = 0;
-			for (let i = 0; i < attributes.length; i++) {
-				array.set(attributes[i].buffer.array, offset);
-				offset += attributes[i].buffer.array.length;
-			}
-			return new t3d.Attribute(new t3d.Buffer(array, size), size, 0, normalized);
-		}
-
-		/**
-		 * @param {Geometry} geometry
-		 * @param {Matrix4} matrix
-		 * @param {boolean} updateBoundings
-		 * @returns {Geometry}
-		 */
-		static applyMatrix4(geometry, matrix, updateBoundings) {
-			let array, count, offset;
-			const position = geometry.attributes['a_Position'];
-			if (position !== undefined) {
-				array = position.buffer.array;
-				count = position.buffer.count;
-				offset = position.offset;
-				for (let i = 0; i < count; i++) {
-					_vec3_1.fromArray(array, i * 3 + offset);
-					_vec3_1.applyMatrix4(matrix);
-					_vec3_1.toArray(array, i * 3 + offset);
-				}
-				position.buffer.version++;
-			}
-			const normal = geometry.attributes['a_Normal'];
-			if (normal !== undefined) {
-				array = normal.buffer.array;
-				count = normal.buffer.count;
-				offset = normal.offset;
-				const normalMatrix = _mat3_1.setFromMatrix4(matrix).invert().transpose();
-				for (let i = 0; i < count; i++) {
-					_vec3_1.fromArray(array, i * 3 + offset);
-					_vec3_1.applyMatrix3(normalMatrix).normalize();
-					_vec3_1.toArray(array, i * 3 + offset);
-				}
-				normal.buffer.version++;
-			}
-			const tangent = geometry.attributes['a_Tangent'];
-			if (tangent !== undefined) {
-				array = tangent.buffer.array;
-				count = tangent.buffer.count;
-				offset = tangent.offset;
-				for (let i = 0; i < count; i++) {
-					_vec3_1.fromArray(array, i * 3 + offset);
-					_vec3_1.transformDirection(matrix);
-					_vec3_1.toArray(array, i * 3 + offset);
-				}
-				tangent.buffer.version++;
-			}
-			if (geometry.boundingBox !== null && updateBoundings) {
-				geometry.computeBoundingBox();
-			}
-			if (geometry.boundingSphere !== null && updateBoundings) {
-				geometry.computeBoundingSphere();
-			}
-			return geometry;
-		}
-
-		/**
-		 * @param {Geometry} geometry
-		 * @returns {Attribute}
-		 */
-		static getWireframeAttribute(geometry) {
-			const indices = [];
-			const geometryIndex = geometry.index;
-			const geometryPosition = geometry.attributes.a_Position;
-			if (!geometryPosition) {
-				console.error('GeometryUtils: .getWireframeAttribute() failed. The geometry must have an a_Position attribute');
-				return null;
-			}
-			if (geometryIndex !== null) {
-				const array = geometryIndex.buffer.array;
-				for (let i = 0, l = array.length; i < l; i += 3) {
-					const a = array[i + 0];
-					const b = array[i + 1];
-					const c = array[i + 2];
-					indices.push(a, b, b, c, c, a);
-				}
-			} else {
-				const array = geometryPosition.buffer.array;
-				for (let i = 0, l = array.length / 3 - 1; i < l; i += 3) {
-					const a = i + 0;
-					const b = i + 1;
-					const c = i + 2;
-					indices.push(a, b, b, c, c, a);
-				}
-			}
-			return new t3d.Attribute(new t3d.Buffer(geometryPosition.buffer.array.length / 3 > 65536 ? new Uint32Array(indices) : new Uint16Array(indices), 1));
-		}
-
-		// deprecated since v0.2.0, add warning since v0.3.0
-		static mergeBufferAttributes(attributes) {
-			console.warn('GeometryUtils: mergeBufferAttributes() has been renamed to mergeAttributes().');
-			return this.mergeAttributes(attributes);
-		}
-	}
-	const _vec3_1 = new t3d.Vector3();
-	const _mat3_1 = new t3d.Matrix3();
-
 	const TILE_X$1 = Symbol('TILE_X');
 	const TILE_Y$1 = Symbol('TILE_Y');
 	const TILE_LEVEL$1 = Symbol('TILE_LEVEL');
@@ -10515,7 +8690,7 @@ ${instancing_normal_vert}
 			// when using batched mesh rendering.
 			const mesh = new t3d.Mesh(new t3d.PlaneGeometry(2 * sx, 2 * sy), new t3d.BasicMaterial());
 			const rotation = new t3d.Euler(Math.PI / 2, 0, 0, 'XYZ');
-			GeometryUtils.applyMatrix4(mesh.geometry, new t3d.Matrix4().makeRotationFromEuler(rotation), true);
+			GeometryUtils_js.GeometryUtils.applyMatrix4(mesh.geometry, new t3d.Matrix4().makeRotationFromEuler(rotation), true);
 			mesh.material.diffuseMap = texture;
 			mesh.material.transparent = true;
 			mesh.position.set(x, y, z);
@@ -12801,229 +10976,6 @@ ${instancing_normal_vert}
 		}
 	}
 
-	class Box3Helper extends t3d.Mesh {
-		constructor(box, color = 0xffff00) {
-			const indices = new Uint16Array([0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7]);
-			const positions = [1, 1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, 1, 1, -1, -1, 1, -1, -1, -1, -1, 1, -1, -1];
-			const geometry = new t3d.Geometry();
-			geometry.setIndex(new t3d.Attribute(new t3d.Buffer(indices, 1)));
-			geometry.addAttribute('a_Position', new t3d.Attribute(new t3d.Buffer(new Float32Array(positions), 3)));
-
-			// Skip update bounding box
-			// Because we may not want to consider Box3Helper's bounding box
-			geometry.computeBoundingSphere();
-			const material = new t3d.LineMaterial();
-			material.diffuse.setHex(color);
-			super(geometry, material);
-			this.box = box;
-		}
-		updateMatrix(force) {
-			const box = this.box;
-			box.getCenter(this.position);
-			if (box.isEmpty()) {
-				this.scale.multiplyScalar(0);
-			} else {
-				box.getSize(this.scale);
-				this.scale.multiplyScalar(0.5);
-			}
-			super.updateMatrix(force);
-		}
-	}
-	Box3Helper.prototype.isBox3Helper = true;
-
-	class SphereHelper extends t3d.Mesh {
-		constructor(sphere, color = 0xffff00, angleSteps = 40) {
-			const positions = [];
-			for (let i = 0; i < 3; i++) {
-				const axis1 = axes[i];
-				const axis2 = axes[(i + 1) % 3];
-				_vector.set(0, 0, 0);
-				for (let a = 0; a < angleSteps; a++) {
-					let angle;
-					angle = 2 * Math.PI * a / (angleSteps - 1);
-					_vector[axis1] = Math.sin(angle);
-					_vector[axis2] = Math.cos(angle);
-					positions.push(_vector.x, _vector.y, _vector.z);
-					angle = 2 * Math.PI * (a + 1) / (angleSteps - 1);
-					_vector[axis1] = Math.sin(angle);
-					_vector[axis2] = Math.cos(angle);
-					positions.push(_vector.x, _vector.y, _vector.z);
-				}
-			}
-			const geometry = new t3d.Geometry();
-			geometry.addAttribute('a_Position', new t3d.Attribute(new t3d.Buffer(new Float32Array(positions), 3)));
-			geometry.computeBoundingSphere();
-			const lineMaterial = new t3d.LineMaterial();
-			lineMaterial.diffuse.setHex(color);
-			super(geometry, lineMaterial);
-			this.sphere = sphere;
-		}
-		updateMatrix(force) {
-			const sphere = this.sphere;
-			this.position.copy(sphere.center);
-			if (sphere.isEmpty()) {
-				this.scale.setScalar(0);
-			} else {
-				this.scale.setScalar(sphere.radius);
-			}
-			super.updateMatrix(force);
-		}
-	}
-	SphereHelper.prototype.isSphereHelper = true;
-	const _vector = new t3d.Vector3();
-	const axes = ['x', 'y', 'z'];
-
-	/**
-	 * EdgesBuilder is a helper for building edges geometry from given triangles data.
-	 */
-	const EdgesBuilder = {
-		/**
-		 * @param {Array} bufferArray - Flat buffer array containing vertex positions.
-		 * @param {Array} [indices] - Flat buffer array of indices, must be multiple of 3.
-		 * @param {object} [options={}] - The options object.
-		 * @param {number} [options.thresholdAngle=1] - An edge is only rendered if the angle (in degrees) between the face normals of the adjoining faces exceeds this value.
-		 * @param {number} [options.stride=3] - The number of values of the array that should be associated with a particular vertex.
-		 * @param {number} [options.offset=0] - The offset in the buffer array where the position starts.
-		 * @returns {object} - The edges geometry data.
-		 */
-		getGeometryData: function (bufferArray, indices, options = {}) {
-			const thresholdAngle = options.thresholdAngle !== undefined ? options.thresholdAngle : 1;
-			const stride = options.stride !== undefined ? options.stride : 3;
-			const offset = options.offset !== undefined ? options.offset : 0;
-			let i, j, l, key, face;
-			const result = [];
-
-			/** merge vertices */
-
-			const verticesMap = {};
-			const unique = [],
-				changes = [];
-			const precisionPoints = 4; // number of decimal points, e.g. 4 for epsilon of 0.0001
-			const precision = Math.pow(10, precisionPoints);
-			let offsetIndex, x, y, z;
-			l = bufferArray.length / stride;
-			for (i = 0; i < l; i++) {
-				offsetIndex = i * stride + offset;
-				x = bufferArray[offsetIndex + 0];
-				y = bufferArray[offsetIndex + 1];
-				z = bufferArray[offsetIndex + 2];
-				key = Math.round(x * precision) + '_' + Math.round(y * precision) + '_' + Math.round(z * precision);
-				if (verticesMap[key] === undefined) {
-					verticesMap[key] = i;
-					unique.push(x, y, z);
-					changes[i] = unique.length / 3 - 1;
-				} else {
-					changes[i] = changes[verticesMap[key]];
-				}
-			}
-
-			/** get faces	(vertices and normal) */
-
-			const faces = [];
-			if (indices) {
-				l = indices.length / 3;
-				for (i = 0; i < l; i++) {
-					face = {
-						i: [0, 0, 0],
-						n: [1, 1, 1]
-					};
-					face.i[0] = changes[indices[i * 3 + 0]];
-					face.i[1] = changes[indices[i * 3 + 1]];
-					face.i[2] = changes[indices[i * 3 + 2]];
-					computeFaceNormal(face, unique);
-					faces.push(face);
-				}
-			} else {
-				for (i = 0; i < l; i++) {
-					face = {
-						i: [0, 0, 0],
-						n: [1, 1, 1]
-					};
-					face.i[0] = changes[i * 3 + 0];
-					face.i[1] = changes[i * 3 + 1];
-					face.i[2] = changes[i * 3 + 2];
-					computeFaceNormal(face, unique);
-					faces.push(face);
-				}
-			}
-
-			/**
-			 * get edges { index1: edge[ 0 ], index2: edge[ 1 ], face1: i, face2: undefined }
-			 */
-			let edge1, edge2;
-			const edge = [0, 0],
-				edges = {};
-			for (i = 0, l = faces.length; i < l; i++) {
-				face = faces[i];
-				for (j = 0; j < 3; j++) {
-					edge1 = face.i[j];
-					edge2 = face.i[(j + 1) % 3];
-					edge[0] = Math.min(edge1, edge2);
-					edge[1] = Math.max(edge1, edge2);
-					key = edge[0] + ',' + edge[1];
-					if (edges[key] === undefined) {
-						edges[key] = {
-							index1: edge[0],
-							index2: edge[1],
-							face1: i,
-							face2: undefined
-						};
-					} else {
-						edges[key].face2 = i;
-					}
-				}
-			}
-
-			/** edges filter */
-			const thresholdDot = Math.cos(DEG2RAD * thresholdAngle);
-			for (key in edges) {
-				const e = edges[key];
-				// an edge is only rendered if the angle (in degrees) between the face normals of the adjoining faces exceeds this value. default = 1 degree.
-				if (e.face2 === undefined || dot(faces[e.face1].n, faces[e.face2].n) <= thresholdDot) {
-					result.push(unique[e.index1 * 3 + 0], unique[e.index1 * 3 + 1], unique[e.index1 * 3 + 2], unique[e.index2 * 3 + 0], unique[e.index2 * 3 + 1], unique[e.index2 * 3 + 2]);
-				}
-			}
-
-			/** return */
-			return {
-				positions: result
-			};
-		}
-	};
-	function dot(v1, v2) {
-		return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
-	}
-	function computeFaceNormal(face, buffer) {
-		const vAX = buffer[face.i[0] * 3 + 0];
-		const vAY = buffer[face.i[0] * 3 + 1];
-		const vAZ = buffer[face.i[0] * 3 + 2];
-		const vBX = buffer[face.i[1] * 3 + 0];
-		const vBY = buffer[face.i[1] * 3 + 1];
-		const vBZ = buffer[face.i[1] * 3 + 2];
-		const vCX = buffer[face.i[2] * 3 + 0];
-		const vCY = buffer[face.i[2] * 3 + 1];
-		const vCZ = buffer[face.i[2] * 3 + 2];
-		const cbX = vCX - vBX; // ax
-		const cbY = vCY - vBY; // ay
-		const cbZ = vCZ - vBZ; // az
-
-		const abX = vAX - vBX; // bx
-		const abY = vAY - vBY; // by
-		const abZ = vAZ - vBZ; // bz
-
-		let nX = cbY * abZ - cbZ * abY;
-		let nY = cbZ * abX - cbX * abZ;
-		let nZ = cbX * abY - cbY * abX;
-		const nLen = Math.sqrt(nX * nX + nY * nY + nZ * nZ);
-		nX /= nLen;
-		nY /= nLen;
-		nZ /= nLen;
-		face.n[0] = nX;
-		face.n[1] = nY;
-		face.n[2] = nZ;
-	}
-	const DEG2RAD = Math.PI / 180;
-
 	const _pos = new t3d.Vector3();
 	function getRegionGeometry(ellipsoidRegion) {
 		// retrieve the relevant fields
@@ -13078,7 +11030,7 @@ ${instancing_normal_vert}
 			const regionGeometry = getRegionGeometry(this.ellipsoidRegion);
 			const {
 				positions
-			} = EdgesBuilder.getGeometryData(regionGeometry.attributes.a_Position.buffer.array, regionGeometry.index.buffer.array, {
+			} = EdgesBuilder_js.EdgesBuilder.getGeometryData(regionGeometry.attributes.a_Position.buffer.array, regionGeometry.index.buffer.array, {
 				thresholdAngle: 80
 			});
 			const geometry = new t3d.Geometry();
@@ -13544,7 +11496,7 @@ ${instancing_normal_vert}
 				boxHelperGroup.matrix.copy(obb._originBoxTransform);
 				boxHelperGroup.matrixAutoUpdate = false;
 				boxHelperGroup.matrixNeedsUpdate = false;
-				const boxHelper = new Box3Helper(obb._originBox, getIndexedRandomColor(tile.__depth).getHex());
+				const boxHelper = new Box3Helper_js.Box3Helper(obb._originBox, getIndexedRandomColor(tile.__depth).getHex());
 				boxHelper.raycast = emptyRaycast;
 				boxHelperGroup.add(boxHelper);
 				cached.boxHelperGroup = boxHelperGroup;
@@ -13555,7 +11507,7 @@ ${instancing_normal_vert}
 			}
 			if (sphere) {
 				// Create debug bounding sphere
-				const sphereHelper = new SphereHelper(sphere, getIndexedRandomColor(tile.__depth).getHex());
+				const sphereHelper = new SphereHelper_js.SphereHelper(sphere, getIndexedRandomColor(tile.__depth).getHex());
 				sphereHelper.raycast = emptyRaycast;
 				cached.sphereHelper = sphereHelper;
 				if (tiles.visibleTiles.has(tile) && this.displaySphereBounds) {
@@ -13651,7 +11603,7 @@ ${instancing_normal_vert}
 						pointsMaterial.sizeAttenuation = originalMaterial.sizeAttenuation;
 						c.material = pointsMaterial;
 					} else if (c.geometry.instanceCount >= 0) {
-						c.material = unlit ? new InstancedBasicMaterial() : new InstancedPBRMaterial();
+						c.material = unlit ? new InstancedMaterial_js.InstancedBasicMaterial() : new InstancedMaterial_js.InstancedPBRMaterial();
 						c.material.metalness = 0.0;
 						c.material.roughness = 1.0;
 						c.material.shading = unlit ? t3d.SHADING_TYPE.SMOOTH_SHADING : t3d.SHADING_TYPE.FLAT_SHADING;

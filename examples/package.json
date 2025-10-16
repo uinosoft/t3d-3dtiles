@@ -4,6 +4,7 @@
     "private": true,
     "description": "Examples for t3d-atmosphere library",
     "dependencies": {
+        "@spz-loader/core": "^0.3.0",
         "@tweakpane/plugin-essentials": "^0.2.1",
         "es-module-shims": "^2.5.1",
         "ktx-parse": "^1.0.0",
