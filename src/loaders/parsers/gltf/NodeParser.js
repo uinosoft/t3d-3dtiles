@@ -143,8 +143,8 @@ function createSplatMesh(context, gltfNode, loader) {
 	const { mesh: meshID } = gltfNode;
 
 	const meshes = primitives[meshID].map(primitive => {
-		const GaussianSplattingMeshClass = loader.getGaussianSplattingMeshClass();
-		const mesh = new GaussianSplattingMeshClass(primitive.splatBuffer, true);
+		const mesh = new Object3D();
+		mesh.splatBuffer = primitive.splatBuffer;
 		return mesh;
 	});
 

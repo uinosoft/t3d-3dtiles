@@ -31,13 +31,4 @@ export class TileGLTFLoader extends GLTFLoader {
 		return this._spzLoader;
 	}
 
-	setGaussianSplattingMeshClass(gaussianSplattingMeshClass) {
-		this._gaussianSplattingMeshClass = gaussianSplattingMeshClass;
-		return this;
-	}
-
-	getGaussianSplattingMeshClass() {
-		return this._gaussianSplattingMeshClass;
-	}
-
 }

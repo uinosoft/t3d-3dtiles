@@ -7,7 +7,7 @@ export class KHR_gaussian_splatting_compression_spz {
 		return new Promise(function(resolve, reject) {
 			const bufferViewTypedArray = new Uint8Array(bufferView);
 			spzLoader(bufferViewTypedArray, {
-				unpackOptions: { coordinateSystem: 'LDB' }
+				unpackOptions: { coordinateSystem: 'RUB' }
 			}).then(gcloud => {
 				const splatBuffer = KHR_gaussian_splatting_compression_spz.convertInternalDataToSplat(gcloud.numPoints, gcloud.positions, gcloud.rotations, gcloud.scales, gcloud.alphas, gcloud.colors);
 				splatBuffer._isSplatBuffer = true;

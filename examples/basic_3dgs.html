@@ -35,8 +35,8 @@
 		import { Pane } from 'tweakpane';
 		import { loadSpz } from '@spz-loader/core';
 		import ionAccessToken from './ionAccessToken.js';
-		import { GaussianSplattingMesh } from 'https://cdn.jsdelivr.net/gh/uinosoft/t3d-gaussian-splatting@134537258d87112c3a228c58a45c028cf49dca04/build/t3d.gaussiansplatting.js';
-		let width = window.innerWidth || 2;
+		import { TileGSManager } from './jsm/TileGSManager.js';
+		import { GaussianSplattingMesh } from 'https://cdn.jsdelivr.net/gh/uinosoft/t3d-gaussian-splatting@feat-serializationMesh/build/t3d.gaussiansplatting.js';		let width = window.innerWidth || 2;
 		let height = window.innerHeight || 2;
 
 		const canvas = document.createElement('canvas');
@@ -68,7 +68,6 @@
 		const controller = new OrbitControls(camera, canvas);
 		controller.enablePan = true;
 		controller.maxDistance = 100000;
-
 		// Create 3D tiles
 		const ionParams = { ionAssetId: '3921000', ionAccessToken };
 		let tiles3D;
@@ -88,7 +87,6 @@
 			}));
 
 			tiles3D.setSPZLoader(loadSpz);
-			tiles3D.setGaussianSplattingMeshClass(GaussianSplattingMesh);
 		
 			tiles3D.addCamera(camera);
 			tiles3D.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
@@ -115,7 +113,15 @@
 		}
 
 		fetchIonAsset(ionParams.ionAssetId, ionParams.ionAccessToken);
-		let center;
+
+		const gsMesh = new GaussianSplattingMesh(new Float32Array(0));
+		scene.add(gsMesh);
+		const tileGSManager = new TileGSManager(gsMesh);
+		tiles3D.addEventListener('tile-visibility-change', organizeData);
+
+		function organizeData(tile) {
+			tileGSManager.updateTile(tile);
+		}
 
 		function loop(count) {
 			requestAnimationFrame(loop);
@@ -123,17 +129,7 @@
 			controller.update();
 
 			tiles3D.update();
-			tiles3D.children.forEach(gs => {
-				gs.traverse(child => {
-					if (child.isGaussianSplattingMesh) {
-						center = child.geometry.boundingSphere.center.clone().applyMatrix4(child.worldMatrix);
-						const distance = center.distanceTo(camera.position);
-						child.renderOrder = -distance;
-						child.update(camera, width, height);
-					}
-				});
-			});
-
+			gsMesh.update(camera, width, height);
 			forwardRenderer.render(scene, camera);
 		}
 		requestAnimationFrame(loop);

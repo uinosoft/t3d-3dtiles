@@ -1254,10 +1254,6 @@ export class Tiles3D extends Object3D {
 		this._loaders.get('gltf').setSPZLoader(spzLoader);
 	}
 
-	setGaussianSplattingMeshClass(gaussianSplattingMeshClass) {
-		this._loaders.get('gltf').setGaussianSplattingMeshClass(gaussianSplattingMeshClass);
-	}
-
 	setKTX2Loader(ktx2Loader) {
 		this._loaders.get('b3dm').setKTX2Loader(ktx2Loader);
 		this._loaders.get('i3dm').setKTX2Loader(ktx2Loader);
