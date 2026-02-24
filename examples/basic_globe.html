@@ -45,7 +45,7 @@
 		document.body.appendChild(canvas);
 
 		const forwardRenderer = new ForwardRenderer(canvas);
-		forwardRenderer.setClearColor(0.6, 0.7, 0.8, 1);
+		forwardRenderer.screenRenderTarget.setColorClearValue(0.6, 0.7, 0.8, 1);
 
 		const scene = new t3d.Scene();
 		scene.logarithmicDepthBuffer = true;
@@ -133,7 +133,7 @@
 
 			camera.setPerspective(60 / 180 * Math.PI, width / height, 1, 160000000);
 
-			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			forwardRenderer.screenRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			if (tiles) {
 				tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);

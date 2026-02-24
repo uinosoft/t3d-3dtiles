@@ -14,7 +14,7 @@ import { LineSegment } from './LineSegment.js';
 export function getIntersectWithPath(tiles, lineSegment, minDistance) {
 	// Get obb in tiles root space
 	const obb = _lineSegment_1.copy(lineSegment)
-		.applyMatrix4(tiles.group.worldMatrixInverse)
+		// .applyMatrix4(tiles.group.worldMatrixInverse)
 		.getOBB(minDistance, _obb_1);
 	// TODO: obb.applyMatrix4 has bug, so don't use this until it's fixed
 	// const obb = lineSegment.getOBB(minDistance, _obb_1);

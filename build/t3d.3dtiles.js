@@ -4685,12 +4685,18 @@
 `;
 	const instancing_normal_vert = `
 #ifdef USE_INSTANCING
-	mat4 instancingNormalMatrix = transposeMat4(inverseMat4(instancingMatrix));
+	mat3 im = mat3(instancingMatrix);
 
-	objectNormal = (instancingNormalMatrix * vec4(objectNormal, 0.0)).xyz;
+	// mirrored? (determinant sign: -1 or +1)
+		float detSign = (dot(im[0], cross(im[1], im[2])) < 0.0) ? -1.0 : 1.0;
+
+	// squared scale per basis (for non-uniform scale correction)
+		vec3 invScale = vec3(dot(im[0], im[0]), dot(im[1], im[1]), dot(im[2], im[2]));
+
+	objectNormal = (im * (objectNormal / invScale)) * detSign;
 
 	#ifdef USE_TANGENT
-		objectTangent = (instancingNormalMatrix * vec4(objectTangent, 0.0)).xyz;
+		objectTangent = (im * (objectTangent / invScale)) * detSign;
 	#endif
 #endif
 `;
@@ -10772,12 +10778,6 @@ ${instancing_normal_vert}
 				}
 			}
 			return new t3d.Attribute(new t3d.Buffer(geometryPosition.buffer.array.length / 3 > 65536 ? new Uint32Array(indices) : new Uint16Array(indices), 1));
-		}
-
-		// deprecated since v0.2.0, add warning since v0.3.0
-		static mergeBufferAttributes(attributes) {
-			console.warn('GeometryUtils: mergeBufferAttributes() has been renamed to mergeAttributes().');
-			return this.mergeAttributes(attributes);
 		}
 	}
 	const _vec3_1 = new t3d.Vector3();

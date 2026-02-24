@@ -6,9 +6,9 @@ import {
 	Plane,
 	EventDispatcher,
 	MathUtils,
-	Ray
+	Ray,
+	Raycaster
 } from 't3d';
-import { Raycaster } from 't3d/addons/Raycaster.js';
 import { PivotPointMesh } from './PivotPointMesh.js';
 import { PointerTracker } from './PointerTracker.js';
 import { mouseToCoords, makeRotateAroundPoint, setRaycasterFromCamera } from './utils.js';

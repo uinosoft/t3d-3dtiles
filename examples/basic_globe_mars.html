@@ -132,7 +132,7 @@
 
 			camera.setPerspective(45 / 180 * Math.PI, width / height, 10, 10000000);
 
-			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			forwardRenderer.screenRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			if (tiles) {
 				tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);

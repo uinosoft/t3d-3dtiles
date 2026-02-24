@@ -33,7 +33,6 @@
 		import { OrbitControls } from 't3d/addons/controls/OrbitControls.js';
 		import { ForwardRenderer } from 't3d/addons/render/ForwardRenderer.js';
 		import { DRACOLoader } from 't3d/addons/loaders/DRACOLoader.js';
-		import { Raycaster } from 't3d/addons/Raycaster.js';
 
 		import { TilesRenderer, ReorientationPlugin, DebugTilesPlugin, GLTFExtensionsPlugin, TilesFadePlugin } from 't3d-3dtiles';
 
@@ -51,7 +50,7 @@
 		document.body.appendChild(canvas);
 
 		const forwardRenderer = new ForwardRenderer(canvas);
-		forwardRenderer.setClearColor(0.6, 0.7, 0.8, 1);
+		forwardRenderer.screenRenderTarget.setColorClearValue(0.6, 0.7, 0.8, 1);
 
 		const scene = new t3d.Scene();
 
@@ -91,7 +90,7 @@
 
 		// Ray casting
 
-		const raycaster = new Raycaster();
+		const raycaster = new t3d.Raycaster();
 		const mouse = new t3d.Vector2();
 		const rayIntersection = createRayIntersection();
 
@@ -236,7 +235,7 @@
 
 			camera.setPerspective(45 / 180 * Math.PI, width / height, 1, 10000);
 
-			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			forwardRenderer.screenRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 			tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			canvas.style.width = width + 'px';

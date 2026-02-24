@@ -46,8 +46,7 @@
 		document.body.appendChild(canvas);
 
 		const forwardRenderer = new ForwardRenderer(canvas);
-		forwardRenderer.setClearColor(0.6, 0.7, 0.8, 1);
-		forwardRenderer.autoClear = false;
+		forwardRenderer.screenRenderTarget.setColorClearValue(0.6, 0.7, 0.8, 1);
 
 		const scene = new t3d.Scene();
 
@@ -155,12 +154,12 @@
 
 			cameras.forEach((camera, i) => camera.helper.visible = i !== params.mainCamera && params[`camera${i + 1}`]);
 			cameras[params.mainCamera].camera.rect.set(0, 0, 1, 1);
-			forwardRenderer.clear(true, true, true);
+			forwardRenderer.screenRenderTarget.setClear(true, true, true);
 			forwardRenderer.render(scene, cameras[params.mainCamera].camera);
 
 			cameras.forEach((camera, i) => camera.helper.visible = i !== params.miniCamera && params[`camera${i + 1}`]);
 			cameras[params.miniCamera].camera.rect.set(0, 0, 0.25, 0.25);
-			forwardRenderer.clear(false, true, true);
+			forwardRenderer.screenRenderTarget.setClear(false, true, true);
 			forwardRenderer.render(scene, cameras[params.miniCamera].camera);
 		}
 		requestAnimationFrame(loop);
@@ -174,7 +173,7 @@
 				camera.helper.update();
 			});
 
-			forwardRenderer.backRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
+			forwardRenderer.screenRenderTarget.resize(width * window.devicePixelRatio, height * window.devicePixelRatio);
 			tiles.setResolution(width * window.devicePixelRatio, height * window.devicePixelRatio);
 
 			canvas.style.width = width + 'px';
